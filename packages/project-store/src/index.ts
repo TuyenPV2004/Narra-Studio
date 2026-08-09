@@ -12,6 +12,13 @@ export type {
   StoryboardWorkspace,
   TimelineWarning,
   VoiceWorkspace,
+  ApprovalGate,
+  ApprovalRecord,
+  EditorialDocument,
+  EditorialWorkspace,
+  RenderJobRecord,
+  RenderTarget,
+  ReviewWorkspace,
   ValidationIssue,
   ValidationReport,
 } from './types.js';

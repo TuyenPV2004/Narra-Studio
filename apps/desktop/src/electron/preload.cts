@@ -1,4 +1,4 @@
-import type {AssetStatusInput, CreateAssetTaskInput, CreateProjectInput} from '@narra/project-store';
+import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProjectInput, EditorialDocument, RenderTarget} from '@narra/project-store';
 import {contextBridge, ipcRenderer, webUtils} from 'electron';
 
 const channels = {
@@ -21,11 +21,18 @@ const channels = {
   chooseAndImportNarrationAudio: 'voice:choose-and-import-audio',
   chooseAndImportCaptions: 'voice:choose-and-import-captions',
   fitTimelineToNarration: 'voice:fit-timeline',
+  getEditorialWorkspace: 'editorial:get',
+  saveEditorialDocument: 'editorial:save-document',
+  getReviewWorkspace: 'review:get',
+  approveGate: 'review:approve-gate',
+  revokeGate: 'review:revoke-gate',
+  queueRender: 'render:queue',
+  chooseAndAttachRenderOutput: 'render:choose-and-attach-output',
 } as const;
 
 const api = {
   runtime: 'electron',
-  version: 4,
+  version: 5,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -50,6 +57,17 @@ const api = {
     ipcRenderer.invoke(channels.chooseAndImportNarrationAudio, projectId, segmentId),
   chooseAndImportCaptions: (projectId: string) => ipcRenderer.invoke(channels.chooseAndImportCaptions, projectId),
   fitTimelineToNarration: (projectId: string) => ipcRenderer.invoke(channels.fitTimelineToNarration, projectId),
+  getEditorialWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getEditorialWorkspace, projectId),
+  saveEditorialDocument: (projectId: string, document: EditorialDocument, content: string) =>
+    ipcRenderer.invoke(channels.saveEditorialDocument, projectId, document, content),
+  getReviewWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getReviewWorkspace, projectId),
+  approveGate: (projectId: string, gate: ApprovalGate, note: string) =>
+    ipcRenderer.invoke(channels.approveGate, projectId, gate, note),
+  revokeGate: (projectId: string, gate: ApprovalGate, note: string) =>
+    ipcRenderer.invoke(channels.revokeGate, projectId, gate, note),
+  queueRender: (projectId: string, target: RenderTarget) => ipcRenderer.invoke(channels.queueRender, projectId, target),
+  chooseAndAttachRenderOutput: (projectId: string, jobId: string) =>
+    ipcRenderer.invoke(channels.chooseAndAttachRenderOutput, projectId, jobId),
 };
 
 contextBridge.exposeInMainWorld('narra', api);

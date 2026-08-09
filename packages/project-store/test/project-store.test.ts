@@ -239,4 +239,58 @@ describe('ProjectStore', () => {
     expect(renderInput.bundle.narrationSegments).toHaveLength(2);
     expect(renderInput.bundle.captions).toHaveLength(2);
   });
+
+  it('enforces approval order and keeps versioned render snapshots, outputs, and logs', () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Approval Flow', question: 'Can each decision be audited?'});
+    const projectId = created.project.id;
+    const importDirectory = mkdtempSync(path.join(tmpdir(), 'narra-approval-import-'));
+    temporaryDirectories.push(importDirectory);
+    const scenesPath = path.join(importDirectory, 'scenes.json');
+    const shotsPath = path.join(importDirectory, 'shots.json');
+    writeFileSync(scenesPath, JSON.stringify([{
+      id: 'scene-one', projectId, order: 0, title: 'Opening', narration: 'A traceable decision begins here.', durationSec: 5, claimIds: [],
+    }]), 'utf8');
+    writeFileSync(shotsPath, JSON.stringify([{
+      id: 'shot-one', projectId, sceneId: 'scene-one', order: 0, durationSec: 5,
+      visualType: 'TEXT', visualPurpose: 'State the opening question', assetRoute: 'NONE', claimIds: [],
+    }]), 'utf8');
+    store.importStoryboard(projectId, scenesPath, shotsPath);
+    store.saveEditorialDocument(projectId, 'THESIS', 'The process is reliable when every transition is explicit.');
+    store.saveEditorialDocument(projectId, 'SCRIPT', '# Opening\n\nEvery approval leaves a local record.');
+
+    expect(() => store.approveGate(projectId, 'THESIS', '')).toThrow('locked');
+    store.approveGate(projectId, 'TOPIC', 'Question selected.');
+    store.approveGate(projectId, 'THESIS', 'Thesis selected.');
+    store.approveGate(projectId, 'SCRIPT', 'Script reviewed.');
+    store.approveGate(projectId, 'STORYBOARD', 'Shots reviewed.');
+    let review = store.approveGate(projectId, 'ASSETS', 'No external visual assets required.');
+    expect(review.approvals.find(({gate}) => gate === 'ASSETS')?.status).toBe('APPROVED');
+
+    review = store.queueRender(projectId, 'ROUGH');
+    const rough = review.jobs[0];
+    expect(rough).toMatchObject({target: 'ROUGH', version: 1, status: 'QUEUED'});
+    expect(readFileSync(path.join(created.project.rootPath, rough?.inputSnapshotPath ?? ''), 'utf8')).toContain(projectId);
+    const roughOutput = path.join(importDirectory, 'rough.mp4');
+    writeFileSync(roughOutput, 'rough-video-placeholder', 'utf8');
+    review = store.attachRenderOutput(projectId, rough?.id ?? '', roughOutput);
+    expect(review.jobs[0]).toMatchObject({status: 'COMPLETED', outputPath: 'renders/rough/render-v1.mp4'});
+    expect(review.jobs[0]?.log).toContain('Output imported');
+
+    store.approveGate(projectId, 'ROUGH_CUT', 'Rough cut approved.');
+    review = store.queueRender(projectId, 'FINAL');
+    const final = review.jobs.find(({target}) => target === 'FINAL');
+    const finalOutput = path.join(importDirectory, 'final.mp4');
+    writeFileSync(finalOutput, 'final-video-placeholder', 'utf8');
+    store.attachRenderOutput(projectId, final?.id ?? '', finalOutput);
+    store.approveGate(projectId, 'FINAL', 'Ready to publish.');
+    expect(store.getProject(projectId).project.status).toBe('FINAL_APPROVED');
+
+    store.saveEditorialDocument(projectId, 'SCRIPT', '# Revised opening\n\nThe script changed.');
+    review = store.getReviewWorkspace(projectId);
+    expect(review.approvals.find(({gate}) => gate === 'THESIS')?.status).toBe('APPROVED');
+    expect(review.approvals.find(({gate}) => gate === 'SCRIPT')?.status).toBe('REVOKED');
+    expect(review.approvals.find(({gate}) => gate === 'FINAL')?.unlocked).toBe(false);
+    expect(store.getProject(projectId).project.status).toBe('THESIS_APPROVED');
+  });
 });

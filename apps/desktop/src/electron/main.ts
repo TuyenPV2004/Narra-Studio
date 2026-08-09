@@ -3,6 +3,9 @@ import {
   type AssetStatusInput,
   type CreateAssetTaskInput,
   type CreateProjectInput,
+  type ApprovalGate,
+  type EditorialDocument,
+  type RenderTarget,
 } from '@narra/project-store';
 import {app, BrowserWindow, dialog, ipcMain, net, protocol} from 'electron';
 import {writeFileSync} from 'node:fs';
@@ -115,6 +118,35 @@ const registerProjectHandlers = (): void => {
   ipcMain.handle(IPC_CHANNELS.fitTimelineToNarration, (_event, projectId: string) =>
     getProjectStore().fitTimelineToNarration(projectId),
   );
+  ipcMain.handle(IPC_CHANNELS.getEditorialWorkspace, (_event, projectId: string) =>
+    getProjectStore().getEditorialWorkspace(projectId),
+  );
+  ipcMain.handle(
+    IPC_CHANNELS.saveEditorialDocument,
+    (_event, projectId: string, document: EditorialDocument, content: string) =>
+      getProjectStore().saveEditorialDocument(projectId, document, content),
+  );
+  ipcMain.handle(IPC_CHANNELS.getReviewWorkspace, (_event, projectId: string) =>
+    getProjectStore().getReviewWorkspace(projectId),
+  );
+  ipcMain.handle(IPC_CHANNELS.approveGate, (_event, projectId: string, gate: ApprovalGate, note: string) =>
+    getProjectStore().approveGate(projectId, gate, note),
+  );
+  ipcMain.handle(IPC_CHANNELS.revokeGate, (_event, projectId: string, gate: ApprovalGate, note: string) =>
+    getProjectStore().revokeGate(projectId, gate, note),
+  );
+  ipcMain.handle(IPC_CHANNELS.queueRender, (_event, projectId: string, target: RenderTarget) =>
+    getProjectStore().queueRender(projectId, target),
+  );
+  ipcMain.handle(IPC_CHANNELS.chooseAndAttachRenderOutput, async (_event, projectId: string, jobId: string) => {
+    const selection = await dialog.showOpenDialog({
+      title: 'Attach completed render output',
+      properties: ['openFile'],
+      filters: [{name: 'Video', extensions: ['mp4', 'mov', 'mkv', 'webm']}],
+    });
+    if (selection.canceled || !selection.filePaths[0]) return null;
+    return getProjectStore().attachRenderOutput(projectId, jobId, selection.filePaths[0]);
+  });
 };
 
 const createWindow = async (): Promise<BrowserWindow> => {
@@ -189,12 +221,12 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Projects' || result.apiVersion !== 4 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Projects' || result.apiVersion !== 5 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Projects\napiVersion=4\nprojectCount=${result.projectCount}\n`,
+      `renderer=Projects\napiVersion=5\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     console.log('NARRA_DESKTOP_SMOKE_OK');

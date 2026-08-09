@@ -12,6 +12,7 @@ import {
   SceneCollectionSchema,
   ShotCollectionSchema,
   SourceCollectionSchema,
+  ThesisSchema,
   type Asset,
   type CaptionCue,
   type NarrationSegment,
@@ -40,11 +41,18 @@ import {
 import {openWorkspaceDatabase} from './database.js';
 import {compareNarrationTranscript, parseTimedText, parseWordTimestamps} from './caption-parser.js';
 import type {
+  ApprovalGate,
+  ApprovalRecord,
   CreateProjectInput,
   AssetStatusInput,
   CreateAssetTaskInput,
+  EditorialDocument,
+  EditorialWorkspace,
   ProjectDetail,
   ProjectRecord,
+  RenderJobRecord,
+  RenderTarget,
+  ReviewWorkspace,
   StaleScope,
   StoryboardWorkspace,
   ValidationIssue,
@@ -72,10 +80,41 @@ type ProjectRow = {
 
 const isoNow = (): string => new Date().toISOString();
 const toPortablePath = (value: string): string => value.split(path.sep).join('/');
+const APPROVAL_GATES: ApprovalGate[] = ['TOPIC', 'THESIS', 'SCRIPT', 'STORYBOARD', 'ASSETS', 'ROUGH_CUT', 'FINAL'];
+
+type ApprovalRow = {
+  id: string;
+  project_id: string;
+  gate: ApprovalGate;
+  status: ApprovalRecord['status'];
+  artifact_version: number;
+  approved_at: string | null;
+  note: string | null;
+};
+
+type JobRow = {
+  id: string;
+  project_id: string;
+  type: 'RENDER';
+  status: RenderJobRecord['status'];
+  input_snapshot_path: string;
+  version: number;
+  target: RenderTarget;
+  log_path: string | null;
+  output_path: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 const atomicWriteJson = (filePath: string, value: unknown): void => {
   const temporaryPath = `${filePath}.tmp`;
   writeFileSync(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
+  renameSync(temporaryPath, filePath);
+};
+
+const atomicWriteText = (filePath: string, value: string): void => {
+  const temporaryPath = `${filePath}.tmp`;
+  writeFileSync(temporaryPath, value, 'utf8');
   renameSync(temporaryPath, filePath);
 };
 
@@ -218,6 +257,9 @@ export class ProjectStore {
         items: [],
       });
     }
+    writeFileSync(path.join(projectRoot, 'research/research_packet.md'), '', 'utf8');
+    atomicWriteJson(path.join(projectRoot, 'thesis/thesis.json'), {schemaVersion: 1, projectId: project.id, updatedAt: now, statement: ''});
+    writeFileSync(path.join(projectRoot, 'script/script_v1.md'), '', 'utf8');
 
     this.upsertProject(project, projectRoot, false);
     return this.refreshProject(project.id);
@@ -274,6 +316,7 @@ export class ProjectStore {
   refreshProject(projectId: string): ProjectDetail {
     const record = this.getProject(projectId).project;
     this.ensurePhase4Artifacts(record.rootPath, projectId);
+    this.ensurePhase5Artifacts(record.rootPath);
     const report = this.validateProjectDirectory(record.rootPath, projectId);
     this.database
       .prepare(
@@ -678,6 +721,171 @@ export class ProjectStore {
     return outputPath;
   }
 
+  getEditorialWorkspace(projectId: string): EditorialWorkspace {
+    const project = this.getProject(projectId).project;
+    this.ensurePhase5Artifacts(project.rootPath);
+    return {
+      projectId,
+      researchBrief: readFileSync(path.join(project.rootPath, 'research/research_packet.md'), 'utf8'),
+      thesis: ThesisSchema.parse(parseJson(path.join(project.rootPath, 'thesis/thesis.json'))).statement,
+      script: readFileSync(path.join(project.rootPath, 'script/script_v1.md'), 'utf8'),
+      sources: SourceCollectionSchema.parse(parseJson(path.join(project.rootPath, 'research/sources.json'))).items,
+      facts: FactCollectionSchema.parse(parseJson(path.join(project.rootPath, 'research/facts.json'))).items,
+      claims: ClaimCollectionSchema.parse(parseJson(path.join(project.rootPath, 'script/claims.json'))).items,
+    };
+  }
+
+  saveEditorialDocument(projectId: string, document: EditorialDocument, content: string): EditorialWorkspace {
+    const project = this.getProject(projectId).project;
+    this.ensurePhase5Artifacts(project.rootPath);
+    const paths: Record<EditorialDocument, string> = {
+      RESEARCH: 'research/research_packet.md',
+      THESIS: 'thesis/thesis.json',
+      SCRIPT: 'script/script_v1.md',
+    };
+    const relativePath = paths[document];
+    const filePath = path.join(project.rootPath, ...relativePath.split('/'));
+    const normalized = content.trimEnd();
+    const now = isoNow();
+    const persisted = document === 'THESIS'
+      ? `${JSON.stringify({schemaVersion: 1, projectId, updatedAt: now, statement: normalized}, null, 2)}\n`
+      : normalized ? `${normalized}\n` : '';
+    atomicWriteText(filePath, persisted);
+    this.database.prepare(
+      `INSERT INTO artifact_versions (project_id, artifact_path, schema_version, content_hash, updated_at, stale)
+       VALUES (?, ?, 1, ?, ?, 0)
+       ON CONFLICT(project_id, artifact_path) DO UPDATE SET
+         content_hash = excluded.content_hash, updated_at = excluded.updated_at, stale = 0`,
+    ).run(projectId, relativePath, contentHash(persisted), now);
+    const gate: ApprovalGate = document === 'SCRIPT' ? 'SCRIPT' : 'THESIS';
+    this.revokeApprovalChain(projectId, gate, `${document.toLowerCase()} document changed`);
+    this.markScopes(projectId, ['AUDIO', 'CAPTIONS', 'RENDER'], `${document.toLowerCase()} document changed`);
+    return this.getEditorialWorkspace(projectId);
+  }
+
+  getReviewWorkspace(projectId: string): ReviewWorkspace {
+    const project = this.getProject(projectId).project;
+    this.ensureApprovalRows(projectId);
+    const rows = this.database.prepare(
+      `SELECT id, project_id, gate, status, artifact_version, approved_at, note
+       FROM approvals WHERE project_id = ?`,
+    ).all(projectId) as ApprovalRow[];
+    const byGate = new Map(rows.map((row) => [row.gate, row]));
+    const approvals = APPROVAL_GATES.map((gate, index): ApprovalRecord => {
+      const row = byGate.get(gate)!;
+      const previousApproved = index === 0 || byGate.get(APPROVAL_GATES[index - 1]!)?.status === 'APPROVED';
+      const readiness = this.getGateReadiness(projectId, gate);
+      return {
+        id: row.id,
+        projectId: row.project_id,
+        gate: row.gate,
+        status: row.status,
+        artifactVersion: row.artifact_version,
+        approvedAt: row.approved_at,
+        note: row.note,
+        unlocked: previousApproved,
+        ready: readiness.ready,
+        readinessMessage: readiness.message,
+      };
+    });
+    const jobRows = this.database.prepare(
+      `SELECT id, project_id, type, status, input_snapshot_path, version, target,
+              log_path, output_path, created_at, updated_at
+       FROM jobs WHERE project_id = ? ORDER BY created_at DESC`,
+    ).all(projectId) as JobRow[];
+    return {
+      projectId,
+      approvals,
+      jobs: jobRows.map((row) => ({
+        id: row.id,
+        projectId: row.project_id,
+        type: row.type,
+        status: row.status,
+        version: row.version,
+        target: row.target,
+        inputSnapshotPath: row.input_snapshot_path,
+        logPath: row.log_path,
+        outputPath: row.output_path,
+        log: row.log_path && existsSync(path.join(project.rootPath, ...row.log_path.split('/')))
+          ? readFileSync(path.join(project.rootPath, ...row.log_path.split('/')), 'utf8')
+          : '',
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      })),
+    };
+  }
+
+  approveGate(projectId: string, gate: ApprovalGate, note: string): ReviewWorkspace {
+    const workspace = this.getReviewWorkspace(projectId);
+    const approval = workspace.approvals.find((item) => item.gate === gate);
+    if (!approval?.unlocked) throw new Error(`${gate} is locked until the previous gate is approved.`);
+    if (!approval.ready) throw new Error(approval.readinessMessage);
+    const now = isoNow();
+    this.database.prepare(
+      `UPDATE approvals SET status = 'APPROVED',
+       artifact_version = CASE WHEN status = 'PENDING' THEN artifact_version ELSE artifact_version + 1 END,
+       approved_at = ?, note = ? WHERE project_id = ? AND gate = ?`,
+    ).run(now, note.trim() || null, projectId, gate);
+    this.updateProjectStatus(projectId, this.statusForGate(gate), now);
+    return this.getReviewWorkspace(projectId);
+  }
+
+  revokeGate(projectId: string, gate: ApprovalGate, note: string): ReviewWorkspace {
+    this.ensureApprovalRows(projectId);
+    this.revokeApprovalChain(projectId, gate, note.trim() || `${gate} approval revoked`);
+    return this.getReviewWorkspace(projectId);
+  }
+
+  queueRender(projectId: string, target: RenderTarget): ReviewWorkspace {
+    const review = this.getReviewWorkspace(projectId);
+    const requiredGate: ApprovalGate = target === 'ROUGH' ? 'ASSETS' : 'ROUGH_CUT';
+    if (review.approvals.find(({gate}) => gate === requiredGate)?.status !== 'APPROVED') {
+      throw new Error(`${requiredGate} must be approved before queuing a ${target.toLowerCase()} render.`);
+    }
+    const project = this.getProject(projectId).project;
+    const versionRow = this.database.prepare(
+      'SELECT COALESCE(MAX(version), 0) + 1 AS next_version FROM jobs WHERE project_id = ? AND target = ?',
+    ).get(projectId, target) as {next_version: number};
+    const version = versionRow.next_version;
+    const exportedPath = this.exportStoryboardRenderInput(projectId);
+    const snapshotRelative = `renders/${target.toLowerCase()}/render-v${version}-input.json`;
+    const snapshotPath = path.join(project.rootPath, ...snapshotRelative.split('/'));
+    renameSync(exportedPath, snapshotPath);
+    const logRelative = `renders/${target.toLowerCase()}/render-v${version}.log`;
+    const logPath = path.join(project.rootPath, ...logRelative.split('/'));
+    const now = isoNow();
+    writeFileSync(logPath, `[${now}] Queued ${target.toLowerCase()} render v${version}.\nSnapshot: ${snapshotRelative}\n`, 'utf8');
+    this.database.prepare(
+      `INSERT INTO jobs (id, project_id, type, status, input_snapshot_path, created_at, updated_at,
+                         version, target, log_path, output_path)
+       VALUES (?, ?, 'RENDER', 'QUEUED', ?, ?, ?, ?, ?, ?, NULL)`,
+    ).run(`render-${target.toLowerCase()}-${randomUUID().slice(0, 8)}`, projectId, snapshotRelative, now, now, version, target, logRelative);
+    return this.getReviewWorkspace(projectId);
+  }
+
+  attachRenderOutput(projectId: string, jobId: string, sourcePath: string): ReviewWorkspace {
+    const project = this.getProject(projectId).project;
+    const job = this.database.prepare(
+      'SELECT id, version, target, log_path FROM jobs WHERE id = ? AND project_id = ?',
+    ).get(jobId, projectId) as Pick<JobRow, 'id' | 'version' | 'target' | 'log_path'> | undefined;
+    if (!job) throw new Error(`Render job ${jobId} was not found.`);
+    if (!existsSync(sourcePath) || !statSync(sourcePath).isFile()) throw new Error('Selected render output is not a file.');
+    const extension = path.extname(sourcePath).toLowerCase() || '.mp4';
+    const outputRelative = `renders/${job.target.toLowerCase()}/render-v${job.version}${extension}`;
+    copyFileSync(sourcePath, path.join(project.rootPath, ...outputRelative.split('/')));
+    const now = isoNow();
+    if (job.log_path) {
+      const logPath = path.join(project.rootPath, ...job.log_path.split('/'));
+      const previous = existsSync(logPath) ? readFileSync(logPath, 'utf8') : '';
+      writeFileSync(logPath, `${previous}[${now}] Output imported: ${outputRelative}\n`, 'utf8');
+    }
+    this.database.prepare(
+      `UPDATE jobs SET status = 'COMPLETED', output_path = ?, updated_at = ? WHERE id = ?`,
+    ).run(outputRelative, now, jobId);
+    this.setScope(projectId, 'RENDER', false, null);
+    return this.getReviewWorkspace(projectId);
+  }
+
   private upsertProject(project: Project, rootPath: string, archived: boolean): void {
     this.database
       .prepare(
@@ -737,6 +945,101 @@ export class ProjectStore {
       mkdirSync(path.dirname(filePath), {recursive: true});
       atomicWriteJson(filePath, {schemaVersion: 1, projectId, updatedAt: now, items: []});
     }
+  }
+
+  private ensurePhase5Artifacts(projectRoot: string): void {
+    for (const artifactPath of ['research/research_packet.md', 'script/script_v1.md']) {
+      const filePath = path.join(projectRoot, ...artifactPath.split('/'));
+      if (existsSync(filePath)) continue;
+      mkdirSync(path.dirname(filePath), {recursive: true});
+      writeFileSync(filePath, '', 'utf8');
+    }
+    const thesisPath = path.join(projectRoot, 'thesis/thesis.json');
+    if (!existsSync(thesisPath)) {
+      mkdirSync(path.dirname(thesisPath), {recursive: true});
+      const project = ProjectSchema.parse(parseJson(path.join(projectRoot, 'project.json')));
+      atomicWriteJson(thesisPath, {schemaVersion: 1, projectId: project.id, updatedAt: isoNow(), statement: ''});
+    }
+  }
+
+  private ensureApprovalRows(projectId: string): void {
+    for (const gate of APPROVAL_GATES) {
+      this.database.prepare(
+        `INSERT OR IGNORE INTO approvals
+         (id, project_id, gate, status, artifact_version, approved_at, note)
+         VALUES (?, ?, ?, 'PENDING', 1, NULL, NULL)`,
+      ).run(`approval-${gate.toLowerCase()}-${projectId}`, projectId, gate);
+    }
+  }
+
+  private getGateReadiness(projectId: string, gate: ApprovalGate): {ready: boolean; message: string} {
+    const project = this.getProject(projectId).project;
+    this.ensurePhase5Artifacts(project.rootPath);
+    if (gate === 'TOPIC') return {ready: true, message: 'Topic and documentary question are ready.'};
+    if (gate === 'THESIS') {
+      const ready = ThesisSchema.parse(parseJson(path.join(project.rootPath, 'thesis/thesis.json'))).statement.trim().length > 0;
+      return {ready, message: ready ? 'Thesis document is ready.' : 'Write and save the thesis before approval.'};
+    }
+    if (gate === 'SCRIPT') {
+      const ready = readFileSync(path.join(project.rootPath, 'script/script_v1.md'), 'utf8').trim().length > 0;
+      return {ready, message: ready ? 'Script document is ready.' : 'Write and save the script before approval.'};
+    }
+    if (gate === 'STORYBOARD') {
+      const workspace = this.getStoryboardWorkspace(projectId);
+      const ready = workspace.scenes.length > 0 && workspace.shots.length > 0;
+      return {ready, message: ready ? 'Storyboard has scenes and shots.' : 'Import a storyboard with at least one scene and one shot.'};
+    }
+    if (gate === 'ASSETS') {
+      const workspace = this.getStoryboardWorkspace(projectId);
+      const required = workspace.shots.filter(({visualType}) => ['AI_IMAGE', 'AI_VIDEO', 'STOCK'].includes(visualType));
+      const byId = new Map(workspace.assets.map((asset) => [asset.id, asset]));
+      const ready = required.every((shot) => shot.assetId && byId.get(shot.assetId)?.status === 'QA_PASS');
+      return {ready, message: ready ? 'All required visual assets passed QA.' : 'Every generated or stock shot needs an asset with QA PASS.'};
+    }
+    const target: RenderTarget = gate === 'ROUGH_CUT' ? 'ROUGH' : 'FINAL';
+    const completed = this.database.prepare(
+      `SELECT output_path FROM jobs WHERE project_id = ? AND target = ? AND status = 'COMPLETED'
+       AND output_path IS NOT NULL ORDER BY version DESC LIMIT 1`,
+    ).get(projectId, target) as {output_path: string} | undefined;
+    const ready = Boolean(completed && existsSync(path.join(project.rootPath, ...completed.output_path.split('/'))));
+    return {ready, message: ready ? `${target} render output is available.` : `Complete and import a ${target.toLowerCase()} render output first.`};
+  }
+
+  private revokeApprovalChain(projectId: string, gate: ApprovalGate, note: string): void {
+    this.ensureApprovalRows(projectId);
+    const start = APPROVAL_GATES.indexOf(gate);
+    const now = isoNow();
+    for (const current of APPROVAL_GATES.slice(start)) {
+      this.database.prepare(
+        `UPDATE approvals
+         SET status = CASE WHEN status = 'APPROVED' THEN 'REVOKED' ELSE status END,
+             approved_at = NULL, note = ?
+         WHERE project_id = ? AND gate = ?`,
+      ).run(current === gate ? note : `Upstream ${gate} approval changed`, projectId, current);
+    }
+    const previousGate = APPROVAL_GATES[start - 1];
+    this.updateProjectStatus(projectId, previousGate ? this.statusForGate(previousGate) : 'NEW', now);
+  }
+
+  private statusForGate(gate: ApprovalGate): Project['status'] {
+    const statuses: Record<ApprovalGate, Project['status']> = {
+      TOPIC: 'TOPIC_SELECTED',
+      THESIS: 'THESIS_APPROVED',
+      SCRIPT: 'SCRIPT_APPROVED',
+      STORYBOARD: 'STORYBOARD_APPROVED',
+      ASSETS: 'ASSETS_READY',
+      ROUGH_CUT: 'ROUGH_CUT_APPROVED',
+      FINAL: 'FINAL_APPROVED',
+    };
+    return statuses[gate];
+  }
+
+  private updateProjectStatus(projectId: string, status: Project['status'], updatedAt: string): void {
+    const project = this.getProject(projectId).project;
+    const projectPath = path.join(project.rootPath, 'project.json');
+    const portable = ProjectSchema.parse(parseJson(projectPath));
+    atomicWriteJson(projectPath, {...portable, status, updatedAt});
+    this.database.prepare('UPDATE projects SET status = ?, updated_at = ? WHERE id = ?').run(status, updatedAt, projectId);
   }
 
   private setScope(projectId: string, scope: StaleScope['scope'], stale: boolean, reason: string | null): void {

@@ -2,7 +2,7 @@ import {mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 
-const DATABASE_VERSION = 2;
+const DATABASE_VERSION = 3;
 
 export const openWorkspaceDatabase = (workspaceRoot: string): DatabaseSync => {
   const stateDirectory = path.join(workspaceRoot, '.narra');
@@ -85,6 +85,19 @@ export const openWorkspaceDatabase = (workspaceRoot: string): DatabaseSync => {
         PRIMARY KEY (project_id, scope)
       ) STRICT;
       PRAGMA user_version = 2;
+      COMMIT;
+    `);
+  }
+
+  if (version.user_version < 3) {
+    database.exec(`
+      BEGIN IMMEDIATE;
+      ALTER TABLE jobs ADD COLUMN version INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE jobs ADD COLUMN target TEXT NOT NULL DEFAULT 'ROUGH';
+      ALTER TABLE jobs ADD COLUMN log_path TEXT;
+      ALTER TABLE jobs ADD COLUMN output_path TEXT;
+      CREATE UNIQUE INDEX approvals_project_gate ON approvals(project_id, gate);
+      PRAGMA user_version = 3;
       COMMIT;
     `);
   }

@@ -8,11 +8,16 @@ import type {
   ProjectRecord,
   StoryboardWorkspace,
   VoiceWorkspace,
+  ApprovalGate,
+  EditorialDocument,
+  EditorialWorkspace,
+  RenderTarget,
+  ReviewWorkspace,
 } from '@narra/project-store';
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 4;
+  readonly version: 5;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -32,6 +37,13 @@ interface NarraDesktopApi {
   chooseAndImportNarrationAudio: (projectId: string, segmentId: string) => Promise<VoiceWorkspace | null>;
   chooseAndImportCaptions: (projectId: string) => Promise<VoiceWorkspace | null>;
   fitTimelineToNarration: (projectId: string) => Promise<VoiceWorkspace>;
+  getEditorialWorkspace: (projectId: string) => Promise<EditorialWorkspace>;
+  saveEditorialDocument: (projectId: string, document: EditorialDocument, content: string) => Promise<EditorialWorkspace>;
+  getReviewWorkspace: (projectId: string) => Promise<ReviewWorkspace>;
+  approveGate: (projectId: string, gate: ApprovalGate, note: string) => Promise<ReviewWorkspace>;
+  revokeGate: (projectId: string, gate: ApprovalGate, note: string) => Promise<ReviewWorkspace>;
+  queueRender: (projectId: string, target: RenderTarget) => Promise<ReviewWorkspace>;
+  chooseAndAttachRenderOutput: (projectId: string, jobId: string) => Promise<ReviewWorkspace | null>;
 }
 
 declare global {

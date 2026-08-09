@@ -70,6 +70,13 @@ export const ClaimSchema = z.object({
   status: z.enum(['SUPPORTED', 'NEEDS_REVIEW', 'REJECTED']),
 });
 
+export const ThesisSchema = z.object({
+  schemaVersion: z.literal(1),
+  projectId: IdSchema,
+  updatedAt: IsoDateTimeSchema,
+  statement: z.string(),
+});
+
 export const SceneSchema = z.object({
   id: IdSchema,
   projectId: IdSchema,
@@ -297,6 +304,7 @@ export type CaptionCue = z.infer<typeof CaptionCueSchema>;
 export type SourceCollection = z.infer<typeof SourceCollectionSchema>;
 export type FactCollection = z.infer<typeof FactCollectionSchema>;
 export type ClaimCollection = z.infer<typeof ClaimCollectionSchema>;
+export type Thesis = z.infer<typeof ThesisSchema>;
 export type SceneCollection = z.infer<typeof SceneCollectionSchema>;
 export type ShotCollection = z.infer<typeof ShotCollectionSchema>;
 export type AssetCollection = z.infer<typeof AssetCollectionSchema>;

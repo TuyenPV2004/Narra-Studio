@@ -18,4 +18,11 @@ export const IPC_CHANNELS = {
   chooseAndImportNarrationAudio: 'voice:choose-and-import-audio',
   chooseAndImportCaptions: 'voice:choose-and-import-captions',
   fitTimelineToNarration: 'voice:fit-timeline',
+  getEditorialWorkspace: 'editorial:get',
+  saveEditorialDocument: 'editorial:save-document',
+  getReviewWorkspace: 'review:get',
+  approveGate: 'review:approve-gate',
+  revokeGate: 'review:revoke-gate',
+  queueRender: 'render:queue',
+  chooseAndAttachRenderOutput: 'render:choose-and-attach-output',
 } as const;

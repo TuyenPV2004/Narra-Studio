@@ -1,4 +1,4 @@
-import type {Asset, CaptionCue, NarrationSegment, Project, Scene, Shot} from '@narra/contracts';
+import type {Asset, CaptionCue, ClaimCollection, FactCollection, NarrationSegment, Project, Scene, Shot, SourceCollection} from '@narra/contracts';
 
 export type CreateProjectInput = {
   title: string;
@@ -92,4 +92,54 @@ export type VoiceWorkspace = {
   }>;
   timelineWarnings: TimelineWarning[];
   staleScopes: StaleScope[];
+};
+
+export type EditorialWorkspace = {
+  projectId: string;
+  researchBrief: string;
+  thesis: string;
+  script: string;
+  sources: SourceCollection['items'];
+  facts: FactCollection['items'];
+  claims: ClaimCollection['items'];
+};
+
+export type EditorialDocument = 'RESEARCH' | 'THESIS' | 'SCRIPT';
+
+export type ApprovalGate = 'TOPIC' | 'THESIS' | 'SCRIPT' | 'STORYBOARD' | 'ASSETS' | 'ROUGH_CUT' | 'FINAL';
+
+export type ApprovalRecord = {
+  id: string;
+  projectId: string;
+  gate: ApprovalGate;
+  status: 'PENDING' | 'APPROVED' | 'REVOKED';
+  artifactVersion: number;
+  approvedAt: string | null;
+  note: string | null;
+  unlocked: boolean;
+  ready: boolean;
+  readinessMessage: string;
+};
+
+export type RenderTarget = 'ROUGH' | 'FINAL';
+
+export type RenderJobRecord = {
+  id: string;
+  projectId: string;
+  type: 'RENDER';
+  status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'RETRYABLE_FAILED' | 'TERMINAL_FAILED' | 'CANCELLED';
+  version: number;
+  target: RenderTarget;
+  inputSnapshotPath: string;
+  logPath: string | null;
+  outputPath: string | null;
+  log: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ReviewWorkspace = {
+  projectId: string;
+  approvals: ApprovalRecord[];
+  jobs: RenderJobRecord[];
 };
