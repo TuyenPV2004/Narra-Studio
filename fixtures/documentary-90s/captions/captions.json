@@ -1,0 +1,12 @@
+[
+  {"text":"Every AI answer begins in a physical place.","startMs":0,"endMs":8500,"timestampMs":null,"confidence":1},
+  {"text":"Behind the interface are processors, cooling equipment and power supplies.","startMs":8500,"endMs":19000,"timestampMs":null,"confidence":1},
+  {"text":"The intelligence may feel weightless, but the infrastructure is not.","startMs":19000,"endMs":30000,"timestampMs":null,"confidence":1},
+  {"text":"Specialized chips move data and release heat.","startMs":30000,"endMs":40000,"timestampMs":null,"confidence":1},
+  {"text":"Cooling systems turn more electricity into reliable computing capacity.","startMs":40000,"endMs":50000,"timestampMs":null,"confidence":1},
+  {"text":"A new data centre also needs a connection to the grid.","startMs":50000,"endMs":60000,"timestampMs":null,"confidence":1},
+  {"text":"Transformers, transmission and generation can become the constraint.","startMs":60000,"endMs":70000,"timestampMs":null,"confidence":1},
+  {"text":"Faster chips still need substations and dependable power.","startMs":70000,"endMs":80000,"timestampMs":null,"confidence":1},
+  {"text":"The AI race is becoming an infrastructure race.","startMs":80000,"endMs":89000,"timestampMs":null,"confidence":1}
+]
+

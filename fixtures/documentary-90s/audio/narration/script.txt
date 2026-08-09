@@ -1,0 +1,8 @@
+Every artificial intelligence answer begins in a physical place. Behind the clean interface are rows of processors, cooling equipment, power supplies, and network cables. The intelligence may feel weightless, but the infrastructure is not.
+
+Each request activates specialized chips that move enormous quantities of data. Those chips release heat, so pumps, fans, and chillers must carry that heat away. Electricity therefore powers both the computation and the machinery that keeps computation reliable. As models grow and more people use them, both demands rise together.
+
+The challenge does not stop at the walls of the data centre. A new site needs a connection to the grid, transformers capable of handling its load, and enough generation to serve it throughout the day. These projects can be built faster than transmission lines and power stations, turning electricity access into a constraint on expansion.
+
+This is why the next phase of artificial intelligence will not be decided by algorithms alone. Faster chips still need substations. Better models still need cooling water and dependable power. The AI race is becoming an infrastructure race, and its most important bottleneck may be found not inside the software, but in the physical grid beneath it.
+

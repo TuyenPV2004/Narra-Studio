@@ -8,11 +8,14 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "pnpm --filter @narra/contracts build && pnpm --filter @narra/desktop build",
+    "build": "pnpm --filter @narra/contracts build && pnpm --filter @narra/render build && pnpm --filter @narra/desktop build",
     "dev": "pnpm --filter @narra/desktop dev",
     "lint": "eslint .",
+    "render:fixture": "pnpm --filter @narra/render render:fixture",
+    "render:probe": "pnpm --filter @narra/render probe",
+    "studio": "pnpm --filter @narra/render studio",
     "test": "vitest run",
-    "typecheck": "pnpm --filter @narra/contracts typecheck && pnpm --filter @narra/desktop typecheck",
+    "typecheck": "pnpm --filter @narra/contracts typecheck && pnpm --filter @narra/render typecheck && pnpm --filter @narra/desktop typecheck",
     "validate": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
   },
   "devDependencies": {
@@ -20,6 +23,7 @@
     "@types/node": "^26.2.0",
     "eslint": "^10.8.1",
     "globals": "^17.9.0",
+    "tsx": "^4.23.11",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.66.0",
     "vitest": "^4.1.10"

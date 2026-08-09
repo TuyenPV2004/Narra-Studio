@@ -1,4 +1,6 @@
 packages:
   - apps/*
   - packages/*
-
+  - remotion
+allowBuilds:
+  esbuild: true

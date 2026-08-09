@@ -110,7 +110,8 @@
       "projectId": "ai-electricity-90s",
       "shotId": "shot-power-flow",
       "kind": "VIDEO",
-      "status": "PLANNED",
+      "status": "QA_PASS",
+      "path": "assets/videos/power-flow-placeholder.mp4",
       "rightsNote": "Synthetic fixture video will be generated during Render Core phase."
     },
     {
@@ -118,7 +119,8 @@
       "projectId": "ai-electricity-90s",
       "shotId": "shot-data-centre",
       "kind": "AUDIO",
-      "status": "PLANNED",
+      "status": "QA_PASS",
+      "path": "audio/narration/narration.wav",
       "rightsNote": "Synthetic fixture narration will be generated or imported during the voice phase."
     },
     {
@@ -142,4 +144,3 @@
     "note": "Fixture approval for contract validation."
   }]
 }
-
