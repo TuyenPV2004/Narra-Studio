@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "projectId": "ai-electricity-eval",
+  "updatedAt": "2026-08-10T00:00:00.000Z",
+  "items": [
+    {"id":"scene-scale","projectId":"ai-electricity-eval","order":0,"title":"Efficiency meets scale","narration":"AI can become more efficient and still use much more electricity. IEA projects global data-center use rising from 485 TWh in 2025 to 950 TWh in 2030.","durationSec":42,"claimIds":["claim-global-growth"]},
+    {"id":"scene-bottleneck","projectId":"ai-electricity-eval","order":1,"title":"The infrastructure mismatch","narration":"Berkeley Lab models a wide U.S. range for 2030. The uncertainty matters: the challenge is the speed mismatch between deployment and the infrastructure expected to power it.","durationSec":48,"claimIds":["claim-us-range"]}
+  ]
+}

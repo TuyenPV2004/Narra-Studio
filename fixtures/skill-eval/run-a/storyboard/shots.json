@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "projectId": "ai-electricity-eval",
+  "updatedAt": "2026-08-10T00:00:00.000Z",
+  "items": [
+    {"id":"shot-hook","projectId":"ai-electricity-eval","sceneId":"scene-scale","order":0,"durationSec":14,"visualType":"TEXT","visualPurpose":"Contrast per-task efficiency with rising total demand","assetRoute":"NONE","evidenceRequired":false,"claimIds":[]},
+    {"id":"shot-global-chart","projectId":"ai-electricity-eval","sceneId":"scene-scale","order":1,"durationSec":28,"visualType":"CHART","visualPurpose":"Plot IEA 485 TWh to 950 TWh projection","assetRoute":"GENERATED","evidenceRequired":true,"claimIds":["claim-global-growth"]},
+    {"id":"shot-us-evidence","projectId":"ai-electricity-eval","sceneId":"scene-bottleneck","order":0,"durationSec":24,"visualType":"EVIDENCE","visualPurpose":"Show Berkeley Lab reference case and uncertainty range","assetRoute":"LOCAL","evidenceRequired":true,"claimIds":["claim-us-range"]},
+    {"id":"shot-grid-mismatch","projectId":"ai-electricity-eval","sceneId":"scene-bottleneck","order":1,"durationSec":24,"visualType":"AI_IMAGE","visualPurpose":"Illustrate dense data-center load meeting constrained grid infrastructure","assetRoute":"GOOGLE_FLOW","evidenceRequired":false,"claimIds":[]}
+  ]
+}

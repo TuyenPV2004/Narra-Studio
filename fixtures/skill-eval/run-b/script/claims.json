@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "projectId": "ai-electricity-eval",
+  "updatedAt": "2026-08-10T00:00:00.000Z",
+  "items": [
+    {"id":"claim-efficiency","projectId":"ai-electricity-eval","statement":"Per-task AI energy use is falling rapidly while intensive use cases can consume far more than simple text.","factIds":["fact-efficiency-tension"],"scriptVersion":1,"status":"SUPPORTED"},
+    {"id":"claim-global-growth","projectId":"ai-electricity-eval","statement":"Global data-center electricity use is projected to rise from 485 TWh in 2025 to 950 TWh in 2030.","factIds":["fact-global-demand"],"scriptVersion":1,"status":"SUPPORTED"},
+    {"id":"claim-us-range","projectId":"ai-electricity-eval","statement":"The U.S. 2030 model spans 521–843 TWh around a 649 TWh reference case.","factIds":["fact-us-range"],"scriptVersion":1,"status":"SUPPORTED"}
+  ]
+}

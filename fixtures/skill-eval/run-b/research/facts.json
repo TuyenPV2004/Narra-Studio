@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "projectId": "ai-electricity-eval",
+  "updatedAt": "2026-08-10T00:00:00.000Z",
+  "items": [
+    {"id":"fact-global-demand","projectId":"ai-electricity-eval","statement":"IEA's central projection has global data-center electricity consumption rising from 485 TWh in 2025 to 950 TWh in 2030, while consumption from AI-focused data centers triples.","sourceIds":["source-iea-2026"],"confidence":"HIGH","notes":"Projection with material uncertainty after 2030."},
+    {"id":"fact-us-range","projectId":"ai-electricity-eval","statement":"Berkeley Lab's 2025 update estimates a 2030 U.S. reference case of 649 TWh and a compounded uncertainty range of 521–843 TWh, equal to 9.5%–15.3% of U.S. electricity use.","sourceIds":["source-lbnl-2026"],"confidence":"HIGH","notes":"Bottom-up scenario model, not a point prediction."},
+    {"id":"fact-efficiency-tension","projectId":"ai-electricity-eval","statement":"IEA reports that energy use per AI task has recently fallen by at least an order of magnitude annually, while video generation, reasoning, and agentic tasks can consume hundreds or thousands of times more energy per query than simple text generation.","sourceIds":["source-iea-2026"],"confidence":"HIGH","notes":"The total-demand outcome depends on efficiency, uptake, and changing model capabilities."}
+  ]
+}

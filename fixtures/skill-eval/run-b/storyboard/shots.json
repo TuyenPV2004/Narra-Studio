@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "projectId": "ai-electricity-eval",
+  "updatedAt": "2026-08-10T00:00:00.000Z",
+  "items": [
+    {"id":"shot-efficiency","projectId":"ai-electricity-eval","sceneId":"scene-paradox","order":0,"durationSec":15,"visualType":"CHART","visualPurpose":"Show falling energy per comparable AI task","assetRoute":"GENERATED","evidenceRequired":true,"claimIds":["claim-efficiency"]},
+    {"id":"shot-intensive-tasks","projectId":"ai-electricity-eval","sceneId":"scene-paradox","order":1,"durationSec":15,"visualType":"TEXT","visualPurpose":"Compare simple text with video, reasoning, and agentic workloads","assetRoute":"NONE","evidenceRequired":false,"claimIds":["claim-efficiency"]},
+    {"id":"shot-global-demand","projectId":"ai-electricity-eval","sceneId":"scene-scale","order":0,"durationSec":28,"visualType":"CHART","visualPurpose":"Plot IEA 2025-to-2030 central projection","assetRoute":"GENERATED","evidenceRequired":true,"claimIds":["claim-global-growth"]},
+    {"id":"shot-us-range","projectId":"ai-electricity-eval","sceneId":"scene-range","order":0,"durationSec":18,"visualType":"EVIDENCE","visualPurpose":"Display Berkeley Lab reference case and uncertainty bounds","assetRoute":"LOCAL","evidenceRequired":true,"claimIds":["claim-us-range"]},
+    {"id":"shot-three-variables","projectId":"ai-electricity-eval","sceneId":"scene-range","order":1,"durationSec":14,"visualType":"TEXT","visualPurpose":"Resolve the story with efficiency, adoption, and task intensity","assetRoute":"NONE","evidenceRequired":false,"claimIds":[]}
+  ]
+}

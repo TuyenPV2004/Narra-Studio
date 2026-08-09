@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "projectId": "ai-electricity-eval",
+  "updatedAt": "2026-08-10T00:00:00.000Z",
+  "items": [
+    {"id":"scene-paradox","projectId":"ai-electricity-eval","order":0,"title":"The efficiency paradox","narration":"Energy per AI task is falling rapidly, yet video, reasoning, and agentic tasks can demand far more than simple text.","durationSec":30,"claimIds":["claim-efficiency"]},
+    {"id":"scene-scale","projectId":"ai-electricity-eval","order":1,"title":"Scale changes the total","narration":"IEA projects global data-center use rising from 485 TWh in 2025 to 950 TWh in 2030 as adoption expands.","durationSec":28,"claimIds":["claim-global-growth"]},
+    {"id":"scene-range","projectId":"ai-electricity-eval","order":2,"title":"A range, not destiny","narration":"Berkeley Lab's U.S. model spans 521 to 843 TWh. The outcome depends on efficiency, adoption, and task intensity.","durationSec":32,"claimIds":["claim-us-range"]}
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "id": "ai-electricity-eval",
+  "title": "AI's Electricity Bottleneck — Run B",
+  "question": "Why is AI increasing data-center electricity demand even as computing becomes more efficient?",
+  "status": "NEW",
+  "targetDurationSec": 90,
+  "language": "en",
+  "aspectRatio": "16:9",
+  "createdAt": "2026-08-10T00:00:00.000Z",
+  "updatedAt": "2026-08-10T00:00:00.000Z"
+}
