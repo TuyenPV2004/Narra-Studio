@@ -7,4 +7,3 @@
   },
   "include": ["src/renderer", "vite.config.ts"]
 }
-

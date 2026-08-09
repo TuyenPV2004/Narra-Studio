@@ -122,6 +122,21 @@ export const ApprovalSchema = z.object({
   note: z.string().optional(),
 });
 
+const artifactCollection = <T extends z.ZodType>(itemSchema: T) =>
+  z.object({
+    schemaVersion: z.literal(1),
+    projectId: IdSchema,
+    updatedAt: IsoDateTimeSchema,
+    items: z.array(itemSchema),
+  });
+
+export const SourceCollectionSchema = artifactCollection(SourceSchema);
+export const FactCollectionSchema = artifactCollection(FactSchema);
+export const ClaimCollectionSchema = artifactCollection(ClaimSchema);
+export const SceneCollectionSchema = artifactCollection(SceneSchema);
+export const ShotCollectionSchema = artifactCollection(ShotSchema);
+export const AssetCollectionSchema = artifactCollection(AssetSchema);
+
 export const ProjectBundleSchema = z
   .object({
     project: ProjectSchema,
@@ -193,4 +208,9 @@ export const ProjectBundleSchema = z
 
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectBundle = z.infer<typeof ProjectBundleSchema>;
-
+export type SourceCollection = z.infer<typeof SourceCollectionSchema>;
+export type FactCollection = z.infer<typeof FactCollectionSchema>;
+export type ClaimCollection = z.infer<typeof ClaimCollectionSchema>;
+export type SceneCollection = z.infer<typeof SceneCollectionSchema>;
+export type ShotCollection = z.infer<typeof ShotCollectionSchema>;
+export type AssetCollection = z.infer<typeof AssetCollectionSchema>;

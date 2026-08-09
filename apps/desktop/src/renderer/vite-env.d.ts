@@ -1,11 +1,23 @@
 /// <reference types="vite/client" />
 
-interface NarraBridge {
+import type {CreateProjectInput, ProjectDetail, ProjectRecord} from '@narra/project-store';
+
+interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: number;
+  readonly version: 2;
+  listProjects: () => Promise<ProjectRecord[]>;
+  createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
+  chooseAndOpenProject: () => Promise<ProjectDetail | null>;
+  getProject: (projectId: string) => Promise<ProjectDetail>;
+  duplicateProject: (projectId: string) => Promise<ProjectDetail>;
+  archiveProject: (projectId: string) => Promise<ProjectRecord>;
+  refreshProject: (projectId: string) => Promise<ProjectDetail>;
 }
 
-interface Window {
-  readonly narra?: NarraBridge;
+declare global {
+  interface Window {
+    readonly narra: NarraDesktopApi;
+  }
 }
 
+export {};

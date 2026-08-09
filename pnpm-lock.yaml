@@ -38,6 +38,9 @@ importers:
       '@narra/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
+      '@narra/project-store':
+        specifier: workspace:*
+        version: link:../../packages/project-store
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -66,6 +69,12 @@ importers:
       zod:
         specifier: ^4.4.3
         version: 4.4.3
+
+  packages/project-store:
+    dependencies:
+      '@narra/contracts':
+        specifier: workspace:*
+        version: link:../contracts
 
   remotion:
     dependencies:

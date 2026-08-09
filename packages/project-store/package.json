@@ -1,5 +1,5 @@
 {
-  "name": "@narra/contracts",
+  "name": "@narra/project-store",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,6 +15,6 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "zod": "^4.4.3"
+    "@narra/contracts": "workspace:*"
   }
 }
