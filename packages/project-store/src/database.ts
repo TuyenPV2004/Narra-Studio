@@ -2,7 +2,7 @@ import {mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 
-const DATABASE_VERSION = 1;
+const DATABASE_VERSION = 2;
 
 export const openWorkspaceDatabase = (workspaceRoot: string): DatabaseSync => {
   const stateDirectory = path.join(workspaceRoot, '.narra');
@@ -69,6 +69,22 @@ export const openWorkspaceDatabase = (workspaceRoot: string): DatabaseSync => {
         PRIMARY KEY (project_id, artifact_path)
       ) STRICT;
       PRAGMA user_version = 1;
+      COMMIT;
+    `);
+  }
+
+  if (version.user_version < 2) {
+    database.exec(`
+      BEGIN IMMEDIATE;
+      CREATE TABLE stale_scopes (
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        scope TEXT NOT NULL,
+        stale INTEGER NOT NULL DEFAULT 0,
+        reason TEXT,
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (project_id, scope)
+      ) STRICT;
+      PRAGMA user_version = 2;
       COMMIT;
     `);
   }

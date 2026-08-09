@@ -6,4 +6,11 @@ export const IPC_CHANNELS = {
   duplicateProject: 'projects:duplicate',
   archiveProject: 'projects:archive',
   refreshProject: 'projects:refresh',
+  getStoryboard: 'storyboard:get',
+  chooseAndImportStoryboard: 'storyboard:choose-and-import',
+  createAssetTask: 'assets:create-task',
+  updateAssetStatus: 'assets:update-status',
+  chooseAndImportAssetMedia: 'assets:choose-and-import-media',
+  importAssetMediaPath: 'assets:import-media-path',
+  exportStoryboardRenderInput: 'render:export-storyboard-input',
 } as const;

@@ -1,6 +1,7 @@
 import type {FormEvent} from 'react';
 import {useEffect, useMemo, useState} from 'react';
 import type {ProjectDetail, ProjectRecord} from '@narra/project-store';
+import {StoryboardWorkspaceView} from './StoryboardWorkspace';
 
 const formatDate = (value: string | null): string =>
   value ? new Intl.DateTimeFormat('en', {dateStyle: 'medium', timeStyle: 'short'}).format(new Date(value)) : 'Never';
@@ -12,6 +13,7 @@ export const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [question, setQuestion] = useState('');
+  const [activeTab, setActiveTab] = useState<'overview' | 'storyboard'>('overview');
 
   const activeProjects = useMemo(() => projects.filter(({archived}) => !archived), [projects]);
   const archivedProjects = useMemo(() => projects.filter(({archived}) => archived), [projects]);
@@ -25,6 +27,8 @@ export const App = () => {
       setError(reason instanceof Error ? reason.message : 'Could not load the local workspace.');
     });
   }, []);
+
+  useEffect(() => setActiveTab('overview'), [selected?.project.id]);
 
   const run = async (action: () => Promise<void>): Promise<void> => {
     setBusy(true);
@@ -185,25 +189,34 @@ export const App = () => {
                 <div className="path-cell"><dt>Folder</dt><dd>{selected.project.rootPath}</dd></div>
               </dl>
 
-              <section className="validation-panel">
-                <div className="panel-heading">
-                  <div><p className="section-label">ARTIFACT HEALTH</p><h3>{selected.artifactVersions.length} versioned artifacts</h3></div>
-                  <span>{formatDate(selected.project.validation?.checkedAt ?? null)}</span>
-                </div>
-                {selected.project.validation?.issues.length ? (
-                  <div className="issue-list">
-                    {selected.project.validation.issues.map((issue, index) => (
-                      <article className="issue" key={`${issue.file}-${issue.path}-${index}`}>
-                        <strong>{issue.file}{issue.path ? ` · ${issue.path}` : ''}</strong>
-                        <p>{issue.message}</p>
-                        <small>{issue.suggestion}</small>
-                      </article>
-                    ))}
+              <nav className="workspace-tabs" aria-label="Project workspace">
+                <button aria-selected={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>Overview</button>
+                <button aria-selected={activeTab === 'storyboard'} onClick={() => setActiveTab('storyboard')}>Storyboard &amp; assets</button>
+              </nav>
+
+              {activeTab === 'overview' ? (
+                <section className="validation-panel">
+                  <div className="panel-heading">
+                    <div><p className="section-label">ARTIFACT HEALTH</p><h3>{selected.artifactVersions.length} versioned artifacts</h3></div>
+                    <span>{formatDate(selected.project.validation?.checkedAt ?? null)}</span>
                   </div>
-                ) : (
-                  <p className="healthy-message">All required artifacts match schema version 1.</p>
-                )}
-              </section>
+                  {selected.project.validation?.issues.length ? (
+                    <div className="issue-list">
+                      {selected.project.validation.issues.map((issue, index) => (
+                        <article className="issue" key={`${issue.file}-${issue.path}-${index}`}>
+                          <strong>{issue.file}{issue.path ? ` · ${issue.path}` : ''}</strong>
+                          <p>{issue.message}</p>
+                          <small>{issue.suggestion}</small>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="healthy-message">All required artifacts match schema version 1.</p>
+                  )}
+                </section>
+              ) : (
+                <StoryboardWorkspaceView projectId={selected.project.id} onProjectRefresh={setSelected} />
+              )}
             </>
           )}
         </section>

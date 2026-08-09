@@ -88,7 +88,33 @@ export const ShotSchema = z.object({
   durationSec: z.number().positive(),
   visualType: z.enum(['AI_IMAGE', 'AI_VIDEO', 'STOCK', 'CHART', 'MAP', 'TEXT', 'EVIDENCE']),
   visualPurpose: z.string().min(1),
+  assetRoute: z.enum(['GOOGLE_FLOW', 'STOCK', 'LOCAL', 'GENERATED', 'NONE']).optional(),
+  evidenceRequired: z.boolean().optional(),
+  claimIds: z.array(IdSchema).optional(),
   assetId: IdSchema.optional(),
+});
+
+export const MediaMetadataSchema = z.object({
+  format: z.string().min(1),
+  mimeType: z.string().min(1),
+  durationSec: z.number().nonnegative().optional(),
+  width: z.number().int().positive().optional(),
+  height: z.number().int().positive().optional(),
+  aspectRatio: z.string().min(1).optional(),
+  videoCodec: z.string().min(1).optional(),
+  audioCodec: z.string().min(1).optional(),
+  sampleRate: z.number().int().positive().optional(),
+  channels: z.number().int().positive().optional(),
+  fileSizeBytes: z.number().int().nonnegative(),
+  probedAt: IsoDateTimeSchema,
+});
+
+export const AssetTaskSchema = z.object({
+  provider: z.enum(['GOOGLE_FLOW', 'STOCK', 'LOCAL', 'OTHER']),
+  brief: z.string().min(1),
+  prompt: z.string().min(1),
+  negativePrompt: z.string().optional(),
+  createdAt: IsoDateTimeSchema,
 });
 
 export const AssetSchema = z.object({
@@ -100,6 +126,9 @@ export const AssetSchema = z.object({
   path: RelativePathSchema.optional(),
   sourceId: IdSchema.optional(),
   rightsNote: z.string().min(1),
+  task: AssetTaskSchema.optional(),
+  metadata: MediaMetadataSchema.optional(),
+  qaNote: z.string().optional(),
 });
 
 export const JobSchema = z.object({
@@ -208,6 +237,10 @@ export const ProjectBundleSchema = z
 
 export type Project = z.infer<typeof ProjectSchema>;
 export type ProjectBundle = z.infer<typeof ProjectBundleSchema>;
+export type Scene = z.infer<typeof SceneSchema>;
+export type Shot = z.infer<typeof ShotSchema>;
+export type Asset = z.infer<typeof AssetSchema>;
+export type MediaMetadata = z.infer<typeof MediaMetadataSchema>;
 export type SourceCollection = z.infer<typeof SourceCollectionSchema>;
 export type FactCollection = z.infer<typeof FactCollectionSchema>;
 export type ClaimCollection = z.infer<typeof ClaimCollectionSchema>;

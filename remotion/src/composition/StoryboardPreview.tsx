@@ -1,0 +1,54 @@
+import type {ProjectBundle} from '@narra/contracts';
+import {AbsoluteFill, Series, useVideoConfig} from 'remotion';
+import {AIImageScene} from '../scenes/AIImageScene';
+import {AIVideoScene} from '../scenes/AIVideoScene';
+import {EvidenceScene} from '../scenes/EvidenceScene';
+import {TextDataScene} from '../scenes/TextDataScene';
+import {secondsToFrames} from '../timeline';
+
+export type StoryboardPreviewProps = {
+  readonly bundle: ProjectBundle;
+};
+
+export const getStoryboardDurationFrames = (bundle: ProjectBundle, fps: number): number =>
+  bundle.shots.reduce((total, shot) => total + secondsToFrames(shot.durationSec, fps), 0);
+
+export const StoryboardPreview = ({bundle}: StoryboardPreviewProps) => {
+  const {fps} = useVideoConfig();
+  const scenes = new Map(bundle.scenes.map((scene) => [scene.id, scene]));
+  const assets = new Map(bundle.assets.map((asset) => [asset.id, asset]));
+  const shots = [...bundle.shots].sort((left, right) => {
+    const sceneOrder = (scenes.get(left.sceneId)?.order ?? 0) - (scenes.get(right.sceneId)?.order ?? 0);
+    return sceneOrder || left.order - right.order;
+  });
+
+  return (
+    <AbsoluteFill style={{backgroundColor: '#070b12'}}>
+      <Series>
+        {shots.map((shot) => {
+          const scene = scenes.get(shot.sceneId);
+          const asset = shot.assetId ? assets.get(shot.assetId) : undefined;
+          const renderableAsset = asset?.status === 'QA_PASS' && asset.path ? asset : undefined;
+          if (!scene) return null;
+
+          return (
+            <Series.Sequence key={shot.id} durationInFrames={secondsToFrames(shot.durationSec, fps)}>
+              {renderableAsset?.kind === 'IMAGE' && renderableAsset.path ? <AIImageScene scene={scene} imagePath={renderableAsset.path} /> : null}
+              {renderableAsset?.kind === 'VIDEO' && renderableAsset.path ? <AIVideoScene scene={scene} videoPath={renderableAsset.path} /> : null}
+              {shot.visualType === 'CHART' || shot.visualType === 'MAP' || shot.visualType === 'TEXT' ? <TextDataScene scene={scene} /> : null}
+              {shot.visualType === 'EVIDENCE' ? <EvidenceScene source={bundle.sources[0]} /> : null}
+              {!renderableAsset && !['CHART', 'MAP', 'TEXT', 'EVIDENCE'].includes(shot.visualType) ? (
+                <AbsoluteFill style={{display: 'grid', placeItems: 'center', color: '#91a0b5', fontFamily: 'Arial, sans-serif'}}>
+                  <div style={{textAlign: 'center'}}>
+                    <div style={{fontSize: 26, fontWeight: 700, letterSpacing: 4}}>ASSET NOT QA APPROVED</div>
+                    <div style={{marginTop: 18, maxWidth: 900, fontSize: 42, color: '#f2f5fa'}}>{shot.visualPurpose}</div>
+                  </div>
+                </AbsoluteFill>
+              ) : null}
+            </Series.Sequence>
+          );
+        })}
+      </Series>
+    </AbsoluteFill>
+  );
+};

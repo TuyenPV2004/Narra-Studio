@@ -3,6 +3,7 @@ import {Composition, Folder} from 'remotion';
 import bundleJson from '../../fixtures/documentary-90s/bundle.json';
 import {DocumentaryComposition} from './composition/DocumentaryComposition';
 import {FixtureMotionClip} from './composition/FixtureMotionClip';
+import {getStoryboardDurationFrames, StoryboardPreview} from './composition/StoryboardPreview';
 import {VIDEO_FPS, VIDEO_HEIGHT, VIDEO_WIDTH} from './constants';
 import {getTotalDurationFrames} from './timeline';
 
@@ -24,6 +25,18 @@ export const RemotionRoot = () => (
       id="DocumentaryFixture"
       component={DocumentaryComposition}
       durationInFrames={getTotalDurationFrames(fixtureBundle.scenes, VIDEO_FPS)}
+      fps={VIDEO_FPS}
+      width={VIDEO_WIDTH}
+      height={VIDEO_HEIGHT}
+    />
+    <Composition
+      id="StoryboardPreview"
+      component={StoryboardPreview}
+      defaultProps={{bundle: fixtureBundle}}
+      calculateMetadata={({props}) => ({
+        durationInFrames: getStoryboardDurationFrames(props.bundle, VIDEO_FPS),
+      })}
+      durationInFrames={getStoryboardDurationFrames(fixtureBundle, VIDEO_FPS)}
       fps={VIDEO_FPS}
       width={VIDEO_WIDTH}
       height={VIDEO_HEIGHT}
