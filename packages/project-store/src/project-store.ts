@@ -1,14 +1,20 @@
 import {
   AssetCollectionSchema,
   AssetSchema,
+  CaptionCollectionSchema,
+  CaptionCueSchema,
   ClaimCollectionSchema,
   FactCollectionSchema,
   ProjectBundleSchema,
   ProjectSchema,
+  NarrationSegmentCollectionSchema,
+  NarrationSegmentSchema,
   SceneCollectionSchema,
   ShotCollectionSchema,
   SourceCollectionSchema,
   type Asset,
+  type CaptionCue,
+  type NarrationSegment,
   type Project,
   type ShotCollection,
 } from '@narra/contracts';
@@ -32,6 +38,7 @@ import {
   PROJECT_DIRECTORIES,
 } from './artifact-layout.js';
 import {openWorkspaceDatabase} from './database.js';
+import {compareNarrationTranscript, parseTimedText, parseWordTimestamps} from './caption-parser.js';
 import type {
   CreateProjectInput,
   AssetStatusInput,
@@ -42,6 +49,7 @@ import type {
   StoryboardWorkspace,
   ValidationIssue,
   ValidationReport,
+  VoiceWorkspace,
 } from './types.js';
 
 type ProjectRow = {
@@ -265,6 +273,7 @@ export class ProjectStore {
 
   refreshProject(projectId: string): ProjectDetail {
     const record = this.getProject(projectId).project;
+    this.ensurePhase4Artifacts(record.rootPath, projectId);
     const report = this.validateProjectDirectory(record.rootPath, projectId);
     this.database
       .prepare(
@@ -459,6 +468,194 @@ export class ProjectStore {
     return resolved;
   }
 
+  getVoiceWorkspace(projectId: string): VoiceWorkspace {
+    const project = this.getProject(projectId).project;
+    this.ensurePhase4Artifacts(project.rootPath, projectId);
+    this.ensureStaleScopes(projectId);
+    const segments = NarrationSegmentCollectionSchema.parse(
+      parseJson(path.join(project.rootPath, 'audio/narration/segments.json')),
+    ).items;
+    const captions = CaptionCollectionSchema.parse(
+      parseJson(path.join(project.rootPath, 'captions/captions.json')),
+    ).items;
+    const staleRows = this.database
+      .prepare('SELECT scope, stale, reason, updated_at FROM stale_scopes WHERE project_id = ? ORDER BY scope')
+      .all(projectId) as Array<{scope: StaleScope['scope']; stale: number; reason: string | null; updated_at: string}>;
+    return {
+      projectId,
+      segments: [...segments].sort((left, right) => left.order - right.order),
+      captions,
+      qaIssues: compareNarrationTranscript(segments, captions),
+      timelineWarnings: this.getTimelineWarnings(project.rootPath, segments),
+      staleScopes: staleRows.map((row) => ({
+        scope: row.scope,
+        stale: row.stale === 1,
+        reason: row.reason,
+        updatedAt: row.updated_at,
+      })),
+    };
+  }
+
+  syncNarrationSegments(projectId: string): VoiceWorkspace {
+    const project = this.getProject(projectId).project;
+    const now = isoNow();
+    const scenes = SceneCollectionSchema.parse(parseJson(path.join(project.rootPath, 'storyboard/scenes.json'))).items;
+    if (scenes.length === 0) throw new Error('Import a storyboard before creating narration segments.');
+    const segmentsPath = path.join(project.rootPath, 'audio/narration/segments.json');
+    const collection = NarrationSegmentCollectionSchema.parse(parseJson(segmentsPath));
+    const existingByScene = new Map(collection.items.map((segment) => [segment.sceneId, segment]));
+    const segments = [...scenes]
+      .sort((left, right) => left.order - right.order)
+      .map((scene, order) => {
+        const existing = existingByScene.get(scene.id);
+        return NarrationSegmentSchema.parse({
+          id: existing?.id ?? `vo-${scene.id}`,
+          projectId,
+          sceneId: scene.id,
+          order,
+          text: scene.narration,
+          plannedDurationSec: existing?.plannedDurationSec ?? scene.durationSec,
+          durationSec: existing?.durationSec,
+          audioPath: existing?.audioPath,
+          audioMetadata: existing?.audioMetadata,
+          status: existing?.audioPath && existing.text !== scene.narration ? 'NEEDS_REVIEW' : existing?.status ?? 'PLANNED',
+          version: existing?.version ?? 1,
+          pronunciationNotes: existing?.pronunciationNotes,
+        });
+      });
+    atomicWriteJson(segmentsPath, {...collection, updatedAt: now, items: segments});
+    this.refreshProject(projectId);
+    this.syncAudioScope(projectId, segments);
+    this.markScopes(projectId, ['CAPTIONS', 'RENDER'], 'Narration segments changed');
+    return this.getVoiceWorkspace(projectId);
+  }
+
+  async importNarrationAudio(projectId: string, segmentId: string, sourcePath: string): Promise<VoiceWorkspace> {
+    const project = this.getProject(projectId).project;
+    if (!existsSync(sourcePath) || !statSync(sourcePath).isFile()) throw new Error(`Audio file was not found: ${sourcePath}`);
+    const segmentsPath = path.join(project.rootPath, 'audio/narration/segments.json');
+    const collection = NarrationSegmentCollectionSchema.parse(parseJson(segmentsPath));
+    const index = collection.items.findIndex(({id}) => id === segmentId);
+    const segment = collection.items[index];
+    if (!segment) throw new Error(`Narration segment ${segmentId} was not found.`);
+    const {probeMedia} = await import('./media-probe.js');
+    const metadata = await probeMedia(sourcePath, 'AUDIO');
+    if (!metadata.durationSec || metadata.durationSec <= 0) throw new Error(`Audio duration could not be read for ${path.basename(sourcePath)}.`);
+    const version = segment.audioPath ? segment.version + 1 : segment.version;
+    const extension = path.extname(sourcePath).toLowerCase();
+    const relativePath = `audio/narration/${segment.id}-v${version}${extension}`;
+    copyFileSync(sourcePath, path.join(project.rootPath, ...relativePath.split('/')));
+    const next = NarrationSegmentSchema.parse({
+      ...segment,
+      version,
+      audioPath: relativePath,
+      audioMetadata: metadata,
+      durationSec: metadata.durationSec,
+      status: 'IMPORTED',
+    });
+    this.retimeCaptionsForSegment(project.rootPath, collection.items, segment, metadata.durationSec);
+    atomicWriteJson(segmentsPath, {
+      ...collection,
+      updatedAt: isoNow(),
+      items: collection.items.map((item, itemIndex) => itemIndex === index ? next : item),
+    });
+    this.refreshProject(projectId);
+    this.syncAudioScope(projectId);
+    this.markScopes(projectId, ['CAPTIONS', 'RENDER'], `Narration segment ${segmentId} audio changed`);
+    return this.getVoiceWorkspace(projectId);
+  }
+
+  importCaptions(projectId: string, sourcePath: string): VoiceWorkspace {
+    const project = this.getProject(projectId).project;
+    if (!existsSync(sourcePath) || !statSync(sourcePath).isFile()) throw new Error(`Caption file was not found: ${sourcePath}`);
+    const extension = path.extname(sourcePath).toLowerCase();
+    const raw = readFileSync(sourcePath, 'utf8');
+    let captions: CaptionCue[];
+    let segmentTimebase = false;
+    if (extension === '.srt' || extension === '.vtt') {
+      captions = parseTimedText(raw, projectId);
+    } else if (extension === '.json') {
+      const value = JSON.parse(raw) as unknown;
+      segmentTimebase = Boolean(value && typeof value === 'object' && !Array.isArray(value) && 'timebase' in value && (value as {timebase?: unknown}).timebase === 'segment');
+      const wrapped = CaptionCollectionSchema.safeParse(value);
+      if (wrapped.success) {
+        captions = wrapped.data.items;
+      } else {
+        const direct = CaptionCollectionSchema.safeParse({schemaVersion: 1, projectId, updatedAt: isoNow(), items: value});
+        captions = direct.success ? direct.data.items : parseWordTimestamps(value, projectId);
+      }
+    } else {
+      throw new Error('Caption import supports .srt, .vtt and word timestamp .json files.');
+    }
+
+    const segmentsPath = path.join(project.rootPath, 'audio/narration/segments.json');
+    const segmentCollection = NarrationSegmentCollectionSchema.parse(parseJson(segmentsPath));
+    if (segmentTimebase) captions = this.offsetSegmentCaptions(captions, segmentCollection.items);
+    const collectionPath = path.join(project.rootPath, 'captions/captions.json');
+    const current = CaptionCollectionSchema.parse(parseJson(collectionPath));
+    const parsedCaptions = captions.map((caption, index) => CaptionCueSchema.parse({
+      ...caption,
+      id: `caption-${index + 1}`,
+      projectId,
+    }));
+    atomicWriteJson(collectionPath, {...current, updatedAt: isoNow(), items: parsedCaptions});
+
+    const issues = compareNarrationTranscript(segmentCollection.items, parsedCaptions);
+    const issueIds = new Set(issues.map(({segmentId}) => segmentId));
+    atomicWriteJson(segmentsPath, {
+      ...segmentCollection,
+      updatedAt: isoNow(),
+      items: segmentCollection.items.map((segment) => ({
+        ...segment,
+        status: issueIds.has(segment.id) ? 'NEEDS_REVIEW' : segment.audioPath ? 'READY' : segment.status,
+      })),
+    });
+    this.refreshProject(projectId);
+    this.setScope(projectId, 'CAPTIONS', false, null);
+    this.markScopes(projectId, ['RENDER'], 'Captions changed');
+    return this.getVoiceWorkspace(projectId);
+  }
+
+  fitTimelineToNarration(projectId: string): VoiceWorkspace {
+    const project = this.getProject(projectId).project;
+    const segments = NarrationSegmentCollectionSchema.parse(
+      parseJson(path.join(project.rootPath, 'audio/narration/segments.json')),
+    ).items;
+    if (segments.length === 0 || segments.some(({durationSec}) => !durationSec)) {
+      throw new Error('Every narration segment needs imported audio before fitting the timeline.');
+    }
+    const scenesPath = path.join(project.rootPath, 'storyboard/scenes.json');
+    const shotsPath = path.join(project.rootPath, 'storyboard/shots.json');
+    const scenes = SceneCollectionSchema.parse(parseJson(scenesPath));
+    const shots = ShotCollectionSchema.parse(parseJson(shotsPath));
+    const durationByScene = new Map<string, number>();
+    for (const segment of segments) durationByScene.set(segment.sceneId, (durationByScene.get(segment.sceneId) ?? 0) + (segment.durationSec ?? 0));
+    const nextScenes = scenes.items.map((scene) => ({...scene, durationSec: durationByScene.get(scene.id) ?? scene.durationSec}));
+    const nextShots = shots.items.map((shot) => {
+      const sceneShots = shots.items.filter(({sceneId}) => sceneId === shot.sceneId);
+      const previousTotal = sceneShots.reduce((total, item) => total + item.durationSec, 0);
+      const target = durationByScene.get(shot.sceneId);
+      return target && previousTotal > 0 ? {...shot, durationSec: shot.durationSec * target / previousTotal} : shot;
+    });
+    const now = isoNow();
+    atomicWriteJson(scenesPath, {...scenes, updatedAt: now, items: nextScenes});
+    atomicWriteJson(shotsPath, {...shots, updatedAt: now, items: nextShots});
+    this.refreshProject(projectId);
+    this.setScope(projectId, 'AUDIO', false, null);
+    this.markScopes(projectId, ['RENDER'], 'Timeline fitted to narration audio');
+    return this.getVoiceWorkspace(projectId);
+  }
+
+  getNarrationFilePath(projectId: string, segmentId: string): string {
+    const project = this.getProject(projectId).project;
+    const segments = NarrationSegmentCollectionSchema.parse(
+      parseJson(path.join(project.rootPath, 'audio/narration/segments.json')),
+    ).items;
+    const segment = segments.find(({id}) => id === segmentId);
+    if (!segment?.audioPath) throw new Error(`Narration segment ${segmentId} has no imported audio.`);
+    return this.resolveProjectFile(project.rootPath, segment.audioPath, `Narration segment ${segmentId}`);
+  }
+
   exportStoryboardRenderInput(projectId: string): string {
     const project = this.getProject(projectId).project;
     const bundle = ProjectBundleSchema.parse({
@@ -469,6 +666,10 @@ export class ProjectStore {
       scenes: SceneCollectionSchema.parse(parseJson(path.join(project.rootPath, 'storyboard/scenes.json'))).items,
       shots: ShotCollectionSchema.parse(parseJson(path.join(project.rootPath, 'storyboard/shots.json'))).items,
       assets: AssetCollectionSchema.parse(parseJson(path.join(project.rootPath, 'assets/manifest.json'))).items,
+      narrationSegments: NarrationSegmentCollectionSchema.parse(
+        parseJson(path.join(project.rootPath, 'audio/narration/segments.json')),
+      ).items,
+      captions: CaptionCollectionSchema.parse(parseJson(path.join(project.rootPath, 'captions/captions.json'))).items,
       jobs: [],
       approvals: [],
     });
@@ -522,6 +723,143 @@ export class ProjectStore {
         )
         .run(projectId, scope, now);
     }
+  }
+
+  private ensurePhase4Artifacts(projectRoot: string, projectId: string): void {
+    const now = isoNow();
+    for (const artifactPath of ['audio/narration/segments.json', 'captions/captions.json']) {
+      const filePath = path.join(projectRoot, ...artifactPath.split('/'));
+      if (existsSync(filePath)) continue;
+      const tracked = this.database
+        .prepare('SELECT 1 AS found FROM artifact_versions WHERE project_id = ? AND artifact_path = ?')
+        .get(projectId, artifactPath) as {found: number} | undefined;
+      if (tracked) continue;
+      mkdirSync(path.dirname(filePath), {recursive: true});
+      atomicWriteJson(filePath, {schemaVersion: 1, projectId, updatedAt: now, items: []});
+    }
+  }
+
+  private setScope(projectId: string, scope: StaleScope['scope'], stale: boolean, reason: string | null): void {
+    this.ensureStaleScopes(projectId);
+    this.database
+      .prepare(
+        `UPDATE stale_scopes SET stale = ?, reason = ?, updated_at = ?
+         WHERE project_id = ? AND scope = ?`,
+      )
+      .run(stale ? 1 : 0, reason, isoNow(), projectId, scope);
+  }
+
+  private syncAudioScope(projectId: string, provided?: NarrationSegment[]): void {
+    const project = this.getProject(projectId).project;
+    const segments = provided ?? NarrationSegmentCollectionSchema.parse(
+      parseJson(path.join(project.rootPath, 'audio/narration/segments.json')),
+    ).items;
+    const ready = segments.length > 0 && segments.every(({audioPath, durationSec}) => audioPath && durationSec);
+    this.setScope(projectId, 'AUDIO', !ready, ready ? null : 'One or more narration segments need imported audio');
+  }
+
+  private getTimelineWarnings(projectRoot: string, segments: NarrationSegment[]): VoiceWorkspace['timelineWarnings'] {
+    const scenes = SceneCollectionSchema.parse(parseJson(path.join(projectRoot, 'storyboard/scenes.json'))).items;
+    return scenes.map((scene) => {
+      const sceneSegments = segments.filter(({sceneId}) => sceneId === scene.id);
+      const plannedDurationSec = sceneSegments.reduce((total, segment) => total + segment.plannedDurationSec, 0) || scene.durationSec;
+      if (sceneSegments.length === 0 || sceneSegments.some(({durationSec}) => !durationSec)) {
+        return {
+          sceneId: scene.id,
+          kind: 'MISSING_AUDIO' as const,
+          plannedDurationSec,
+          actualDurationSec: null,
+          deltaSec: null,
+          message: 'Import every narration segment for this scene before fitting the timeline.',
+        };
+      }
+      const actualDurationSec = sceneSegments.reduce((total, segment) => total + (segment.durationSec ?? 0), 0);
+      const deltaSec = actualDurationSec - plannedDurationSec;
+      const kind = Math.abs(deltaSec) <= 0.25 ? 'ALIGNED' as const : deltaSec > 0 ? 'LONGER' as const : 'SHORTER' as const;
+      return {
+        sceneId: scene.id,
+        kind,
+        plannedDurationSec,
+        actualDurationSec,
+        deltaSec,
+        message: kind === 'ALIGNED'
+          ? 'Narration matches the planned scene duration.'
+          : `Narration is ${Math.abs(deltaSec).toFixed(2)}s ${deltaSec > 0 ? 'longer' : 'shorter'} than the original plan.`,
+      };
+    });
+  }
+
+  private offsetSegmentCaptions(captions: CaptionCue[], segments: NarrationSegment[]): CaptionCue[] {
+    const offsets = new Map<string, number>();
+    let offsetMs = 0;
+    for (const segment of [...segments].sort((left, right) => left.order - right.order)) {
+      offsets.set(segment.id, offsetMs);
+      offsetMs += Math.round((segment.durationSec ?? segment.plannedDurationSec) * 1000);
+    }
+    return captions.map((caption) => {
+      if (!caption.segmentId) return caption;
+      const offset = offsets.get(caption.segmentId) ?? 0;
+      return {
+        ...caption,
+        startMs: caption.startMs + offset,
+        endMs: caption.endMs + offset,
+        words: caption.words?.map((word) => ({...word, startMs: word.startMs + offset, endMs: word.endMs + offset})),
+      };
+    });
+  }
+
+  private retimeCaptionsForSegment(
+    projectRoot: string,
+    segments: NarrationSegment[],
+    changedSegment: NarrationSegment,
+    nextDurationSec: number,
+  ): void {
+    if (!changedSegment.durationSec || Math.abs(changedSegment.durationSec - nextDurationSec) < 0.001) return;
+    const captionsPath = path.join(projectRoot, 'captions/captions.json');
+    const collection = CaptionCollectionSchema.parse(parseJson(captionsPath));
+    if (!collection.items.some(({segmentId}) => segmentId)) return;
+    const ordered = [...segments].sort((left, right) => left.order - right.order);
+    const segmentStartMs = ordered
+      .filter(({order}) => order < changedSegment.order)
+      .reduce((total, segment) => total + Math.round((segment.durationSec ?? segment.plannedDurationSec) * 1000), 0);
+    const previousDurationMs = changedSegment.durationSec * 1000;
+    const nextDurationMs = nextDurationSec * 1000;
+    const deltaMs = nextDurationMs - previousDurationMs;
+    const ratio = nextDurationMs / previousDurationMs;
+    const orderById = new Map(ordered.map(({id, order}) => [id, order]));
+    const retime = (timeMs: number, segmentId: string | undefined): number => {
+      if (!segmentId) return timeMs;
+      if (segmentId === changedSegment.id) return Math.round(segmentStartMs + (timeMs - segmentStartMs) * ratio);
+      return (orderById.get(segmentId) ?? -1) > changedSegment.order ? Math.round(timeMs + deltaMs) : timeMs;
+    };
+    atomicWriteJson(captionsPath, {
+      ...collection,
+      updatedAt: isoNow(),
+      items: collection.items.map((caption) => {
+        const startMs = retime(caption.startMs, caption.segmentId);
+        return {
+          ...caption,
+          startMs,
+          endMs: Math.max(startMs + 1, retime(caption.endMs, caption.segmentId)),
+          words: caption.words?.map((word) => {
+            const wordStartMs = retime(word.startMs, caption.segmentId);
+            return {
+              ...word,
+              startMs: wordStartMs,
+              endMs: Math.max(wordStartMs + 1, retime(word.endMs, caption.segmentId)),
+            };
+          }),
+        };
+      }),
+    });
+  }
+
+  private resolveProjectFile(projectRoot: string, relativePath: string, label: string): string {
+    const resolved = path.resolve(projectRoot, ...relativePath.split('/'));
+    const prefix = `${path.resolve(projectRoot)}${path.sep}`;
+    if (!resolved.startsWith(prefix)) throw new Error(`${label} points outside its project.`);
+    if (!existsSync(resolved)) throw new Error(`${label} media is missing: ${relativePath}`);
+    return resolved;
   }
 
   private markScopes(projectId: string, scopes: StaleScope['scope'][], reason: string): void {
@@ -681,6 +1019,10 @@ export class ProjectStore {
             this.markScopes(projectId, ['ASSETS', 'RENDER'], 'Shots changed on disk');
           } else if (target.path === 'assets/manifest.json') {
             this.markScopes(projectId, ['RENDER'], 'Asset manifest changed on disk');
+          } else if (target.path === 'audio/narration/segments.json') {
+            this.markScopes(projectId, ['CAPTIONS', 'RENDER'], 'Narration segments changed on disk');
+          } else if (target.path === 'captions/captions.json') {
+            this.markScopes(projectId, ['RENDER'], 'Captions changed on disk');
           }
         }
       } catch (error) {
@@ -698,9 +1040,12 @@ export class ProjectStore {
       const scenes = SceneCollectionSchema.parse(parseJson(path.join(projectRoot, 'storyboard/scenes.json')));
       const shots = ShotCollectionSchema.parse(parseJson(path.join(projectRoot, 'storyboard/shots.json')));
       const assets = AssetCollectionSchema.parse(parseJson(path.join(projectRoot, 'assets/manifest.json')));
+      const segments = NarrationSegmentCollectionSchema.parse(parseJson(path.join(projectRoot, 'audio/narration/segments.json')));
+      const captions = CaptionCollectionSchema.parse(parseJson(path.join(projectRoot, 'captions/captions.json')));
       const sceneIds = new Set(scenes.items.map(({id}) => id));
       const shotIds = new Set(shots.items.map(({id}) => id));
       const assetIds = new Set(assets.items.map(({id}) => id));
+      const segmentIds = new Set(segments.items.map(({id}) => id));
       for (const shot of shots.items) {
         if (!sceneIds.has(shot.sceneId)) {
           issues.push({
@@ -723,6 +1068,24 @@ export class ProjectStore {
             severity: 'ERROR', file: 'assets/manifest.json', path: `${asset.id}.shotId`,
             message: `Asset ${asset.id} references unknown shot ${asset.shotId}.`,
             suggestion: 'Restore the shot or move the asset task to an existing shot.',
+          });
+        }
+      }
+      for (const segment of segments.items) {
+        if (!sceneIds.has(segment.sceneId)) {
+          issues.push({
+            severity: 'ERROR', file: 'audio/narration/segments.json', path: `${segment.id}.sceneId`,
+            message: `Narration segment ${segment.id} references unknown scene ${segment.sceneId}.`,
+            suggestion: 'Sync narration segments from the current storyboard.',
+          });
+        }
+      }
+      for (const caption of captions.items) {
+        if (caption.segmentId && !segmentIds.has(caption.segmentId)) {
+          issues.push({
+            severity: 'ERROR', file: 'captions/captions.json', path: `${caption.id}.segmentId`,
+            message: `Caption ${caption.id} references unknown narration segment ${caption.segmentId}.`,
+            suggestion: 'Import captions for the current narration segment set.',
           });
         }
       }

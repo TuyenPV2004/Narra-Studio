@@ -1,10 +1,12 @@
 import {
   AssetCollectionSchema,
+  CaptionCollectionSchema,
   ClaimCollectionSchema,
   FactCollectionSchema,
   SceneCollectionSchema,
   ShotCollectionSchema,
   SourceCollectionSchema,
+  NarrationSegmentCollectionSchema,
 } from '@narra/contracts';
 
 export const PROJECT_DIRECTORIES = [
@@ -28,6 +30,8 @@ export const COLLECTION_ARTIFACTS = [
   {path: 'storyboard/scenes.json', schema: SceneCollectionSchema},
   {path: 'storyboard/shots.json', schema: ShotCollectionSchema},
   {path: 'assets/manifest.json', schema: AssetCollectionSchema},
+  {path: 'audio/narration/segments.json', schema: NarrationSegmentCollectionSchema},
+  {path: 'captions/captions.json', schema: CaptionCollectionSchema},
 ] as const;
 
 export const CURRENT_ARTIFACT_SCHEMA_VERSION = 1;

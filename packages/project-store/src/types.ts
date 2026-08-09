@@ -1,4 +1,4 @@
-import type {Asset, Project, Scene, Shot} from '@narra/contracts';
+import type {Asset, CaptionCue, NarrationSegment, Project, Scene, Shot} from '@narra/contracts';
 
 export type CreateProjectInput = {
   title: string;
@@ -68,4 +68,28 @@ export type CreateAssetTaskInput = {
 export type AssetStatusInput = {
   status: Asset['status'];
   qaNote?: string;
+};
+
+export type TimelineWarning = {
+  sceneId: string;
+  kind: 'MISSING_AUDIO' | 'SHORTER' | 'LONGER' | 'ALIGNED';
+  plannedDurationSec: number;
+  actualDurationSec: number | null;
+  deltaSec: number | null;
+  message: string;
+};
+
+export type VoiceWorkspace = {
+  projectId: string;
+  segments: NarrationSegment[];
+  captions: CaptionCue[];
+  qaIssues: Array<{
+    segmentId: string;
+    severity: 'WARNING' | 'ERROR';
+    message: string;
+    missingTerms: string[];
+    similarity: number;
+  }>;
+  timelineWarnings: TimelineWarning[];
+  staleScopes: StaleScope[];
 };

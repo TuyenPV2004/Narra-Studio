@@ -16,11 +16,16 @@ const channels = {
   chooseAndImportAssetMedia: 'assets:choose-and-import-media',
   importAssetMediaPath: 'assets:import-media-path',
   exportStoryboardRenderInput: 'render:export-storyboard-input',
+  getVoiceWorkspace: 'voice:get',
+  syncNarrationSegments: 'voice:sync-segments',
+  chooseAndImportNarrationAudio: 'voice:choose-and-import-audio',
+  chooseAndImportCaptions: 'voice:choose-and-import-captions',
+  fitTimelineToNarration: 'voice:fit-timeline',
 } as const;
 
 const api = {
   runtime: 'electron',
-  version: 3,
+  version: 4,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -39,6 +44,12 @@ const api = {
   importDroppedAssetMedia: (projectId: string, assetId: string, file: File) =>
     ipcRenderer.invoke(channels.importAssetMediaPath, projectId, assetId, webUtils.getPathForFile(file)),
   exportStoryboardRenderInput: (projectId: string) => ipcRenderer.invoke(channels.exportStoryboardRenderInput, projectId),
+  getVoiceWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getVoiceWorkspace, projectId),
+  syncNarrationSegments: (projectId: string) => ipcRenderer.invoke(channels.syncNarrationSegments, projectId),
+  chooseAndImportNarrationAudio: (projectId: string, segmentId: string) =>
+    ipcRenderer.invoke(channels.chooseAndImportNarrationAudio, projectId, segmentId),
+  chooseAndImportCaptions: (projectId: string) => ipcRenderer.invoke(channels.chooseAndImportCaptions, projectId),
+  fitTimelineToNarration: (projectId: string) => ipcRenderer.invoke(channels.fitTimelineToNarration, projectId),
 };
 
 contextBridge.exposeInMainWorld('narra', api);

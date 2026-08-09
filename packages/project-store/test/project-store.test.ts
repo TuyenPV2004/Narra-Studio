@@ -7,6 +7,27 @@ import {ProjectStore} from '../src/index.js';
 const temporaryDirectories: string[] = [];
 const stores: ProjectStore[] = [];
 
+const silentWav = (durationSec: number): Buffer => {
+  const sampleRate = 8000;
+  const channels = 1;
+  const bitsPerSample = 16;
+  const dataSize = Math.round(durationSec * sampleRate) * channels * bitsPerSample / 8;
+  const buffer = Buffer.alloc(44 + dataSize);
+  buffer.write('RIFF', 0);
+  buffer.writeUInt32LE(36 + dataSize, 4);
+  buffer.write('WAVEfmt ', 8);
+  buffer.writeUInt32LE(16, 16);
+  buffer.writeUInt16LE(1, 20);
+  buffer.writeUInt16LE(channels, 22);
+  buffer.writeUInt32LE(sampleRate, 24);
+  buffer.writeUInt32LE(sampleRate * channels * bitsPerSample / 8, 28);
+  buffer.writeUInt16LE(channels * bitsPerSample / 8, 32);
+  buffer.writeUInt16LE(bitsPerSample, 34);
+  buffer.write('data', 36);
+  buffer.writeUInt32LE(dataSize, 40);
+  return buffer;
+};
+
 const createStore = (): ProjectStore => {
   const workspace = mkdtempSync(path.join(tmpdir(), 'narra-project-store-'));
   temporaryDirectories.push(workspace);
@@ -29,7 +50,7 @@ describe('ProjectStore', () => {
     const created = store.createProject({title: 'Grid at Midnight', question: 'Why is demand changing?'});
 
     expect(created.project.validation?.status).toBe('VALID');
-    expect(created.artifactVersions).toHaveLength(7);
+    expect(created.artifactVersions).toHaveLength(9);
     expect(readFileSync(path.join(created.project.rootPath, 'project.json'), 'utf8')).toContain(created.project.id);
 
     const workspace = store.workspaceRoot;
@@ -153,5 +174,69 @@ describe('ProjectStore', () => {
 
     expect(() => store.importStoryboard(projectId, scenesPath, shotsPath)).toThrow('references unknown scene');
     expect(store.getStoryboardWorkspace(projectId).scenes).toHaveLength(0);
+  });
+
+  it('replaces one narration segment, fits scene and shot timing, and exports captions for render', async () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Voice Timeline', question: 'Can real narration control timing?'});
+    const projectId = created.project.id;
+    const importDirectory = mkdtempSync(path.join(tmpdir(), 'narra-voice-import-'));
+    temporaryDirectories.push(importDirectory);
+    const scenesPath = path.join(importDirectory, 'scenes.json');
+    const shotsPath = path.join(importDirectory, 'shots.json');
+    writeFileSync(scenesPath, JSON.stringify([
+      {id: 'scene-one', projectId, order: 0, title: 'One', narration: 'Electricity powers systems.', durationSec: 4, claimIds: []},
+      {id: 'scene-two', projectId, order: 1, title: 'Two', narration: 'Cooling protects computers.', durationSec: 6, claimIds: []},
+    ]), 'utf8');
+    writeFileSync(shotsPath, JSON.stringify([
+      {id: 'shot-one', projectId, sceneId: 'scene-one', order: 0, durationSec: 4, visualType: 'TEXT', visualPurpose: 'First idea'},
+      {id: 'shot-two', projectId, sceneId: 'scene-two', order: 0, durationSec: 6, visualType: 'TEXT', visualPurpose: 'Second idea'},
+    ]), 'utf8');
+    store.importStoryboard(projectId, scenesPath, shotsPath);
+    let voice = store.syncNarrationSegments(projectId);
+    expect(voice.segments).toHaveLength(2);
+
+    const firstAudio = path.join(importDirectory, 'first.wav');
+    const firstReplacement = path.join(importDirectory, 'first-replacement.wav');
+    const secondAudio = path.join(importDirectory, 'second.wav');
+    writeFileSync(firstAudio, silentWav(1));
+    writeFileSync(firstReplacement, silentWav(1.5));
+    writeFileSync(secondAudio, silentWav(2));
+    await store.importNarrationAudio(projectId, 'vo-scene-one', firstAudio);
+    voice = await store.importNarrationAudio(projectId, 'vo-scene-two', secondAudio);
+    const secondPath = voice.segments.find(({id}) => id === 'vo-scene-two')?.audioPath;
+    expect(voice.segments.find(({id}) => id === 'vo-scene-one')?.durationSec).toBeCloseTo(1, 2);
+
+    const captionsPath = path.join(importDirectory, 'words.json');
+    writeFileSync(captionsPath, JSON.stringify({timebase: 'segment', words: [
+      {word: 'Electricity', start: 0, end: 0.3, segment_id: 'vo-scene-one'},
+      {word: 'powers', start: 0.3, end: 0.6, segment_id: 'vo-scene-one'},
+      {word: 'systems.', start: 0.6, end: 0.9, segment_id: 'vo-scene-one'},
+      {word: 'Cooling', start: 0, end: 0.5, segment_id: 'vo-scene-two'},
+      {word: 'protects', start: 0.5, end: 1, segment_id: 'vo-scene-two'},
+      {word: 'computers.', start: 1, end: 1.5, segment_id: 'vo-scene-two'},
+    ]}), 'utf8');
+    voice = store.importCaptions(projectId, captionsPath);
+    expect(voice.qaIssues).toEqual([]);
+    expect(voice.captions.find(({segmentId}) => segmentId === 'vo-scene-two')?.startMs).toBe(1000);
+
+    store.fitTimelineToNarration(projectId);
+    let storyboard = store.getStoryboardWorkspace(projectId);
+    expect(storyboard.scenes.map(({durationSec}) => durationSec)).toEqual([1, 2]);
+    expect(storyboard.shots.map(({durationSec}) => durationSec)).toEqual([1, 2]);
+    voice = await store.importNarrationAudio(projectId, 'vo-scene-one', firstReplacement);
+    expect(voice.segments.find(({id}) => id === 'vo-scene-one')).toMatchObject({version: 2, durationSec: 1.5});
+    expect(voice.segments.find(({id}) => id === 'vo-scene-two')?.audioPath).toBe(secondPath);
+    expect(voice.captions.find(({segmentId}) => segmentId === 'vo-scene-two')?.startMs).toBe(1500);
+    expect(voice.staleScopes.find(({scope}) => scope === 'CAPTIONS')?.stale).toBe(true);
+    store.fitTimelineToNarration(projectId);
+    storyboard = store.getStoryboardWorkspace(projectId);
+    expect(storyboard.scenes.map(({durationSec}) => durationSec)).toEqual([1.5, 2]);
+
+    const renderInput = JSON.parse(readFileSync(store.exportStoryboardRenderInput(projectId), 'utf8')) as {
+      bundle: {narrationSegments: unknown[]; captions: unknown[]};
+    };
+    expect(renderInput.bundle.narrationSegments).toHaveLength(2);
+    expect(renderInput.bundle.captions).toHaveLength(2);
   });
 });

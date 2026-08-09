@@ -88,6 +88,33 @@ const registerProjectHandlers = (): void => {
   ipcMain.handle(IPC_CHANNELS.exportStoryboardRenderInput, (_event, projectId: string) =>
     getProjectStore().exportStoryboardRenderInput(projectId),
   );
+  ipcMain.handle(IPC_CHANNELS.getVoiceWorkspace, (_event, projectId: string) =>
+    getProjectStore().getVoiceWorkspace(projectId),
+  );
+  ipcMain.handle(IPC_CHANNELS.syncNarrationSegments, (_event, projectId: string) =>
+    getProjectStore().syncNarrationSegments(projectId),
+  );
+  ipcMain.handle(IPC_CHANNELS.chooseAndImportNarrationAudio, async (_event, projectId: string, segmentId: string) => {
+    const selection = await dialog.showOpenDialog({
+      title: 'Import narration segment audio',
+      properties: ['openFile'],
+      filters: [{name: 'Audio', extensions: ['wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg']}],
+    });
+    if (selection.canceled || !selection.filePaths[0]) return null;
+    return getProjectStore().importNarrationAudio(projectId, segmentId, selection.filePaths[0]);
+  });
+  ipcMain.handle(IPC_CHANNELS.chooseAndImportCaptions, async (_event, projectId: string) => {
+    const selection = await dialog.showOpenDialog({
+      title: 'Import captions or word timestamps',
+      properties: ['openFile'],
+      filters: [{name: 'Captions and timestamps', extensions: ['srt', 'vtt', 'json']}],
+    });
+    if (selection.canceled || !selection.filePaths[0]) return null;
+    return getProjectStore().importCaptions(projectId, selection.filePaths[0]);
+  });
+  ipcMain.handle(IPC_CHANNELS.fitTimelineToNarration, (_event, projectId: string) =>
+    getProjectStore().fitTimelineToNarration(projectId),
+  );
 };
 
 const createWindow = async (): Promise<BrowserWindow> => {
@@ -124,8 +151,13 @@ void app.whenReady().then(async () => {
     try {
       const url = new URL(request.url);
       const [projectId, assetId] = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
-      if (url.hostname !== 'asset' || !projectId || !assetId) return new Response('Invalid media URL', {status: 400});
-      return net.fetch(pathToFileURL(getProjectStore().getAssetFilePath(projectId, assetId)).toString());
+      if (!['asset', 'narration'].includes(url.hostname) || !projectId || !assetId) {
+        return new Response('Invalid media URL', {status: 400});
+      }
+      const filePath = url.hostname === 'narration'
+        ? getProjectStore().getNarrationFilePath(projectId, assetId)
+        : getProjectStore().getAssetFilePath(projectId, assetId);
+      return net.fetch(pathToFileURL(filePath).toString());
     } catch (error) {
       return new Response(error instanceof Error ? error.message : 'Media not found', {status: 404});
     }
@@ -157,12 +189,12 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Projects' || result.apiVersion !== 3 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Projects' || result.apiVersion !== 4 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Projects\napiVersion=3\nprojectCount=${result.projectCount}\n`,
+      `renderer=Projects\napiVersion=4\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     console.log('NARRA_DESKTOP_SMOKE_OK');

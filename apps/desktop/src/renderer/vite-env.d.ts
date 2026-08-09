@@ -7,11 +7,12 @@ import type {
   ProjectDetail,
   ProjectRecord,
   StoryboardWorkspace,
+  VoiceWorkspace,
 } from '@narra/project-store';
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 3;
+  readonly version: 4;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -26,6 +27,11 @@ interface NarraDesktopApi {
   chooseAndImportAssetMedia: (projectId: string, assetId: string) => Promise<StoryboardWorkspace | null>;
   importDroppedAssetMedia: (projectId: string, assetId: string, file: File) => Promise<StoryboardWorkspace>;
   exportStoryboardRenderInput: (projectId: string) => Promise<string>;
+  getVoiceWorkspace: (projectId: string) => Promise<VoiceWorkspace>;
+  syncNarrationSegments: (projectId: string) => Promise<VoiceWorkspace>;
+  chooseAndImportNarrationAudio: (projectId: string, segmentId: string) => Promise<VoiceWorkspace | null>;
+  chooseAndImportCaptions: (projectId: string) => Promise<VoiceWorkspace | null>;
+  fitTimelineToNarration: (projectId: string) => Promise<VoiceWorkspace>;
 }
 
 declare global {

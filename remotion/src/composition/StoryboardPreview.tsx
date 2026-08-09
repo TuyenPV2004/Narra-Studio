@@ -1,5 +1,7 @@
 import type {ProjectBundle} from '@narra/contracts';
-import {AbsoluteFill, Series, useVideoConfig} from 'remotion';
+import {Audio} from '@remotion/media';
+import {AbsoluteFill, Sequence, Series, staticFile, useVideoConfig} from 'remotion';
+import {CaptionLayer} from '../overlays/CaptionLayer';
 import {AIImageScene} from '../scenes/AIImageScene';
 import {AIVideoScene} from '../scenes/AIVideoScene';
 import {EvidenceScene} from '../scenes/EvidenceScene';
@@ -13,6 +15,11 @@ export type StoryboardPreviewProps = {
 export const getStoryboardDurationFrames = (bundle: ProjectBundle, fps: number): number =>
   bundle.shots.reduce((total, shot) => total + secondsToFrames(shot.durationSec, fps), 0);
 
+export const getMasterDurationFrames = (bundle: ProjectBundle, fps: number): number => {
+  const narrationDuration = (bundle.narrationSegments ?? []).reduce((total, segment) => total + (segment.durationSec ?? 0), 0);
+  return narrationDuration > 0 ? secondsToFrames(narrationDuration, fps) : getStoryboardDurationFrames(bundle, fps);
+};
+
 export const StoryboardPreview = ({bundle}: StoryboardPreviewProps) => {
   const {fps} = useVideoConfig();
   const scenes = new Map(bundle.scenes.map((scene) => [scene.id, scene]));
@@ -21,6 +28,17 @@ export const StoryboardPreview = ({bundle}: StoryboardPreviewProps) => {
     const sceneOrder = (scenes.get(left.sceneId)?.order ?? 0) - (scenes.get(right.sceneId)?.order ?? 0);
     return sceneOrder || left.order - right.order;
   });
+  const narrationSegments = [...(bundle.narrationSegments ?? [])].sort((left, right) => left.order - right.order);
+  let narrationOffset = 0;
+  const captions = (bundle.captions ?? []).map((caption) => ({
+    text: caption.text,
+    startMs: caption.startMs,
+    endMs: caption.endMs,
+    timestampMs: null,
+    confidence: caption.words?.length
+      ? caption.words.reduce((total, word) => total + (word.confidence ?? 1), 0) / caption.words.length
+      : null,
+  }));
 
   return (
     <AbsoluteFill style={{backgroundColor: '#070b12'}}>
@@ -49,6 +67,17 @@ export const StoryboardPreview = ({bundle}: StoryboardPreviewProps) => {
           );
         })}
       </Series>
+      {narrationSegments.map((segment) => {
+        const from = narrationOffset;
+        const durationInFrames = secondsToFrames(segment.durationSec ?? 0, fps);
+        narrationOffset += durationInFrames;
+        return segment.audioPath && durationInFrames > 0 ? (
+          <Sequence key={segment.id} from={from} durationInFrames={durationInFrames} name={segment.id}>
+            <Audio src={staticFile(segment.audioPath)} />
+          </Sequence>
+        ) : null;
+      })}
+      {captions.length > 0 ? <CaptionLayer captions={captions} /> : null}
     </AbsoluteFill>
   );
 };

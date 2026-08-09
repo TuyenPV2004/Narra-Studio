@@ -13,4 +13,9 @@ export const IPC_CHANNELS = {
   chooseAndImportAssetMedia: 'assets:choose-and-import-media',
   importAssetMediaPath: 'assets:import-media-path',
   exportStoryboardRenderInput: 'render:export-storyboard-input',
+  getVoiceWorkspace: 'voice:get',
+  syncNarrationSegments: 'voice:sync-segments',
+  chooseAndImportNarrationAudio: 'voice:choose-and-import-audio',
+  chooseAndImportCaptions: 'voice:choose-and-import-captions',
+  fitTimelineToNarration: 'voice:fit-timeline',
 } as const;

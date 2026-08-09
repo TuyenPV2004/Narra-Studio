@@ -23,5 +23,16 @@ describe('ProjectBundleSchema', () => {
       expect(result.error.issues.some(({message}) => message.includes('unknown source'))).toBe(true);
     }
   });
-});
 
+  it('rejects narration segments that reference an unknown scene', async () => {
+    const fixture = await loadJson('../../../fixtures/documentary-90s/bundle.json') as {
+      narrationSegments: Array<{sceneId: string}>;
+    };
+    if (fixture.narrationSegments[0]) fixture.narrationSegments[0].sceneId = 'scene-missing';
+    const result = ProjectBundleSchema.safeParse(fixture);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some(({message}) => message.includes('unknown scene'))).toBe(true);
+    }
+  });
+});

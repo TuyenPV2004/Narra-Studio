@@ -133,6 +133,31 @@
       "rightsNote": "Repository-authored caption fixture."
     }
   ],
+  "narrationSegments": [
+    {
+      "id": "vo-full-fixture",
+      "projectId": "ai-electricity-90s",
+      "sceneId": "scene-hook",
+      "order": 0,
+      "text": "Every AI answer begins in a physical place. Behind the interface are processors, cooling equipment and power supplies. The intelligence may feel weightless, but the infrastructure is not. Specialized chips move data and release heat. Cooling systems turn more electricity into reliable computing capacity. A new data centre also needs a connection to the grid. Transformers, transmission and generation can become the constraint. Faster chips still need substations and dependable power. The AI race is becoming an infrastructure race.",
+      "plannedDurationSec": 90,
+      "durationSec": 90,
+      "audioPath": "audio/narration/narration.wav",
+      "status": "READY",
+      "version": 1
+    }
+  ],
+  "captions": [
+    {"id":"caption-1","projectId":"ai-electricity-90s","segmentId":"vo-full-fixture","text":"Every AI answer begins in a physical place.","startMs":0,"endMs":8500},
+    {"id":"caption-2","projectId":"ai-electricity-90s","segmentId":"vo-full-fixture","text":"Behind the interface are processors, cooling equipment and power supplies.","startMs":8500,"endMs":19000},
+    {"id":"caption-3","projectId":"ai-electricity-90s","segmentId":"vo-full-fixture","text":"The intelligence may feel weightless, but the infrastructure is not.","startMs":19000,"endMs":30000},
+    {"id":"caption-4","projectId":"ai-electricity-90s","segmentId":"vo-full-fixture","text":"Specialized chips move data and release heat.","startMs":30000,"endMs":40000},
+    {"id":"caption-5","projectId":"ai-electricity-90s","segmentId":"vo-full-fixture","text":"Cooling systems turn more electricity into reliable computing capacity.","startMs":40000,"endMs":50000},
+    {"id":"caption-6","projectId":"ai-electricity-90s","segmentId":"vo-full-fixture","text":"A new data centre also needs a connection to the grid.","startMs":50000,"endMs":60000},
+    {"id":"caption-7","projectId":"ai-electricity-90s","segmentId":"vo-full-fixture","text":"Transformers, transmission and generation can become the constraint.","startMs":60000,"endMs":70000},
+    {"id":"caption-8","projectId":"ai-electricity-90s","segmentId":"vo-full-fixture","text":"Faster chips still need substations and dependable power.","startMs":70000,"endMs":80000},
+    {"id":"caption-9","projectId":"ai-electricity-90s","segmentId":"vo-full-fixture","text":"The AI race is becoming an infrastructure race.","startMs":80000,"endMs":89000}
+  ],
   "jobs": [],
   "approvals": [{
     "id": "approval-storyboard-v1",

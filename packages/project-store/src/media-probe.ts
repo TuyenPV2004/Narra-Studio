@@ -88,6 +88,7 @@ export const probeMedia = async (filePath: string, kind: Asset['kind']): Promise
     const format = await input.getFormat();
     const videoTrack = await input.getPrimaryVideoTrack();
     const audioTrack = await input.getPrimaryAudioTrack();
+    if (kind === 'AUDIO' && !audioTrack) throw new Error(`Media file has no readable audio track: ${path.basename(filePath)}.`);
     const durationSec = (await input.getDurationFromMetadata(undefined, {skipLiveWait: true})) ?? undefined;
     const width = videoTrack ? await videoTrack.getDisplayWidth() : undefined;
     const height = videoTrack ? await videoTrack.getDisplayHeight() : undefined;

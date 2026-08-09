@@ -7,6 +7,7 @@ import {
   getTotalDurationSec,
   validateSceneShotDurations,
 } from '../src/timeline';
+import {getMasterDurationFrames} from '../src/composition/StoryboardPreview';
 
 const bundle = ProjectBundleSchema.parse(bundleJson);
 
@@ -19,5 +20,9 @@ describe('documentary timeline', () => {
   it('keeps shot durations aligned with their scenes', () => {
     expect(validateSceneShotDurations(bundle)).toEqual([]);
   });
-});
 
+  it('uses imported narration segments as the master composition duration', () => {
+    expect(bundle.narrationSegments).toHaveLength(1);
+    expect(getMasterDurationFrames(bundle, VIDEO_FPS)).toBe(2700);
+  });
+});

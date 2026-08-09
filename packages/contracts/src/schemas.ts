@@ -131,6 +131,38 @@ export const AssetSchema = z.object({
   qaNote: z.string().optional(),
 });
 
+export const NarrationSegmentSchema = z.object({
+  id: IdSchema,
+  projectId: IdSchema,
+  sceneId: IdSchema,
+  order: z.number().int().nonnegative(),
+  text: z.string().min(1),
+  plannedDurationSec: z.number().positive(),
+  durationSec: z.number().positive().optional(),
+  audioPath: RelativePathSchema.optional(),
+  audioMetadata: MediaMetadataSchema.optional(),
+  status: z.enum(['PLANNED', 'IMPORTED', 'READY', 'NEEDS_REVIEW']),
+  version: z.number().int().positive(),
+  pronunciationNotes: z.string().optional(),
+});
+
+export const WordTimestampSchema = z.object({
+  word: z.string().min(1),
+  startMs: z.number().nonnegative(),
+  endMs: z.number().positive(),
+  confidence: z.number().min(0).max(1).optional(),
+}).refine(({startMs, endMs}) => endMs > startMs, {message: 'Word endMs must be greater than startMs'});
+
+export const CaptionCueSchema = z.object({
+  id: IdSchema,
+  projectId: IdSchema,
+  segmentId: IdSchema.optional(),
+  startMs: z.number().nonnegative(),
+  endMs: z.number().positive(),
+  text: z.string().min(1),
+  words: z.array(WordTimestampSchema).optional(),
+}).refine(({startMs, endMs}) => endMs > startMs, {message: 'Caption endMs must be greater than startMs'});
+
 export const JobSchema = z.object({
   id: IdSchema,
   projectId: IdSchema,
@@ -165,6 +197,8 @@ export const ClaimCollectionSchema = artifactCollection(ClaimSchema);
 export const SceneCollectionSchema = artifactCollection(SceneSchema);
 export const ShotCollectionSchema = artifactCollection(ShotSchema);
 export const AssetCollectionSchema = artifactCollection(AssetSchema);
+export const NarrationSegmentCollectionSchema = artifactCollection(NarrationSegmentSchema);
+export const CaptionCollectionSchema = artifactCollection(CaptionCueSchema);
 
 export const ProjectBundleSchema = z
   .object({
@@ -175,6 +209,8 @@ export const ProjectBundleSchema = z
     scenes: z.array(SceneSchema).min(1),
     shots: z.array(ShotSchema).min(1),
     assets: z.array(AssetSchema),
+    narrationSegments: z.array(NarrationSegmentSchema).default([]),
+    captions: z.array(CaptionCueSchema).default([]),
     jobs: z.array(JobSchema),
     approvals: z.array(ApprovalSchema),
   })
@@ -187,6 +223,8 @@ export const ProjectBundleSchema = z
       ...bundle.scenes,
       ...bundle.shots,
       ...bundle.assets,
+      ...bundle.narrationSegments,
+      ...bundle.captions,
       ...bundle.jobs,
       ...bundle.approvals,
     ];
@@ -202,6 +240,7 @@ export const ProjectBundleSchema = z
     const sceneIds = new Set(bundle.scenes.map(({id}) => id));
     const shotIds = new Set(bundle.shots.map(({id}) => id));
     const assetIds = new Set(bundle.assets.map(({id}) => id));
+    const narrationSegmentIds = new Set(bundle.narrationSegments.map(({id}) => id));
 
     for (const fact of bundle.facts) {
       for (const sourceId of fact.sourceIds) {
@@ -233,6 +272,18 @@ export const ProjectBundleSchema = z
         context.addIssue({code: 'custom', message: `Asset ${asset.id} references unknown shot ${asset.shotId}`});
       }
     }
+
+    for (const segment of bundle.narrationSegments) {
+      if (!sceneIds.has(segment.sceneId)) {
+        context.addIssue({code: 'custom', message: `Narration segment ${segment.id} references unknown scene ${segment.sceneId}`});
+      }
+    }
+
+    for (const caption of bundle.captions) {
+      if (caption.segmentId && !narrationSegmentIds.has(caption.segmentId)) {
+        context.addIssue({code: 'custom', message: `Caption ${caption.id} references unknown narration segment ${caption.segmentId}`});
+      }
+    }
   });
 
 export type Project = z.infer<typeof ProjectSchema>;
@@ -241,9 +292,13 @@ export type Scene = z.infer<typeof SceneSchema>;
 export type Shot = z.infer<typeof ShotSchema>;
 export type Asset = z.infer<typeof AssetSchema>;
 export type MediaMetadata = z.infer<typeof MediaMetadataSchema>;
+export type NarrationSegment = z.infer<typeof NarrationSegmentSchema>;
+export type CaptionCue = z.infer<typeof CaptionCueSchema>;
 export type SourceCollection = z.infer<typeof SourceCollectionSchema>;
 export type FactCollection = z.infer<typeof FactCollectionSchema>;
 export type ClaimCollection = z.infer<typeof ClaimCollectionSchema>;
 export type SceneCollection = z.infer<typeof SceneCollectionSchema>;
 export type ShotCollection = z.infer<typeof ShotCollectionSchema>;
 export type AssetCollection = z.infer<typeof AssetCollectionSchema>;
+export type NarrationSegmentCollection = z.infer<typeof NarrationSegmentCollectionSchema>;
+export type CaptionCollection = z.infer<typeof CaptionCollectionSchema>;

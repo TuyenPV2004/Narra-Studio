@@ -2,6 +2,7 @@ import type {FormEvent} from 'react';
 import {useEffect, useMemo, useState} from 'react';
 import type {ProjectDetail, ProjectRecord} from '@narra/project-store';
 import {StoryboardWorkspaceView} from './StoryboardWorkspace';
+import {VoiceWorkspaceView} from './VoiceWorkspace';
 
 const formatDate = (value: string | null): string =>
   value ? new Intl.DateTimeFormat('en', {dateStyle: 'medium', timeStyle: 'short'}).format(new Date(value)) : 'Never';
@@ -13,7 +14,7 @@ export const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [question, setQuestion] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'storyboard'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'storyboard' | 'voice'>('overview');
 
   const activeProjects = useMemo(() => projects.filter(({archived}) => !archived), [projects]);
   const archivedProjects = useMemo(() => projects.filter(({archived}) => archived), [projects]);
@@ -192,6 +193,7 @@ export const App = () => {
               <nav className="workspace-tabs" aria-label="Project workspace">
                 <button aria-selected={activeTab === 'overview'} onClick={() => setActiveTab('overview')}>Overview</button>
                 <button aria-selected={activeTab === 'storyboard'} onClick={() => setActiveTab('storyboard')}>Storyboard &amp; assets</button>
+                <button aria-selected={activeTab === 'voice'} onClick={() => setActiveTab('voice')}>Voice &amp; captions</button>
               </nav>
 
               {activeTab === 'overview' ? (
@@ -214,8 +216,10 @@ export const App = () => {
                     <p className="healthy-message">All required artifacts match schema version 1.</p>
                   )}
                 </section>
-              ) : (
+              ) : activeTab === 'storyboard' ? (
                 <StoryboardWorkspaceView projectId={selected.project.id} onProjectRefresh={setSelected} />
+              ) : (
+                <VoiceWorkspaceView projectId={selected.project.id} onProjectRefresh={setSelected} />
               )}
             </>
           )}

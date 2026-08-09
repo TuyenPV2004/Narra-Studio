@@ -12,6 +12,7 @@
     "render:fixture": "pnpm generate:audio && pnpm render:clip && pnpm preflight && pnpm render:rough",
     "render:rough": "remotion render src/index.ts DocumentaryFixture ../fixtures/documentary-90s/renders/rough/rough-cut-v1.mp4 --public-dir=../fixtures/documentary-90s --codec=h264 --audio-codec=aac --crf=22 --overwrite",
     "still:storyboard": "remotion still src/index.ts StoryboardPreview ../fixtures/documentary-90s/renders/check/storyboard-preview.png --frame=300 --public-dir=../fixtures/documentary-90s --overwrite",
+    "render:voice-smoke": "remotion render src/index.ts StoryboardPreview ../fixtures/documentary-90s/renders/check/voice-smoke.mp4 --frames=0-89 --public-dir=../fixtures/documentary-90s --codec=h264 --audio-codec=aac --crf=26 --overwrite",
     "still:check": "remotion still src/index.ts DocumentaryFixture ../fixtures/documentary-90s/renders/check/frame-300.png --frame=300 --public-dir=../fixtures/documentary-90s --overwrite && remotion still src/index.ts DocumentaryFixture ../fixtures/documentary-90s/renders/check/frame-1200.png --frame=1200 --public-dir=../fixtures/documentary-90s --overwrite && remotion still src/index.ts DocumentaryFixture ../fixtures/documentary-90s/renders/check/frame-2400.png --frame=2400 --public-dir=../fixtures/documentary-90s --overwrite",
     "studio": "remotion studio src/index.ts --public-dir=../fixtures/documentary-90s --no-open",
     "typecheck": "tsc -p tsconfig.json --noEmit"
