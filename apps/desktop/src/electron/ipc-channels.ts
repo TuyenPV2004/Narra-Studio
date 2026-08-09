@@ -24,5 +24,7 @@ export const IPC_CHANNELS = {
   approveGate: 'review:approve-gate',
   revokeGate: 'review:revoke-gate',
   queueRender: 'render:queue',
+  cancelJob: 'render:cancel-job',
+  retryJob: 'render:retry-job',
   chooseAndAttachRenderOutput: 'render:choose-and-attach-output',
 } as const;

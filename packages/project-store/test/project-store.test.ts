@@ -1,8 +1,8 @@
 import {afterEach, describe, expect, it} from 'vitest';
-import {mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {ProjectStore} from '../src/index.js';
+import {LocalJobRunner, ProjectStore} from '../src/index.js';
 
 const temporaryDirectories: string[] = [];
 const stores: ProjectStore[] = [];
@@ -270,6 +270,7 @@ describe('ProjectStore', () => {
     review = store.queueRender(projectId, 'ROUGH');
     const rough = review.jobs[0];
     expect(rough).toMatchObject({target: 'ROUGH', version: 1, status: 'QUEUED'});
+    expect(store.queueRender(projectId, 'ROUGH').jobs).toHaveLength(1);
     expect(readFileSync(path.join(created.project.rootPath, rough?.inputSnapshotPath ?? ''), 'utf8')).toContain(projectId);
     const roughOutput = path.join(importDirectory, 'rough.mp4');
     writeFileSync(roughOutput, 'rough-video-placeholder', 'utf8');
@@ -293,4 +294,104 @@ describe('ProjectStore', () => {
     expect(review.approvals.find(({gate}) => gate === 'FINAL')?.unlocked).toBe(false);
     expect(store.getProject(projectId).project.status).toBe('THESIS_APPROVED');
   });
+
+  it('runs idempotent media jobs with isolated retry, cancellation, atomic output, and crash recovery', () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Job Recovery', question: 'Can local work resume safely?'});
+    const sourceRelative = 'assets/source.mp4';
+    writeFileSync(path.join(created.project.rootPath, sourceRelative), 'media-placeholder', 'utf8');
+
+    let review = store.queueMediaJob(created.project.id, {type: 'PROBE', sourcePath: sourceRelative});
+    const probeId = review.jobs[0]?.id ?? '';
+    review = store.queueMediaJob(created.project.id, {type: 'PROBE', sourcePath: sourceRelative});
+    expect(review.jobs.filter(({type}) => type === 'PROBE')).toHaveLength(1);
+    const probe = store.claimNextJob();
+    expect(probe).toMatchObject({id: probeId, type: 'PROBE', attempt: 1});
+    writeFileSync(probe?.tempOutputPath ?? '', '{"streams":[]}', 'utf8');
+    store.updateJobProgress(probeId, 0.75);
+    store.completeJob(probeId);
+    expect(store.getReviewWorkspace(created.project.id).jobs.find(({id}) => id === probeId)).toMatchObject({
+      status: 'COMPLETED', progress: 1, outputPath: `renders/jobs/${probeId}.txt`,
+    });
+
+    review = store.queueMediaJob(created.project.id, {type: 'PROXY', sourcePath: sourceRelative, scope: 'scene-one'});
+    const proxyId = review.jobs.find(({type}) => type === 'PROXY')?.id ?? '';
+    const firstAttempt = store.claimNextJob();
+    writeFileSync(firstAttempt?.tempOutputPath ?? '', 'partial', 'utf8');
+    store.failJob(proxyId, 'Encoder stopped.', true);
+    expect(existsSync(firstAttempt?.tempOutputPath ?? '')).toBe(false);
+    expect(store.getReviewWorkspace(created.project.id).jobs.find(({id}) => id === proxyId)?.status).toBe('RETRYABLE_FAILED');
+    store.retryJob(created.project.id, proxyId);
+    const secondAttempt = store.claimNextJob();
+    expect(secondAttempt).toMatchObject({id: proxyId, attempt: 2, scope: 'scene-one'});
+    store.requestJobCancellation(created.project.id, proxyId);
+    store.markJobCancelled(proxyId);
+    expect(store.getReviewWorkspace(created.project.id).jobs.find(({id}) => id === proxyId)?.status).toBe('CANCELLED');
+
+    store.queueMediaJob(created.project.id, {type: 'POST_PROCESS', sourcePath: sourceRelative});
+    const interrupted = store.claimNextJob();
+    writeFileSync(interrupted?.tempOutputPath ?? '', 'partial', 'utf8');
+    expect(store.recoverInterruptedJobs()).toBe(1);
+    expect(existsSync(interrupted?.tempOutputPath ?? '')).toBe(false);
+    const recovered = store.getReviewWorkspace(created.project.id).jobs.find(({id}) => id === interrupted?.id);
+    expect(recovered).toMatchObject({status: 'RETRYABLE_FAILED', errorMessage: expect.stringContaining('stopped')});
+  });
+
+  it('executes a real local ffprobe job through the worker', async () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Worker Probe', question: 'Does the local worker execute media tools?'});
+    const sourceRelative = 'assets/probe.wav';
+    writeFileSync(path.join(created.project.rootPath, sourceRelative), silentWav(0.25));
+    const queued = store.queueMediaJob(created.project.id, {type: 'PROBE', sourcePath: sourceRelative});
+    const jobId = queued.jobs[0]?.id ?? '';
+    const runner = new LocalJobRunner(store, path.resolve(import.meta.dirname, '../../..'));
+    runner.start();
+    let job = store.getReviewWorkspace(created.project.id).jobs.find(({id}) => id === jobId);
+    const deadline = Date.now() + 10_000;
+    while (job?.status === 'QUEUED' || job?.status === 'RUNNING') {
+      if (Date.now() > deadline) throw new Error('Timed out waiting for local probe job.');
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      job = store.getReviewWorkspace(created.project.id).jobs.find(({id}) => id === jobId);
+    }
+    runner.stop();
+    expect(job).toMatchObject({status: 'COMPLETED', progress: 1});
+    expect(readFileSync(path.join(created.project.rootPath, job?.outputPath ?? ''), 'utf8')).toContain('"streams"');
+    expect(job?.log).toContain('Starting attempt 1');
+  });
+
+  it.runIf(process.env.NARRA_RENDER_SMOKE === '1')('renders a real one-second snapshot through the local worker', async () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Worker Render', question: 'Does the local render worker produce a video?'});
+    const projectId = created.project.id;
+    const importDirectory = mkdtempSync(path.join(tmpdir(), 'narra-render-smoke-import-'));
+    temporaryDirectories.push(importDirectory);
+    const scenesPath = path.join(importDirectory, 'scenes.json');
+    const shotsPath = path.join(importDirectory, 'shots.json');
+    writeFileSync(scenesPath, JSON.stringify([{
+      id: 'scene-one', projectId, order: 0, title: 'Smoke', narration: 'Local render.', durationSec: 1, claimIds: [],
+    }]), 'utf8');
+    writeFileSync(shotsPath, JSON.stringify([{
+      id: 'shot-one', projectId, sceneId: 'scene-one', order: 0, durationSec: 1,
+      visualType: 'TEXT', visualPurpose: 'Verify local render', assetRoute: 'NONE', claimIds: [],
+    }]), 'utf8');
+    store.importStoryboard(projectId, scenesPath, shotsPath);
+    store.saveEditorialDocument(projectId, 'THESIS', 'A local worker can render an immutable snapshot.');
+    store.saveEditorialDocument(projectId, 'SCRIPT', '# Smoke\n\nLocal render.');
+    for (const gate of ['TOPIC', 'THESIS', 'SCRIPT', 'STORYBOARD', 'ASSETS'] as const) store.approveGate(projectId, gate, 'Render smoke.');
+    const queued = store.queueRender(projectId, 'ROUGH');
+    const jobId = queued.jobs[0]?.id ?? '';
+    const runner = new LocalJobRunner(store, path.resolve(import.meta.dirname, '../../..'));
+    runner.start();
+    let job = store.getReviewWorkspace(projectId).jobs.find(({id}) => id === jobId);
+    const deadline = Date.now() + 90_000;
+    while (job?.status === 'QUEUED' || job?.status === 'RUNNING') {
+      if (Date.now() > deadline) throw new Error('Timed out waiting for local render job.');
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      job = store.getReviewWorkspace(projectId).jobs.find(({id}) => id === jobId);
+    }
+    runner.stop();
+    if (job?.status !== 'COMPLETED') throw new Error(`Render smoke failed: ${job?.errorMessage ?? 'unknown'}\n${job?.log ?? ''}`);
+    expect(job).toMatchObject({status: 'COMPLETED', progress: 1, outputPath: 'renders/rough/render-v1.mp4'});
+    expect(existsSync(path.join(created.project.rootPath, job?.outputPath ?? ''))).toBe(true);
+  }, 90_000);
 });

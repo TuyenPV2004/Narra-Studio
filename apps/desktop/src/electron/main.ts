@@ -1,5 +1,6 @@
 import {
   ProjectStore,
+  LocalJobRunner,
   type AssetStatusInput,
   type CreateAssetTaskInput,
   type CreateProjectInput,
@@ -15,6 +16,7 @@ import {IPC_CHANNELS} from './ipc-channels.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 let projectStore: ProjectStore | null = null;
+let jobRunner: LocalJobRunner | null = null;
 
 protocol.registerSchemesAsPrivileged([
   {scheme: 'narra-media', privileges: {standard: true, secure: true, supportFetchAPI: true, stream: true}},
@@ -135,9 +137,20 @@ const registerProjectHandlers = (): void => {
   ipcMain.handle(IPC_CHANNELS.revokeGate, (_event, projectId: string, gate: ApprovalGate, note: string) =>
     getProjectStore().revokeGate(projectId, gate, note),
   );
-  ipcMain.handle(IPC_CHANNELS.queueRender, (_event, projectId: string, target: RenderTarget) =>
-    getProjectStore().queueRender(projectId, target),
-  );
+  ipcMain.handle(IPC_CHANNELS.queueRender, (_event, projectId: string, target: RenderTarget) => {
+    const result = getProjectStore().queueRender(projectId, target);
+    void jobRunner?.runNext();
+    return result;
+  });
+  ipcMain.handle(IPC_CHANNELS.cancelJob, (_event, projectId: string, jobId: string) => {
+    jobRunner?.cancel(projectId, jobId);
+    return getProjectStore().getReviewWorkspace(projectId);
+  });
+  ipcMain.handle(IPC_CHANNELS.retryJob, (_event, projectId: string, jobId: string) => {
+    const result = getProjectStore().retryJob(projectId, jobId);
+    void jobRunner?.runNext();
+    return result;
+  });
   ipcMain.handle(IPC_CHANNELS.chooseAndAttachRenderOutput, async (_event, projectId: string, jobId: string) => {
     const selection = await dialog.showOpenDialog({
       title: 'Attach completed render output',
@@ -178,6 +191,8 @@ void app.whenReady().then(async () => {
   const workspaceRoot =
     process.env.NARRA_WORKSPACE_ROOT ?? path.join(app.getPath('documents'), 'Narra Studio', 'projects');
   projectStore = new ProjectStore(workspaceRoot);
+  jobRunner = new LocalJobRunner(projectStore, path.resolve(currentDirectory, '../../..'));
+  jobRunner.start();
   registerProjectHandlers();
   protocol.handle('narra-media', (request) => {
     try {
@@ -221,16 +236,18 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Projects' || result.apiVersion !== 5 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Projects' || result.apiVersion !== 6 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Projects\napiVersion=5\nprojectCount=${result.projectCount}\n`,
+      `renderer=Projects\napiVersion=6\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     console.log('NARRA_DESKTOP_SMOKE_OK');
     await new Promise((resolve) => setTimeout(resolve, 100));
+    jobRunner?.stop();
+    jobRunner = null;
     projectStore.close();
     projectStore = null;
     app.exit(0);
@@ -248,12 +265,16 @@ void app.whenReady().then(async () => {
     const message = error instanceof Error ? `${error.message}\n${error.stack ?? ''}` : String(error);
     writeFileSync(path.join(process.env.NARRA_WORKSPACE_ROOT, '.desktop-smoke-failed'), message, 'utf8');
   }
+  jobRunner?.stop();
+  jobRunner = null;
   projectStore?.close();
   projectStore = null;
   app.exit(1);
 });
 
 app.on('before-quit', () => {
+  jobRunner?.stop();
+  jobRunner = null;
   projectStore?.close();
   projectStore = null;
 });

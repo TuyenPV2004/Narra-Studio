@@ -21,6 +21,7 @@ import {
 } from '@narra/contracts';
 import {createHash, randomUUID} from 'node:crypto';
 import {
+  appendFileSync,
   cpSync,
   copyFileSync,
   existsSync,
@@ -29,6 +30,7 @@ import {
   readdirSync,
   renameSync,
   statSync,
+  unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
@@ -51,6 +53,8 @@ import type {
   ProjectDetail,
   ProjectRecord,
   RenderJobRecord,
+  JobExecution,
+  QueueMediaJobInput,
   RenderTarget,
   ReviewWorkspace,
   StaleScope,
@@ -95,13 +99,23 @@ type ApprovalRow = {
 type JobRow = {
   id: string;
   project_id: string;
-  type: 'RENDER';
+  type: RenderJobRecord['type'];
   status: RenderJobRecord['status'];
   input_snapshot_path: string;
   version: number;
   target: RenderTarget;
   log_path: string | null;
   output_path: string | null;
+  temp_output_path: string | null;
+  attempt: number;
+  progress: number;
+  started_at: string | null;
+  finished_at: string | null;
+  error_message: string | null;
+  idempotency_key: string | null;
+  cancel_requested: number;
+  scope: string;
+  command_json: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -790,7 +804,9 @@ export class ProjectStore {
     });
     const jobRows = this.database.prepare(
       `SELECT id, project_id, type, status, input_snapshot_path, version, target,
-              log_path, output_path, created_at, updated_at
+              log_path, output_path, temp_output_path, attempt, progress, started_at,
+              finished_at, error_message, idempotency_key, cancel_requested, scope,
+              command_json, created_at, updated_at
        FROM jobs WHERE project_id = ? ORDER BY created_at DESC`,
     ).all(projectId) as JobRow[];
     return {
@@ -806,6 +822,14 @@ export class ProjectStore {
         inputSnapshotPath: row.input_snapshot_path,
         logPath: row.log_path,
         outputPath: row.output_path,
+        tempOutputPath: row.temp_output_path,
+        attempt: row.attempt,
+        progress: row.progress,
+        startedAt: row.started_at,
+        finishedAt: row.finished_at,
+        errorMessage: row.error_message,
+        cancelRequested: row.cancel_requested === 1,
+        scope: row.scope,
         log: row.log_path && existsSync(path.join(project.rootPath, ...row.log_path.split('/')))
           ? readFileSync(path.join(project.rootPath, ...row.log_path.split('/')), 'utf8')
           : '',
@@ -843,32 +867,227 @@ export class ProjectStore {
       throw new Error(`${requiredGate} must be approved before queuing a ${target.toLowerCase()} render.`);
     }
     const project = this.getProject(projectId).project;
+    const exportedPath = this.exportStoryboardRenderInput(projectId);
+    const snapshotContent = readFileSync(exportedPath, 'utf8');
+    const idempotencyKey = contentHash(`${target}\nFULL\n${snapshotContent}`);
+    const active = this.database.prepare(
+      `SELECT id FROM jobs WHERE project_id = ? AND idempotency_key = ?
+       AND status IN ('QUEUED', 'RUNNING')`,
+    ).get(projectId, idempotencyKey);
+    if (active) return this.getReviewWorkspace(projectId);
     const versionRow = this.database.prepare(
       'SELECT COALESCE(MAX(version), 0) + 1 AS next_version FROM jobs WHERE project_id = ? AND target = ?',
     ).get(projectId, target) as {next_version: number};
     const version = versionRow.next_version;
-    const exportedPath = this.exportStoryboardRenderInput(projectId);
     const snapshotRelative = `renders/${target.toLowerCase()}/render-v${version}-input.json`;
     const snapshotPath = path.join(project.rootPath, ...snapshotRelative.split('/'));
     renameSync(exportedPath, snapshotPath);
     const logRelative = `renders/${target.toLowerCase()}/render-v${version}.log`;
+    const tempOutputRelative = `renders/${target.toLowerCase()}/.render-v${version}.working.mp4`;
     const logPath = path.join(project.rootPath, ...logRelative.split('/'));
     const now = isoNow();
     writeFileSync(logPath, `[${now}] Queued ${target.toLowerCase()} render v${version}.\nSnapshot: ${snapshotRelative}\n`, 'utf8');
     this.database.prepare(
       `INSERT INTO jobs (id, project_id, type, status, input_snapshot_path, created_at, updated_at,
-                         version, target, log_path, output_path)
-       VALUES (?, ?, 'RENDER', 'QUEUED', ?, ?, ?, ?, ?, ?, NULL)`,
-    ).run(`render-${target.toLowerCase()}-${randomUUID().slice(0, 8)}`, projectId, snapshotRelative, now, now, version, target, logRelative);
+                         version, target, log_path, output_path, temp_output_path, idempotency_key, scope)
+       VALUES (?, ?, 'RENDER', 'QUEUED', ?, ?, ?, ?, ?, ?, NULL, ?, ?, 'FULL')`,
+    ).run(`render-${target.toLowerCase()}-${randomUUID().slice(0, 8)}`, projectId, snapshotRelative, now, now, version, target, logRelative, tempOutputRelative, idempotencyKey);
     return this.getReviewWorkspace(projectId);
+  }
+
+  queueMediaJob(projectId: string, input: QueueMediaJobInput): ReviewWorkspace {
+    const project = this.getProject(projectId).project;
+    const sourcePath = this.resolveProjectFile(project.rootPath, input.sourcePath, 'Media job source');
+    const sourceStat = statSync(sourcePath);
+    const scope = input.scope?.trim() || 'FULL';
+    const idempotencyKey = contentHash(JSON.stringify({
+      type: input.type,
+      sourcePath: input.sourcePath,
+      sourceSize: sourceStat.size,
+      sourceModifiedAt: sourceStat.mtimeMs,
+      scope,
+    }));
+    const active = this.database.prepare(
+      `SELECT id FROM jobs WHERE project_id = ? AND idempotency_key = ?
+       AND status IN ('QUEUED', 'RUNNING')`,
+    ).get(projectId, idempotencyKey);
+    if (active) return this.getReviewWorkspace(projectId);
+
+    const id = `${input.type.toLowerCase()}-${randomUUID().slice(0, 8)}`;
+    const directory = path.join(project.rootPath, 'renders/jobs');
+    mkdirSync(directory, {recursive: true});
+    const snapshotRelative = `renders/jobs/${id}-input.json`;
+    const logRelative = `renders/jobs/${id}.log`;
+    const extension = input.type === 'PROBE' ? 'txt' : 'mp4';
+    const tempOutputRelative = `renders/jobs/.${id}.working.${extension}`;
+    const now = isoNow();
+    atomicWriteJson(path.join(project.rootPath, ...snapshotRelative.split('/')), {type: input.type, sourcePath: input.sourcePath, scope});
+    writeFileSync(path.join(project.rootPath, ...logRelative.split('/')), `[${now}] Queued ${input.type.toLowerCase()} job.\nSnapshot: ${snapshotRelative}\n`, 'utf8');
+    this.database.prepare(
+      `INSERT INTO jobs (id, project_id, type, status, input_snapshot_path, created_at, updated_at,
+                         version, target, log_path, output_path, temp_output_path, idempotency_key, scope)
+       VALUES (?, ?, ?, 'QUEUED', ?, ?, ?, 1, 'ROUGH', ?, NULL, ?, ?, ?)`,
+    ).run(id, projectId, input.type, snapshotRelative, now, now, logRelative, tempOutputRelative, idempotencyKey, scope);
+    return this.getReviewWorkspace(projectId);
+  }
+
+  claimNextJob(): JobExecution | null {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const row = this.database.prepare(
+        `SELECT jobs.*, projects.root_path FROM jobs JOIN projects ON projects.id = jobs.project_id
+         WHERE jobs.status = 'QUEUED' ORDER BY jobs.created_at ASC LIMIT 1`,
+      ).get() as (JobRow & {root_path: string}) | undefined;
+      if (!row) {
+        this.database.exec('COMMIT');
+        return null;
+      }
+      const now = isoNow();
+      this.database.prepare(
+        `UPDATE jobs SET status = 'RUNNING', attempt = attempt + 1, progress = 0,
+         started_at = ?, finished_at = NULL, error_message = NULL, cancel_requested = 0, updated_at = ?
+         WHERE id = ? AND status = 'QUEUED'`,
+      ).run(now, now, row.id);
+      this.database.exec('COMMIT');
+      const outputRelative = row.type === 'RENDER'
+        ? `renders/${row.target.toLowerCase()}/render-v${row.version}.mp4`
+        : `renders/jobs/${row.id}.${row.type === 'PROBE' ? 'txt' : 'mp4'}`;
+      return {
+        id: row.id,
+        projectId: row.project_id,
+        type: row.type,
+        target: row.target,
+        version: row.version,
+        attempt: row.attempt + 1,
+        scope: row.scope,
+        projectRoot: row.root_path,
+        inputSnapshotPath: path.join(row.root_path, ...row.input_snapshot_path.split('/')),
+        tempOutputPath: path.join(row.root_path, ...(row.temp_output_path ?? '').split('/')),
+        outputPath: path.join(row.root_path, ...outputRelative.split('/')),
+      };
+    } catch (error) {
+      this.database.exec('ROLLBACK');
+      throw error;
+    }
+  }
+
+  setJobCommand(jobId: string, command: string, args: string[]): void {
+    this.database.prepare('UPDATE jobs SET command_json = ?, updated_at = ? WHERE id = ?')
+      .run(JSON.stringify({command, args}), isoNow(), jobId);
+  }
+
+  appendJobLog(jobId: string, stream: 'SYSTEM' | 'STDOUT' | 'STDERR', message: string): void {
+    const row = this.database.prepare(
+      `SELECT jobs.log_path, projects.root_path FROM jobs JOIN projects ON projects.id = jobs.project_id WHERE jobs.id = ?`,
+    ).get(jobId) as {log_path: string | null; root_path: string} | undefined;
+    if (!row?.log_path) return;
+    const normalized = message.replace(/\r\n/g, '\n').trimEnd();
+    if (!normalized) return;
+    appendFileSync(path.join(row.root_path, ...row.log_path.split('/')), `[${isoNow()}] ${stream}: ${normalized}\n`, 'utf8');
+  }
+
+  updateJobProgress(jobId: string, progress: number): void {
+    const safeProgress = Math.max(0, Math.min(1, progress));
+    this.database.prepare(
+      `UPDATE jobs SET progress = CASE WHEN progress > ? THEN progress ELSE ? END, updated_at = ?
+       WHERE id = ? AND status = 'RUNNING'`,
+    ).run(safeProgress, safeProgress, isoNow(), jobId);
+  }
+
+  isJobCancellationRequested(jobId: string): boolean {
+    const row = this.database.prepare('SELECT cancel_requested FROM jobs WHERE id = ?').get(jobId) as {cancel_requested: number} | undefined;
+    return row?.cancel_requested === 1;
+  }
+
+  requestJobCancellation(projectId: string, jobId: string): ReviewWorkspace {
+    const row = this.database.prepare('SELECT status FROM jobs WHERE id = ? AND project_id = ?')
+      .get(jobId, projectId) as {status: RenderJobRecord['status']} | undefined;
+    if (!row) throw new Error(`Render job ${jobId} was not found.`);
+    const now = isoNow();
+    if (row.status === 'QUEUED') {
+      this.database.prepare(
+        `UPDATE jobs SET status = 'CANCELLED', cancel_requested = 1, finished_at = ?, updated_at = ? WHERE id = ?`,
+      ).run(now, now, jobId);
+      this.appendJobLog(jobId, 'SYSTEM', 'Cancelled before execution.');
+    } else if (row.status === 'RUNNING') {
+      this.database.prepare('UPDATE jobs SET cancel_requested = 1, updated_at = ? WHERE id = ?').run(now, jobId);
+      this.appendJobLog(jobId, 'SYSTEM', 'Cancellation requested.');
+    }
+    return this.getReviewWorkspace(projectId);
+  }
+
+  markJobCancelled(jobId: string): void {
+    this.removeJobTemporaryOutput(jobId);
+    const now = isoNow();
+    this.database.prepare(
+      `UPDATE jobs SET status = 'CANCELLED', finished_at = ?, updated_at = ? WHERE id = ?`,
+    ).run(now, now, jobId);
+    this.appendJobLog(jobId, 'SYSTEM', 'Job cancelled; temporary output removed.');
+  }
+
+  retryJob(projectId: string, jobId: string): ReviewWorkspace {
+    const row = this.database.prepare('SELECT status FROM jobs WHERE id = ? AND project_id = ?')
+      .get(jobId, projectId) as {status: RenderJobRecord['status']} | undefined;
+    if (!row) throw new Error(`Render job ${jobId} was not found.`);
+    if (!['RETRYABLE_FAILED', 'CANCELLED'].includes(row.status)) {
+      throw new Error('Only a retryable failed or cancelled job can be retried.');
+    }
+    this.removeJobTemporaryOutput(jobId);
+    this.database.prepare(
+      `UPDATE jobs SET status = 'QUEUED', progress = 0, started_at = NULL, finished_at = NULL,
+       error_message = NULL, cancel_requested = 0, updated_at = ? WHERE id = ?`,
+    ).run(isoNow(), jobId);
+    this.appendJobLog(jobId, 'SYSTEM', 'Queued for retry with the same immutable snapshot.');
+    return this.getReviewWorkspace(projectId);
+  }
+
+  completeJob(jobId: string): void {
+    const row = this.database.prepare(
+      `SELECT jobs.project_id, jobs.type, jobs.id, jobs.target, jobs.version, jobs.temp_output_path, projects.root_path
+       FROM jobs JOIN projects ON projects.id = jobs.project_id WHERE jobs.id = ?`,
+    ).get(jobId) as {project_id: string; type: RenderJobRecord['type']; id: string; target: RenderTarget; version: number; temp_output_path: string | null; root_path: string} | undefined;
+    if (!row?.temp_output_path) throw new Error(`Job ${jobId} has no temporary output path.`);
+    const temporary = path.join(row.root_path, ...row.temp_output_path.split('/'));
+    if (!existsSync(temporary) || !statSync(temporary).isFile()) throw new Error('Renderer exited without producing its temporary output.');
+    const outputRelative = row.type === 'RENDER'
+      ? `renders/${row.target.toLowerCase()}/render-v${row.version}.mp4`
+      : `renders/jobs/${row.id}.${row.type === 'PROBE' ? 'txt' : 'mp4'}`;
+    const output = path.join(row.root_path, ...outputRelative.split('/'));
+    if (existsSync(output)) throw new Error(`Refusing to overwrite existing output: ${outputRelative}`);
+    renameSync(temporary, output);
+    const now = isoNow();
+    this.database.prepare(
+      `UPDATE jobs SET status = 'COMPLETED', progress = 1, output_path = ?, finished_at = ?,
+       error_message = NULL, updated_at = ? WHERE id = ?`,
+    ).run(outputRelative, now, now, jobId);
+    if (row.type === 'RENDER') this.setScope(row.project_id, 'RENDER', false, null);
+    this.appendJobLog(jobId, 'SYSTEM', `Completed atomically: ${outputRelative}`);
+  }
+
+  failJob(jobId: string, message: string, retryable = true): void {
+    this.removeJobTemporaryOutput(jobId);
+    const row = this.database.prepare('SELECT attempt FROM jobs WHERE id = ?').get(jobId) as {attempt: number} | undefined;
+    const status = retryable && (row?.attempt ?? 0) < 3 ? 'RETRYABLE_FAILED' : 'TERMINAL_FAILED';
+    const now = isoNow();
+    this.database.prepare(
+      `UPDATE jobs SET status = ?, error_message = ?, finished_at = ?, updated_at = ? WHERE id = ?`,
+    ).run(status, message.slice(0, 2000), now, now, jobId);
+    this.appendJobLog(jobId, 'SYSTEM', `${status}: ${message}`);
+  }
+
+  recoverInterruptedJobs(): number {
+    const rows = this.database.prepare("SELECT id FROM jobs WHERE status = 'RUNNING'").all() as Array<{id: string}>;
+    for (const row of rows) this.failJob(row.id, 'Application stopped while the job was running. Safe to retry.', true);
+    return rows.length;
   }
 
   attachRenderOutput(projectId: string, jobId: string, sourcePath: string): ReviewWorkspace {
     const project = this.getProject(projectId).project;
     const job = this.database.prepare(
-      'SELECT id, version, target, log_path FROM jobs WHERE id = ? AND project_id = ?',
-    ).get(jobId, projectId) as Pick<JobRow, 'id' | 'version' | 'target' | 'log_path'> | undefined;
+      'SELECT id, version, target, status, log_path FROM jobs WHERE id = ? AND project_id = ?',
+    ).get(jobId, projectId) as Pick<JobRow, 'id' | 'version' | 'target' | 'status' | 'log_path'> | undefined;
     if (!job) throw new Error(`Render job ${jobId} was not found.`);
+    if (job.status === 'RUNNING') throw new Error('Cancel the running job before attaching an existing output.');
     if (!existsSync(sourcePath) || !statSync(sourcePath).isFile()) throw new Error('Selected render output is not a file.');
     const extension = path.extname(sourcePath).toLowerCase() || '.mp4';
     const outputRelative = `renders/${job.target.toLowerCase()}/render-v${job.version}${extension}`;
@@ -880,10 +1099,25 @@ export class ProjectStore {
       writeFileSync(logPath, `${previous}[${now}] Output imported: ${outputRelative}\n`, 'utf8');
     }
     this.database.prepare(
-      `UPDATE jobs SET status = 'COMPLETED', output_path = ?, updated_at = ? WHERE id = ?`,
-    ).run(outputRelative, now, jobId);
+      `UPDATE jobs SET status = 'COMPLETED', progress = 1, output_path = ?, finished_at = ?,
+       error_message = NULL, updated_at = ? WHERE id = ?`,
+    ).run(outputRelative, now, now, jobId);
     this.setScope(projectId, 'RENDER', false, null);
     return this.getReviewWorkspace(projectId);
+  }
+
+  private removeJobTemporaryOutput(jobId: string): void {
+    const row = this.database.prepare(
+      `SELECT jobs.temp_output_path, projects.root_path FROM jobs
+       JOIN projects ON projects.id = jobs.project_id WHERE jobs.id = ?`,
+    ).get(jobId) as {temp_output_path: string | null; root_path: string} | undefined;
+    if (!row?.temp_output_path) return;
+    const projectRoot = path.resolve(row.root_path);
+    const temporary = path.resolve(projectRoot, ...row.temp_output_path.split('/'));
+    if (!temporary.startsWith(`${projectRoot}${path.sep}`)) {
+      throw new Error(`Unsafe temporary output path for job ${jobId}.`);
+    }
+    if (existsSync(temporary) && statSync(temporary).isFile()) unlinkSync(temporary);
   }
 
   private upsertProject(project: Project, rootPath: string, archived: boolean): void {

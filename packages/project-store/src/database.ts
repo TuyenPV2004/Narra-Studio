@@ -2,7 +2,7 @@ import {mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 
-const DATABASE_VERSION = 3;
+const DATABASE_VERSION = 4;
 
 export const openWorkspaceDatabase = (workspaceRoot: string): DatabaseSync => {
   const stateDirectory = path.join(workspaceRoot, '.narra');
@@ -98,6 +98,27 @@ export const openWorkspaceDatabase = (workspaceRoot: string): DatabaseSync => {
       ALTER TABLE jobs ADD COLUMN output_path TEXT;
       CREATE UNIQUE INDEX approvals_project_gate ON approvals(project_id, gate);
       PRAGMA user_version = 3;
+      COMMIT;
+    `);
+  }
+
+  if (version.user_version < 4) {
+    database.exec(`
+      BEGIN IMMEDIATE;
+      ALTER TABLE jobs ADD COLUMN attempt INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE jobs ADD COLUMN progress REAL NOT NULL DEFAULT 0;
+      ALTER TABLE jobs ADD COLUMN started_at TEXT;
+      ALTER TABLE jobs ADD COLUMN finished_at TEXT;
+      ALTER TABLE jobs ADD COLUMN error_message TEXT;
+      ALTER TABLE jobs ADD COLUMN idempotency_key TEXT;
+      ALTER TABLE jobs ADD COLUMN temp_output_path TEXT;
+      ALTER TABLE jobs ADD COLUMN cancel_requested INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE jobs ADD COLUMN scope TEXT NOT NULL DEFAULT 'FULL';
+      ALTER TABLE jobs ADD COLUMN command_json TEXT;
+      CREATE UNIQUE INDEX jobs_active_idempotency
+        ON jobs(project_id, idempotency_key)
+        WHERE idempotency_key IS NOT NULL AND status IN ('QUEUED', 'RUNNING');
+      PRAGMA user_version = 4;
       COMMIT;
     `);
   }

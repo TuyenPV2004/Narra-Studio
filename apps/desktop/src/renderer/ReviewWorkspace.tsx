@@ -23,6 +23,14 @@ export const ReviewWorkspaceView = ({projectId, onProjectRefresh}: {
     load().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Could not load review state.')).finally(() => setBusy(false));
   }, [projectId]);
 
+  useEffect(() => {
+    if (!workspace?.jobs.some(({status}) => status === 'QUEUED' || status === 'RUNNING')) return;
+    const timer = window.setInterval(() => {
+      window.narra.getReviewWorkspace(projectId).then(setWorkspace).catch(() => undefined);
+    }, 750);
+    return () => window.clearInterval(timer);
+  }, [projectId, workspace?.jobs.map(({id, status}) => `${id}:${status}`).join('|')]);
+
   const act = async (action: () => Promise<ReviewWorkspace>): Promise<void> => {
     setBusy(true);
     setError(null);
@@ -40,6 +48,8 @@ export const ReviewWorkspaceView = ({projectId, onProjectRefresh}: {
   const approve = (gate: ApprovalGate) => act(() => window.narra.approveGate(projectId, gate, note));
   const revoke = (gate: ApprovalGate) => act(() => window.narra.revokeGate(projectId, gate, note));
   const queue = (target: RenderTarget) => act(() => window.narra.queueRender(projectId, target));
+  const cancel = (jobId: string) => act(() => window.narra.cancelJob(projectId, jobId));
+  const retry = (jobId: string) => act(() => window.narra.retryJob(projectId, jobId));
   const attach = async (jobId: string): Promise<void> => {
     setBusy(true);
     setError(null);
@@ -80,14 +90,24 @@ export const ReviewWorkspaceView = ({projectId, onProjectRefresh}: {
       </div>
       <section className="render-panel">
         <header>
-          <div><p className="section-label">RENDER QUEUE</p><h3>Versioned snapshots and local logs</h3></div>
+          <div><p className="section-label">LOCAL JOB QUEUE</p><h3>Versioned snapshots, progress and recovery</h3></div>
           <div className="actions"><button className="secondary" disabled={busy} onClick={() => void queue('ROUGH')}>Queue rough</button><button className="primary" disabled={busy} onClick={() => void queue('FINAL')}>Queue final</button></div>
         </header>
         {workspace.jobs.length === 0 ? <p className="render-empty">No render requests yet. Approve assets before queuing the rough cut.</p> : workspace.jobs.map((job) => (
           <article className="render-job" key={job.id}>
+            <p className="section-label">{job.type}</p>
             <div><strong>{job.target} · v{job.version}</strong><span className={`job-state ${job.status.toLowerCase()}`}>{job.status.replace('_', ' ')}</span><small>{formatDate(job.updatedAt)}</small></div>
             <code>{job.inputSnapshotPath}</code>
-            {job.outputPath ? <p className="render-output">Output: {job.outputPath}</p> : <button className="secondary" disabled={busy} onClick={() => void attach(job.id)}>Attach completed video</button>}
+            <progress max={1} value={job.progress} aria-label={`Render progress ${Math.round(job.progress * 100)} percent`} />
+            <small>Attempt {job.attempt} · {Math.round(job.progress * 100)}% · scope {job.scope}</small>
+            {job.errorMessage && <p className="notice error-notice">{job.errorMessage}</p>}
+            {job.outputPath
+              ? <p className="render-output">Output: {job.outputPath}</p>
+              : <div className="actions">
+                  {(job.status === 'QUEUED' || job.status === 'RUNNING') && <button className="danger" disabled={busy || job.cancelRequested} onClick={() => void cancel(job.id)}>{job.cancelRequested ? 'Cancelling…' : 'Cancel'}</button>}
+                  {(job.status === 'RETRYABLE_FAILED' || job.status === 'CANCELLED') && <button className="primary" disabled={busy} onClick={() => void retry(job.id)}>Retry this job</button>}
+                  {job.type === 'RENDER' && job.status !== 'RUNNING' && <button className="secondary" disabled={busy} onClick={() => void attach(job.id)}>Attach existing video</button>}
+                </div>}
             <details><summary>Log</summary><pre>{job.log || 'No log entries.'}</pre></details>
           </article>
         ))}

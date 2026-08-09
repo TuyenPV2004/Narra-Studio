@@ -122,20 +122,49 @@ export type ApprovalRecord = {
 };
 
 export type RenderTarget = 'ROUGH' | 'FINAL';
+export type MediaJobType = 'PROBE' | 'PROXY' | 'RENDER' | 'POST_PROCESS';
+
+export type QueueMediaJobInput = {
+  type: Exclude<MediaJobType, 'RENDER'>;
+  sourcePath: string;
+  scope?: string;
+};
 
 export type RenderJobRecord = {
   id: string;
   projectId: string;
-  type: 'RENDER';
+  type: MediaJobType;
   status: 'QUEUED' | 'RUNNING' | 'COMPLETED' | 'RETRYABLE_FAILED' | 'TERMINAL_FAILED' | 'CANCELLED';
   version: number;
   target: RenderTarget;
   inputSnapshotPath: string;
   logPath: string | null;
   outputPath: string | null;
+  tempOutputPath: string | null;
+  attempt: number;
+  progress: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  errorMessage: string | null;
+  cancelRequested: boolean;
+  scope: string;
   log: string;
   createdAt: string;
   updatedAt: string;
+};
+
+export type JobExecution = {
+  id: string;
+  projectId: string;
+  type: MediaJobType;
+  target: RenderTarget;
+  version: number;
+  attempt: number;
+  scope: string;
+  projectRoot: string;
+  inputSnapshotPath: string;
+  tempOutputPath: string;
+  outputPath: string;
 };
 
 export type ReviewWorkspace = {

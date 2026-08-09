@@ -17,7 +17,7 @@ import type {
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 5;
+  readonly version: 6;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -43,6 +43,8 @@ interface NarraDesktopApi {
   approveGate: (projectId: string, gate: ApprovalGate, note: string) => Promise<ReviewWorkspace>;
   revokeGate: (projectId: string, gate: ApprovalGate, note: string) => Promise<ReviewWorkspace>;
   queueRender: (projectId: string, target: RenderTarget) => Promise<ReviewWorkspace>;
+  cancelJob: (projectId: string, jobId: string) => Promise<ReviewWorkspace>;
+  retryJob: (projectId: string, jobId: string) => Promise<ReviewWorkspace>;
   chooseAndAttachRenderOutput: (projectId: string, jobId: string) => Promise<ReviewWorkspace | null>;
 }
 
