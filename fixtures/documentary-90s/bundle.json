@@ -1,0 +1,145 @@
+{
+  "project": {
+    "schemaVersion": 1,
+    "id": "ai-electricity-90s",
+    "title": "Why AI Needs So Much Electricity",
+    "question": "Why is AI infrastructure increasing electricity demand?",
+    "status": "STORYBOARD_APPROVED",
+    "targetDurationSec": 90,
+    "language": "en-US",
+    "aspectRatio": "16:9",
+    "createdAt": "2026-08-09T09:00:00+07:00",
+    "updatedAt": "2026-08-09T09:30:00+07:00"
+  },
+  "sources": [{
+    "id": "src-iea-data-centres",
+    "projectId": "ai-electricity-90s",
+    "title": "Electricity 2024 — Analysis and forecast to 2026",
+    "url": "https://www.iea.org/reports/electricity-2024",
+    "publisher": "International Energy Agency",
+    "sourceType": "OFFICIAL",
+    "accessedAt": "2026-08-09T09:05:00+07:00"
+  }],
+  "facts": [{
+    "id": "fact-data-centre-demand",
+    "projectId": "ai-electricity-90s",
+    "statement": "Data-centre electricity demand is expected to grow materially as AI workloads expand.",
+    "sourceIds": ["src-iea-data-centres"],
+    "confidence": "HIGH"
+  }],
+  "claims": [{
+    "id": "claim-ai-is-physical",
+    "projectId": "ai-electricity-90s",
+    "statement": "The AI boom is also a physical infrastructure and electricity story.",
+    "factIds": ["fact-data-centre-demand"],
+    "scriptVersion": 1,
+    "status": "SUPPORTED"
+  }],
+  "scenes": [
+    {
+      "id": "scene-hook",
+      "projectId": "ai-electricity-90s",
+      "order": 0,
+      "title": "The invisible factory",
+      "narration": "Every AI answer begins in a physical place filled with chips, cooling systems and electrical equipment.",
+      "durationSec": 30,
+      "claimIds": ["claim-ai-is-physical"]
+    },
+    {
+      "id": "scene-mechanism",
+      "projectId": "ai-electricity-90s",
+      "order": 1,
+      "title": "Where the power goes",
+      "narration": "Computing and cooling turn electricity into usable AI capacity, while grid connections limit how quickly new sites can open.",
+      "durationSec": 40,
+      "claimIds": ["claim-ai-is-physical"]
+    },
+    {
+      "id": "scene-conclusion",
+      "projectId": "ai-electricity-90s",
+      "order": 2,
+      "title": "The real bottleneck",
+      "narration": "The next AI breakthrough may depend as much on transformers and transmission lines as on faster algorithms.",
+      "durationSec": 20,
+      "claimIds": ["claim-ai-is-physical"]
+    }
+  ],
+  "shots": [
+    {
+      "id": "shot-data-centre",
+      "projectId": "ai-electricity-90s",
+      "sceneId": "scene-hook",
+      "order": 0,
+      "durationSec": 30,
+      "visualType": "AI_IMAGE",
+      "visualPurpose": "Establish the physical scale of an AI data centre.",
+      "assetId": "asset-data-centre-image"
+    },
+    {
+      "id": "shot-power-flow",
+      "projectId": "ai-electricity-90s",
+      "sceneId": "scene-mechanism",
+      "order": 0,
+      "durationSec": 40,
+      "visualType": "AI_VIDEO",
+      "visualPurpose": "Show electricity moving through compute and cooling infrastructure.",
+      "assetId": "asset-power-flow-video"
+    },
+    {
+      "id": "shot-demand-chart",
+      "projectId": "ai-electricity-90s",
+      "sceneId": "scene-conclusion",
+      "order": 0,
+      "durationSec": 20,
+      "visualType": "CHART",
+      "visualPurpose": "Connect the argument to sourced electricity-demand evidence."
+    }
+  ],
+  "assets": [
+    {
+      "id": "asset-data-centre-image",
+      "projectId": "ai-electricity-90s",
+      "shotId": "shot-data-centre",
+      "kind": "IMAGE",
+      "status": "QA_PASS",
+      "path": "assets/images/data-centre-placeholder.svg",
+      "rightsNote": "Repository-authored placeholder for local fixture use."
+    },
+    {
+      "id": "asset-power-flow-video",
+      "projectId": "ai-electricity-90s",
+      "shotId": "shot-power-flow",
+      "kind": "VIDEO",
+      "status": "PLANNED",
+      "rightsNote": "Synthetic fixture video will be generated during Render Core phase."
+    },
+    {
+      "id": "asset-narration",
+      "projectId": "ai-electricity-90s",
+      "shotId": "shot-data-centre",
+      "kind": "AUDIO",
+      "status": "PLANNED",
+      "rightsNote": "Synthetic fixture narration will be generated or imported during the voice phase."
+    },
+    {
+      "id": "asset-captions",
+      "projectId": "ai-electricity-90s",
+      "shotId": "shot-data-centre",
+      "kind": "CAPTION",
+      "status": "IMPORTED",
+      "path": "captions/narration.vtt",
+      "rightsNote": "Repository-authored caption fixture."
+    }
+  ],
+  "jobs": [],
+  "approvals": [{
+    "id": "approval-storyboard-v1",
+    "projectId": "ai-electricity-90s",
+    "gate": "STORYBOARD",
+    "status": "APPROVED",
+    "artifactVersion": 1,
+    "approvedAt": "2026-08-09T09:30:00+07:00",
+    "note": "Fixture approval for contract validation."
+  }]
+}
+

@@ -1,0 +1,27 @@
+{
+  "name": "narra-studio",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.16.0",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "pnpm --filter @narra/contracts build && pnpm --filter @narra/desktop build",
+    "dev": "pnpm --filter @narra/desktop dev",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "typecheck": "pnpm --filter @narra/contracts typecheck && pnpm --filter @narra/desktop typecheck",
+    "validate": "pnpm lint && pnpm typecheck && pnpm test && pnpm build"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^26.2.0",
+    "eslint": "^10.8.1",
+    "globals": "^17.9.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.66.0",
+    "vitest": "^4.1.10"
+  }
+}

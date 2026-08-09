@@ -1,0 +1,45 @@
+{
+  "project": {
+    "schemaVersion": 1,
+    "id": "invalid-project",
+    "title": "Invalid fixture",
+    "question": "Should broken provenance pass?",
+    "status": "NEW",
+    "targetDurationSec": 90,
+    "language": "en-US",
+    "aspectRatio": "16:9",
+    "createdAt": "2026-08-09T09:00:00+07:00",
+    "updatedAt": "2026-08-09T09:00:00+07:00"
+  },
+  "sources": [],
+  "facts": [{
+    "id": "fact-broken",
+    "projectId": "invalid-project",
+    "statement": "This fact points to a source that does not exist.",
+    "sourceIds": ["src-missing"],
+    "confidence": "LOW"
+  }],
+  "claims": [],
+  "scenes": [{
+    "id": "scene-invalid",
+    "projectId": "invalid-project",
+    "order": 0,
+    "title": "Invalid",
+    "narration": "Invalid fixture narration.",
+    "durationSec": 90,
+    "claimIds": []
+  }],
+  "shots": [{
+    "id": "shot-invalid",
+    "projectId": "invalid-project",
+    "sceneId": "scene-invalid",
+    "order": 0,
+    "durationSec": 90,
+    "visualType": "TEXT",
+    "visualPurpose": "Exercise invalid provenance validation."
+  }],
+  "assets": [],
+  "jobs": [],
+  "approvals": []
+}
+
