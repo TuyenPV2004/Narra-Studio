@@ -1,4 +1,4 @@
-import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProjectInput, EditorialDocument, RenderTarget, SelectTopicInput, SaveOutlineInput, PrepareFlowTaskInput, GenerateNarrationInput, GenerateNarrationBatchInput} from '@narra/project-store';
+import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProjectInput, EditorialDocument, RenderTarget, SelectTopicInput, SaveOutlineInput, PrepareFlowTaskInput, GenerateNarrationInput, GenerateNarrationBatchInput, UpdateCaptionCueInput, UpdateShotAudioInput} from '@narra/project-store';
 import {contextBridge, ipcRenderer, webUtils} from 'electron';
 import type {CodexBridgeNotification} from './codex-bridge.js';
 import type {AiReasoningEffort, AiStage} from '@narra/contracts';
@@ -32,6 +32,11 @@ const channels = {
   generateMissingNarration: 'voice:generate-missing',
   chooseAndImportCaptions: 'voice:choose-and-import-captions',
   fitTimelineToNarration: 'voice:fit-timeline',
+  getTimelineWorkspace: 'timeline:get',
+  updateCaptionCue: 'timeline:update-caption',
+  updateShotAudio: 'timeline:update-shot-audio',
+  chooseAndImportTimelineAudio: 'timeline:import-audio',
+  generateCaptionsFromNarration: 'timeline:generate-captions',
   getEditorialWorkspace: 'editorial:get',
   saveEditorialDocument: 'editorial:save-document',
   selectTopicCandidate: 'editorial:select-topic',
@@ -62,7 +67,7 @@ const channels = {
 
 const api = {
   runtime: 'electron',
-  version: 11,
+  version: 12,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -101,6 +106,14 @@ const api = {
     ipcRenderer.invoke(channels.generateMissingNarration, projectId, input),
   chooseAndImportCaptions: (projectId: string) => ipcRenderer.invoke(channels.chooseAndImportCaptions, projectId),
   fitTimelineToNarration: (projectId: string) => ipcRenderer.invoke(channels.fitTimelineToNarration, projectId),
+  getTimelineWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getTimelineWorkspace, projectId),
+  generateCaptionsFromNarration: (projectId: string) => ipcRenderer.invoke(channels.generateCaptionsFromNarration, projectId),
+  updateCaptionCue: (projectId: string, captionId: string, input: UpdateCaptionCueInput) =>
+    ipcRenderer.invoke(channels.updateCaptionCue, projectId, captionId, input),
+  updateShotAudio: (projectId: string, shotId: string, input: UpdateShotAudioInput) =>
+    ipcRenderer.invoke(channels.updateShotAudio, projectId, shotId, input),
+  chooseAndImportTimelineAudio: (projectId: string, role: 'MUSIC' | 'SFX') =>
+    ipcRenderer.invoke(channels.chooseAndImportTimelineAudio, projectId, role),
   getEditorialWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getEditorialWorkspace, projectId),
   saveEditorialDocument: (projectId: string, document: EditorialDocument, content: string) =>
     ipcRenderer.invoke(channels.saveEditorialDocument, projectId, document, content),

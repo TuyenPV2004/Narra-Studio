@@ -99,6 +99,8 @@ export const ShotSchema = z.object({
   evidenceRequired: z.boolean().optional(),
   claimIds: z.array(IdSchema).optional(),
   assetId: IdSchema.optional(),
+  sourceAudioMode: z.enum(['MUTE', 'DUCK', 'KEEP']).default('MUTE'),
+  sourceAudioVolume: z.number().min(0).max(1).default(0.18),
 });
 
 export const MediaMetadataSchema = z.object({
@@ -160,6 +162,9 @@ export const AssetSchema = z.object({
   metadata: MediaMetadataSchema.optional(),
   qaNote: z.string().optional(),
   generation: AssetGenerationSchema.optional(),
+  audioRole: z.enum(['MUSIC', 'SFX']).optional(),
+  volume: z.number().min(0).max(1).optional(),
+  duckUnderNarration: z.boolean().optional(),
 });
 
 export const VoiceGenerationSchema = z.object({

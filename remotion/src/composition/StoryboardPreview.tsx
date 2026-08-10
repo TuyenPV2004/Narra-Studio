@@ -29,6 +29,13 @@ export const StoryboardPreview = ({bundle}: StoryboardPreviewProps) => {
     return sceneOrder || left.order - right.order;
   });
   const narrationSegments = [...(bundle.narrationSegments ?? [])].sort((left, right) => left.order - right.order);
+  const audioLayers = bundle.assets.filter(({kind, path, status, audioRole}) => kind === 'AUDIO' && path && status === 'QA_PASS' && audioRole);
+  const shotOffsets = new Map<string, number>();
+  let shotOffset = 0;
+  for (const shot of shots) {
+    shotOffsets.set(shot.id, shotOffset);
+    shotOffset += secondsToFrames(shot.durationSec, fps);
+  }
   let narrationOffset = 0;
   const captions = (bundle.captions ?? []).map((caption) => ({
     text: caption.text,
@@ -52,7 +59,7 @@ export const StoryboardPreview = ({bundle}: StoryboardPreviewProps) => {
           return (
             <Series.Sequence key={shot.id} durationInFrames={secondsToFrames(shot.durationSec, fps)}>
               {renderableAsset?.kind === 'IMAGE' && renderableAsset.path ? <AIImageScene scene={scene} imagePath={renderableAsset.path} /> : null}
-              {renderableAsset?.kind === 'VIDEO' && renderableAsset.path ? <AIVideoScene scene={scene} videoPath={renderableAsset.path} /> : null}
+              {renderableAsset?.kind === 'VIDEO' && renderableAsset.path ? <AIVideoScene scene={scene} videoPath={renderableAsset.path} sourceAudioMode={shot.sourceAudioMode} sourceAudioVolume={shot.sourceAudioVolume} /> : null}
               {shot.visualType === 'CHART' || shot.visualType === 'MAP' || shot.visualType === 'TEXT' ? <TextDataScene scene={scene} /> : null}
               {shot.visualType === 'EVIDENCE' ? <EvidenceScene source={bundle.sources[0]} /> : null}
               {!renderableAsset && !['CHART', 'MAP', 'TEXT', 'EVIDENCE'].includes(shot.visualType) ? (
@@ -76,6 +83,20 @@ export const StoryboardPreview = ({bundle}: StoryboardPreviewProps) => {
             <Audio src={staticFile(segment.audioPath)} />
           </Sequence>
         ) : null;
+      })}
+      {audioLayers.map((asset) => {
+        if (!asset.path) return null;
+        const from = asset.audioRole === 'SFX' ? (shotOffsets.get(asset.shotId) ?? 0) : 0;
+        const durationInFrames = asset.audioRole === 'SFX'
+          ? secondsToFrames(asset.metadata?.durationSec ?? 1, fps)
+          : getMasterDurationFrames(bundle, fps);
+        const baseVolume = asset.volume ?? (asset.audioRole === 'MUSIC' ? 0.12 : 0.35);
+        const volume = asset.duckUnderNarration ? Math.min(baseVolume, 0.08) : baseVolume;
+        return (
+          <Sequence key={asset.id} from={from} durationInFrames={Math.max(1, durationInFrames)} name={`${asset.audioRole}-${asset.id}`}>
+            <Audio src={staticFile(asset.path)} volume={volume} loop={asset.audioRole === 'MUSIC'} />
+          </Sequence>
+        );
       })}
       {captions.length > 0 ? <CaptionLayer captions={captions} /> : null}
     </AbsoluteFill>

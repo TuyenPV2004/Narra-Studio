@@ -18,6 +18,7 @@ import {
   Search,
   Sparkles,
   WandSparkles,
+  SlidersHorizontal,
   TriangleAlert,
 } from 'lucide-react';
 import {StoryboardWorkspaceView} from './StoryboardWorkspace';
@@ -25,6 +26,7 @@ import {VoiceWorkspaceView} from './VoiceWorkspace';
 import {EditorialWorkspaceView} from './EditorialWorkspace';
 import {ReviewWorkspaceView} from './ReviewWorkspace';
 import {AiWorkspaceView} from './AiWorkspace';
+import {TimelineWorkspaceView} from './TimelineWorkspace';
 
 const formatDate = (value: string | null): string =>
   value ? new Intl.DateTimeFormat('en', {dateStyle: 'medium', timeStyle: 'short'}).format(new Date(value)) : 'Never';
@@ -40,6 +42,7 @@ const workspaceItems = [
   {id: 'editorial', label: 'Editorial', icon: BookOpenText},
   {id: 'storyboard', label: 'Storyboard & assets', icon: Clapperboard},
   {id: 'voice', label: 'Voice & captions', icon: Captions},
+  {id: 'timeline', label: 'Timeline', icon: SlidersHorizontal},
   {id: 'review', label: 'Review & render', icon: Film},
 ] as const;
 
@@ -50,7 +53,7 @@ export const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [question, setQuestion] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'ai' | 'editorial' | 'storyboard' | 'voice' | 'review'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'ai' | 'editorial' | 'storyboard' | 'voice' | 'timeline' | 'review'>('overview');
 
   const activeProjects = useMemo(() => projects.filter(({archived}) => !archived), [projects]);
   const archivedProjects = useMemo(() => projects.filter(({archived}) => archived), [projects]);
@@ -274,6 +277,8 @@ export const App = () => {
                 <StoryboardWorkspaceView projectId={selected.project.id} onProjectRefresh={setSelected} />
               ) : activeTab === 'voice' ? (
                 <VoiceWorkspaceView projectId={selected.project.id} onProjectRefresh={setSelected} />
+              ) : activeTab === 'timeline' ? (
+                <TimelineWorkspaceView projectId={selected.project.id} onProjectRefresh={setSelected} />
               ) : (
                 <ReviewWorkspaceView projectId={selected.project.id} onProjectRefresh={setSelected} />
               )}

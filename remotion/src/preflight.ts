@@ -29,17 +29,25 @@ export const validateMediaFiles = (
     if (!fileExists(asset.path)) {
       issues.push(`Shot ${shot.id} / asset ${asset.id} is missing file ${asset.path}`);
     }
+    if (asset.status !== 'QA_PASS') {
+      issues.push(`Shot ${shot.id} / asset ${asset.id} has not passed QA`);
+    }
   }
 
-  for (const kind of ['AUDIO', 'CAPTION'] as const) {
-    const asset = bundle.assets.find((candidate) => candidate.kind === kind);
-    if (!asset?.path) {
-      issues.push(`Project ${bundle.project.id} has no ${kind.toLowerCase()} media path`);
-    } else if (!fileExists(asset.path)) {
-      issues.push(`Asset ${asset.id} is missing file ${asset.path}`);
-    }
+  if (bundle.narrationSegments.length === 0 || bundle.narrationSegments.some(({audioPath, durationSec}) => !audioPath || !durationSec)) {
+    issues.push(`Project ${bundle.project.id} does not have complete narration audio`);
+  }
+  for (const segment of bundle.narrationSegments) {
+    if (segment.audioPath && !fileExists(segment.audioPath)) issues.push(`Narration ${segment.id} is missing file ${segment.audioPath}`);
+  }
+  if (bundle.captions.length === 0) issues.push(`Project ${bundle.project.id} has no caption cues`);
+  const durationMs = bundle.narrationSegments.reduce((total, segment) => total + (segment.durationSec ?? 0), 0) * 1000;
+  for (const caption of bundle.captions) {
+    if (caption.endMs > durationMs + 50) issues.push(`Caption ${caption.id} extends past narration duration`);
+  }
+  for (const asset of bundle.assets.filter(({kind}) => kind === 'AUDIO')) {
+    if (asset.path && !fileExists(asset.path)) issues.push(`Audio layer ${asset.id} is missing file ${asset.path}`);
   }
 
   return issues;
 };
-

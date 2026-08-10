@@ -5,16 +5,19 @@ import {AbsoluteFill, interpolate, staticFile, useCurrentFrame} from 'remotion';
 interface AIVideoSceneProps {
   readonly scene: ProjectBundle['scenes'][number];
   readonly videoPath: string;
+  readonly sourceAudioMode: 'MUTE' | 'DUCK' | 'KEEP';
+  readonly sourceAudioVolume: number;
 }
 
-export const AIVideoScene = ({scene, videoPath}: AIVideoSceneProps) => {
+export const AIVideoScene = ({scene, videoPath, sourceAudioMode, sourceAudioVolume}: AIVideoSceneProps) => {
   const frame = useCurrentFrame();
 
   return (
     <AbsoluteFill style={{backgroundColor: '#07101f'}}>
       <Video
         src={staticFile(videoPath)}
-        muted
+        muted={sourceAudioMode === 'MUTE'}
+        volume={sourceAudioMode === 'DUCK' ? Math.min(sourceAudioVolume, 0.08) : sourceAudioVolume}
         objectFit="cover"
         style={{width: '100%', height: '100%'}}
       />

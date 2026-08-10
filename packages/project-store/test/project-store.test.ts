@@ -485,7 +485,29 @@ describe('ProjectStore', () => {
     expect(voice.segments.every(({audioPath}) => Boolean(audioPath))).toBe(true);
   });
 
-  it('enforces approval order and keeps versioned render snapshots, outputs, and logs', () => {
+  it('edits caption timing and persists per-shot source audio policy incrementally', () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Timeline Edit', question: 'Can rough-cut edits remain scoped?'});
+    const projectId = created.project.id;
+    const importDirectory = mkdtempSync(path.join(tmpdir(), 'narra-timeline-edit-'));
+    temporaryDirectories.push(importDirectory);
+    const scenesPath = path.join(importDirectory, 'scenes.json');
+    const shotsPath = path.join(importDirectory, 'shots.json');
+    writeFileSync(scenesPath, JSON.stringify([{id: 'scene-one', projectId, order: 0, title: 'Opening', narration: 'A clear opening.', durationSec: 3, claimIds: []}]), 'utf8');
+    writeFileSync(shotsPath, JSON.stringify([{id: 'shot-one', projectId, sceneId: 'scene-one', order: 0, durationSec: 3, visualType: 'TEXT', visualPurpose: 'Opening title'}]), 'utf8');
+    store.importStoryboard(projectId, scenesPath, shotsPath);
+    const captionsPath = path.join(importDirectory, 'captions.vtt');
+    writeFileSync(captionsPath, 'WEBVTT\n\n00:00:00.100 --> 00:00:02.000\nA clear opening.\n', 'utf8');
+    store.importCaptions(projectId, captionsPath);
+
+    let timeline = store.updateCaptionCue(projectId, 'caption-1', {startMs: 200, endMs: 2200, text: 'A clearer opening.'});
+    expect(timeline.captions[0]).toMatchObject({startMs: 200, endMs: 2200, text: 'A clearer opening.'});
+    timeline = store.updateShotAudio(projectId, 'shot-one', {sourceAudioMode: 'DUCK', sourceAudioVolume: 0.25});
+    expect(timeline.shots[0]).toMatchObject({sourceAudioMode: 'DUCK', sourceAudioVolume: 0.25});
+    expect(timeline.staleScopes.find(({scope}) => scope === 'RENDER')?.stale).toBe(true);
+  });
+
+  it('enforces approval order, render preflight, and keeps versioned snapshots, outputs, and logs', async () => {
     const store = createStore();
     const created = store.createProject({title: 'Approval Flow', question: 'Can each decision be audited?'});
     const projectId = created.project.id;
@@ -511,6 +533,14 @@ describe('ProjectStore', () => {
     store.approveGate(projectId, 'STORYBOARD', 'Shots reviewed.');
     let review = store.approveGate(projectId, 'ASSETS', 'No external visual assets required.');
     expect(review.approvals.find(({gate}) => gate === 'ASSETS')?.status).toBe('APPROVED');
+
+    expect(() => store.queueRender(projectId, 'ROUGH')).toThrow('Render preflight failed');
+    store.syncNarrationSegments(projectId);
+    const narrationPath = path.join(importDirectory, 'narration.wav');
+    writeFileSync(narrationPath, silentWav(5, 48000, 2));
+    await store.importNarrationAudio(projectId, 'vo-scene-one', narrationPath);
+    const timeline = store.generateCaptionsFromNarration(projectId);
+    expect(timeline.captions.map(({text}) => text).join(' ')).toBe('A traceable decision begins here.');
 
     review = store.queueRender(projectId, 'ROUGH');
     const rough = review.jobs[0];

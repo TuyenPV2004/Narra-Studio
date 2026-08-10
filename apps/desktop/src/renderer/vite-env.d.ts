@@ -20,12 +20,15 @@ import type {
   FlowWorkspace,
   GenerateNarrationInput,
   GenerateNarrationBatchInput,
+  TimelineWorkspace,
+  UpdateCaptionCueInput,
+  UpdateShotAudioInput,
 } from '@narra/project-store';
 import type {AiReasoningEffort, AiStage, AiProjectSettings} from '@narra/contracts';
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 11;
+  readonly version: 12;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -54,6 +57,11 @@ interface NarraDesktopApi {
   generateMissingNarration: (projectId: string, input: GenerateNarrationBatchInput) => Promise<VoiceWorkspace>;
   chooseAndImportCaptions: (projectId: string) => Promise<VoiceWorkspace | null>;
   fitTimelineToNarration: (projectId: string) => Promise<VoiceWorkspace>;
+  getTimelineWorkspace: (projectId: string) => Promise<TimelineWorkspace>;
+  generateCaptionsFromNarration: (projectId: string) => Promise<TimelineWorkspace>;
+  updateCaptionCue: (projectId: string, captionId: string, input: UpdateCaptionCueInput) => Promise<TimelineWorkspace>;
+  updateShotAudio: (projectId: string, shotId: string, input: UpdateShotAudioInput) => Promise<TimelineWorkspace>;
+  chooseAndImportTimelineAudio: (projectId: string, role: 'MUSIC' | 'SFX') => Promise<TimelineWorkspace | null>;
   getEditorialWorkspace: (projectId: string) => Promise<EditorialWorkspace>;
   saveEditorialDocument: (projectId: string, document: EditorialDocument, content: string) => Promise<EditorialWorkspace>;
   selectTopicCandidate: (projectId: string, candidateId: string, input: SelectTopicInput) => Promise<EditorialWorkspace>;

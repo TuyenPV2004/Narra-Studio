@@ -19,10 +19,10 @@ export const CaptionLayer = ({captions}: CaptionLayerProps) => {
 
         return (
           <Sequence key={`${caption.startMs}-${caption.text}`} from={from} durationInFrames={durationInFrames}>
-            <AbsoluteFill style={{alignItems: 'center', justifyContent: 'flex-end', padding: '0 150px 68px'}}>
+            <AbsoluteFill style={{alignItems: 'center', justifyContent: 'flex-end', padding: '0 170px 104px'}}>
               <div
                 style={{
-                  maxWidth: 1400,
+                  maxWidth: 1320,
                   padding: '14px 24px',
                   borderRadius: 12,
                   backgroundColor: 'rgba(3, 7, 13, 0.78)',
@@ -44,4 +44,3 @@ export const CaptionLayer = ({captions}: CaptionLayerProps) => {
     </AbsoluteFill>
   );
 };
-

@@ -43,4 +43,8 @@ export type {
   GenerateNarrationBatchInput,
   VoicePreset,
   VoiceRuntimeStatus,
+  TimelineWorkspace,
+  TimelinePreflightIssue,
+  UpdateCaptionCueInput,
+  UpdateShotAudioInput,
 } from './types.js';

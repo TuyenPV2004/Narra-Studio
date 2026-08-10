@@ -46,7 +46,7 @@ export const DocumentaryComposition = () => {
                 <AIImageScene scene={scene} imagePath={asset.path} />
               ) : null}
               {shot?.visualType === 'AI_VIDEO' && asset?.path ? (
-                <AIVideoScene scene={scene} videoPath={asset.path} />
+                <AIVideoScene scene={scene} videoPath={asset.path} sourceAudioMode={shot.sourceAudioMode} sourceAudioVolume={shot.sourceAudioVolume} />
               ) : null}
               {shot?.visualType === 'CHART' || shot?.visualType === 'TEXT' ? (
                 <TextDataScene scene={scene} />

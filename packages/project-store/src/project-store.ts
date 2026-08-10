@@ -102,6 +102,10 @@ import type {
   FlowWorkspace,
   GenerateNarrationInput,
   GenerateNarrationBatchInput,
+  TimelineWorkspace,
+  TimelinePreflightIssue,
+  UpdateCaptionCueInput,
+  UpdateShotAudioInput,
 } from './types.js';
 
 type ProjectRow = {
@@ -923,6 +927,83 @@ export class ProjectStore {
     };
   }
 
+  getTimelineWorkspace(projectId: string): TimelineWorkspace {
+    const project = this.getProject(projectId).project;
+    const scenes = SceneCollectionSchema.parse(parseJson(path.join(project.rootPath, 'storyboard/scenes.json'))).items;
+    const shots = ShotCollectionSchema.parse(parseJson(path.join(project.rootPath, 'storyboard/shots.json'))).items;
+    const assets = AssetCollectionSchema.parse(parseJson(path.join(project.rootPath, 'assets/manifest.json'))).items;
+    const segments = NarrationSegmentCollectionSchema.parse(parseJson(path.join(project.rootPath, 'audio/narration/segments.json'))).items;
+    const captions = CaptionCollectionSchema.parse(parseJson(path.join(project.rootPath, 'captions/captions.json'))).items;
+    const staleRows = this.database
+      .prepare('SELECT scope, stale, reason, updated_at FROM stale_scopes WHERE project_id = ? ORDER BY scope')
+      .all(projectId) as Array<{scope: StaleScope['scope']; stale: number; reason: string | null; updated_at: string}>;
+    const durationSec = segments.reduce((total, segment) => total + (segment.durationSec ?? 0), 0)
+      || scenes.reduce((total, scene) => total + scene.durationSec, 0);
+    return {
+      projectId,
+      durationSec,
+      scenes: [...scenes].sort((left, right) => left.order - right.order),
+      shots: [...shots].sort((left, right) => left.order - right.order),
+      assets,
+      segments: [...segments].sort((left, right) => left.order - right.order),
+      captions: [...captions].sort((left, right) => left.startMs - right.startMs),
+      preflightIssues: this.getTimelinePreflightIssues(project.rootPath, scenes, shots, assets, segments, captions),
+      staleScopes: staleRows.map((row) => ({scope: row.scope, stale: row.stale === 1, reason: row.reason, updatedAt: row.updated_at})),
+    };
+  }
+
+  updateCaptionCue(projectId: string, captionId: string, input: UpdateCaptionCueInput): TimelineWorkspace {
+    const project = this.getProject(projectId).project;
+    const collectionPath = path.join(project.rootPath, 'captions/captions.json');
+    const collection = CaptionCollectionSchema.parse(parseJson(collectionPath));
+    if (!collection.items.some(({id}) => id === captionId)) throw new Error(`Caption ${captionId} was not found.`);
+    const next = CaptionCueSchema.parse({...collection.items.find(({id}) => id === captionId), ...input, id: captionId, projectId, words: undefined});
+    atomicWriteJson(collectionPath, {...collection, updatedAt: isoNow(), items: collection.items.map((cue) => cue.id === captionId ? next : cue)});
+    this.refreshProject(projectId);
+    this.setScope(projectId, 'CAPTIONS', false, null);
+    this.markScopes(projectId, ['RENDER'], `Caption ${captionId} changed`);
+    return this.getTimelineWorkspace(projectId);
+  }
+
+  updateShotAudio(projectId: string, shotId: string, input: UpdateShotAudioInput): TimelineWorkspace {
+    const project = this.getProject(projectId).project;
+    const collectionPath = path.join(project.rootPath, 'storyboard/shots.json');
+    const collection = ShotCollectionSchema.parse(parseJson(collectionPath));
+    if (!collection.items.some(({id}) => id === shotId)) throw new Error(`Shot ${shotId} was not found.`);
+    const items = collection.items.map((shot) => shot.id === shotId
+      ? {...shot, sourceAudioMode: input.sourceAudioMode, sourceAudioVolume: input.sourceAudioVolume}
+      : shot);
+    atomicWriteJson(collectionPath, {...collection, updatedAt: isoNow(), items});
+    this.refreshProject(projectId);
+    this.markScopes(projectId, ['RENDER'], `Source audio policy changed for ${shotId}`);
+    return this.getTimelineWorkspace(projectId);
+  }
+
+  async importTimelineAudio(projectId: string, role: 'MUSIC' | 'SFX', sourcePath: string): Promise<TimelineWorkspace> {
+    const project = this.getProject(projectId).project;
+    if (!existsSync(sourcePath) || !statSync(sourcePath).isFile()) throw new Error('Selected audio file was not found.');
+    const shots = ShotCollectionSchema.parse(parseJson(path.join(project.rootPath, 'storyboard/shots.json'))).items;
+    const shot = shots[0];
+    if (!shot) throw new Error('Import a storyboard before adding music or SFX.');
+    const metadata = await probeMedia(sourcePath, 'AUDIO');
+    const extension = path.extname(sourcePath).toLowerCase();
+    const id = `${role.toLowerCase()}-${randomUUID().slice(0, 8)}`;
+    const relativePath = `audio/${role.toLowerCase()}/${id}${extension}`;
+    mkdirSync(path.dirname(path.join(project.rootPath, relativePath)), {recursive: true});
+    copyFileSync(sourcePath, path.join(project.rootPath, ...relativePath.split('/')));
+    const manifestPath = path.join(project.rootPath, 'assets/manifest.json');
+    const manifest = AssetCollectionSchema.parse(parseJson(manifestPath));
+    const asset = AssetSchema.parse({
+      id, projectId, shotId: shot.id, kind: 'AUDIO', status: 'QA_PASS', path: relativePath,
+      rightsNote: 'Creator-imported local audio; rights review required before final export.', metadata,
+      audioRole: role, volume: role === 'MUSIC' ? 0.12 : 0.35, duckUnderNarration: role === 'MUSIC',
+    });
+    atomicWriteJson(manifestPath, {...manifest, updatedAt: isoNow(), items: [...manifest.items, asset]});
+    this.refreshProject(projectId);
+    this.markScopes(projectId, ['RENDER'], `${role} layer imported`);
+    return this.getTimelineWorkspace(projectId);
+  }
+
   async generateNarrationSegment(projectId: string, input: GenerateNarrationInput): Promise<VoiceWorkspace> {
     const project = this.getProject(projectId).project;
     this.ensureApprovalRows(projectId);
@@ -1107,6 +1188,46 @@ export class ProjectStore {
     this.setScope(projectId, 'CAPTIONS', false, null);
     this.markScopes(projectId, ['RENDER'], 'Captions changed');
     return this.getVoiceWorkspace(projectId);
+  }
+
+  generateCaptionsFromNarration(projectId: string): TimelineWorkspace {
+    const project = this.getProject(projectId).project;
+    const segmentsPath = path.join(project.rootPath, 'audio/narration/segments.json');
+    const segments = NarrationSegmentCollectionSchema.parse(parseJson(segmentsPath));
+    if (segments.items.length === 0 || segments.items.some(({durationSec}) => !durationSec)) {
+      throw new Error('Generate or import every narration segment before creating timed captions.');
+    }
+    const cues: CaptionCue[] = [];
+    let timelineOffsetMs = 0;
+    for (const segment of [...segments.items].sort((left, right) => left.order - right.order)) {
+      const words = segment.text.trim().split(/\s+/);
+      const chunks: string[][] = [];
+      for (const word of words) {
+        const current = chunks.at(-1);
+        if (!current || current.length >= 8 || [...current, word].join(' ').length > 48) chunks.push([word]);
+        else current.push(word);
+      }
+      const segmentDurationMs = Math.round((segment.durationSec ?? 0) * 1000);
+      let consumedWords = 0;
+      chunks.forEach((chunk) => {
+        const startMs = timelineOffsetMs + Math.round(segmentDurationMs * consumedWords / words.length);
+        consumedWords += chunk.length;
+        const endMs = timelineOffsetMs + Math.round(segmentDurationMs * consumedWords / words.length);
+        cues.push(CaptionCueSchema.parse({
+          id: `caption-${cues.length + 1}`, projectId, segmentId: segment.id,
+          startMs, endMs: Math.max(startMs + 1, endMs), text: chunk.join(' '),
+        }));
+      });
+      timelineOffsetMs += segmentDurationMs;
+    }
+    const captionsPath = path.join(project.rootPath, 'captions/captions.json');
+    const collection = CaptionCollectionSchema.parse(parseJson(captionsPath));
+    atomicWriteJson(captionsPath, {...collection, updatedAt: isoNow(), items: cues});
+    atomicWriteJson(segmentsPath, {...segments, updatedAt: isoNow(), items: segments.items.map((segment) => ({...segment, status: segment.audioPath ? 'READY' : segment.status}))});
+    this.refreshProject(projectId);
+    this.setScope(projectId, 'CAPTIONS', false, null);
+    this.markScopes(projectId, ['RENDER'], 'Captions generated from narration timing');
+    return this.getTimelineWorkspace(projectId);
   }
 
   fitTimelineToNarration(projectId: string): VoiceWorkspace {
@@ -1458,6 +1579,10 @@ export class ProjectStore {
       throw new Error(`${requiredGate} must be approved before queuing a ${target.toLowerCase()} render.`);
     }
     const project = this.getProject(projectId).project;
+    const preflightErrors = this.getTimelineWorkspace(projectId).preflightIssues.filter(({severity}) => severity === 'ERROR');
+    if (preflightErrors.length > 0) {
+      throw new Error(`Render preflight failed: ${preflightErrors.map(({message}) => message).join(' | ')}`);
+    }
     const exportedPath = this.exportStoryboardRenderInput(projectId);
     const snapshotContent = readFileSync(exportedPath, 'utf8');
     const idempotencyKey = contentHash(`${target}\nFULL\n${snapshotContent}`);
@@ -2338,6 +2463,48 @@ export class ProjectStore {
     }
 
     return {status: issues.some(({severity}) => severity === 'ERROR') ? 'INVALID' : 'VALID', checkedAt, issues};
+  }
+
+  private getTimelinePreflightIssues(
+    projectRoot: string,
+    scenes: ReturnType<typeof SceneCollectionSchema.parse>['items'],
+    shots: ReturnType<typeof ShotCollectionSchema.parse>['items'],
+    assets: ReturnType<typeof AssetCollectionSchema.parse>['items'],
+    segments: ReturnType<typeof NarrationSegmentCollectionSchema.parse>['items'],
+    captions: ReturnType<typeof CaptionCollectionSchema.parse>['items'],
+  ): TimelinePreflightIssue[] {
+    const issues: TimelinePreflightIssue[] = [];
+    const assetsById = new Map(assets.map((asset) => [asset.id, asset]));
+    const sceneIdsWithAudio = new Set(segments.filter(({audioPath, durationSec}) => audioPath && durationSec).map(({sceneId}) => sceneId));
+    const durationMs = segments.reduce((total, segment) => total + (segment.durationSec ?? 0), 0) * 1000;
+    const add = (issue: TimelinePreflightIssue): void => { issues.push(issue); };
+
+    for (const scene of scenes) {
+      if (!sceneIdsWithAudio.has(scene.id)) add({severity: 'ERROR', code: 'NARRATION_MISSING', subjectId: scene.id, message: `Scene ${scene.id} has no ready narration audio.`});
+      const shotDuration = shots.filter(({sceneId}) => sceneId === scene.id).reduce((total, shot) => total + shot.durationSec, 0);
+      if (Math.abs(shotDuration - scene.durationSec) > 0.02) add({severity: 'ERROR', code: 'TIMELINE_MISMATCH', subjectId: scene.id, message: `Scene ${scene.id} and its shots differ by ${Math.abs(shotDuration - scene.durationSec).toFixed(2)}s.`});
+    }
+    for (const shot of shots) {
+      if (!shot.assetId) continue;
+      const asset = assetsById.get(shot.assetId);
+      if (!asset?.path || !existsSync(path.join(projectRoot, ...asset.path.split('/')))) add({severity: 'ERROR', code: 'ASSET_MISSING', subjectId: shot.id, message: `Shot ${shot.id} has no readable selected media file.`});
+      else if (asset.status !== 'QA_PASS') add({severity: 'ERROR', code: 'ASSET_QA', subjectId: shot.id, message: `Asset ${asset.id} must pass QA before render.`});
+      if (asset && !asset.rightsNote.trim()) add({severity: 'ERROR', code: 'RIGHTS_NOTE', subjectId: asset.id, message: `Asset ${asset.id} has no source or license note.`});
+    }
+    if (captions.length === 0) add({severity: 'ERROR', code: 'CAPTIONS_MISSING', subjectId: 'captions', message: 'No caption cues are available for the rough cut.'});
+    captions.forEach((caption, index) => {
+      if (caption.endMs > durationMs + 50) add({severity: 'ERROR', code: 'CAPTION_RANGE', subjectId: caption.id, message: `Caption ${caption.id} extends past the narration master clock.`});
+      const durationSec = (caption.endMs - caption.startMs) / 1000;
+      const wordsPerMinute = caption.text.trim().split(/\s+/).length / Math.max(durationSec / 60, 0.01);
+      if (caption.text.length > 84 || wordsPerMinute > 210) add({severity: 'WARNING', code: 'CAPTION_READABILITY', subjectId: caption.id, message: `Caption ${caption.id} may be too dense for the title-safe caption area.`});
+      const next = captions[index + 1];
+      if (next && next.startMs < caption.endMs) add({severity: 'WARNING', code: 'CAPTION_OVERLAP', subjectId: caption.id, message: `Caption ${caption.id} overlaps ${next.id}.`});
+    });
+    for (const asset of assets.filter(({kind}) => kind === 'AUDIO')) {
+      if (!asset.audioRole) add({severity: 'WARNING', code: 'AUDIO_ROLE', subjectId: asset.id, message: `Audio asset ${asset.id} has no MUSIC or SFX role and will not be mixed.`});
+      if (asset.path && !existsSync(path.join(projectRoot, ...asset.path.split('/')))) add({severity: 'ERROR', code: 'AUDIO_MISSING', subjectId: asset.id, message: `Audio layer ${asset.id} is missing its local file.`});
+    }
+    return issues;
   }
 
   private rewriteJsonTree(directory: string, previousId: string, nextId: string, now: string): void {

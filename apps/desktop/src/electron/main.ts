@@ -12,6 +12,8 @@ import {
   type RenderTarget,
   type GenerateNarrationInput,
   type GenerateNarrationBatchInput,
+  type UpdateCaptionCueInput,
+  type UpdateShotAudioInput,
   KokoroOnnxProvider,
 } from '@narra/project-store';
 import {getAiStageJsonSchema, type AiReasoningEffort, type AiStage} from '@narra/contracts';
@@ -462,6 +464,23 @@ const registerProjectHandlers = (): void => {
   ipcMain.handle(IPC_CHANNELS.fitTimelineToNarration, (_event, projectId: string) =>
     getProjectStore().fitTimelineToNarration(projectId),
   );
+  ipcMain.handle(IPC_CHANNELS.getTimelineWorkspace, (_event, projectId: string) =>
+    getProjectStore().getTimelineWorkspace(projectId));
+  ipcMain.handle(IPC_CHANNELS.generateCaptionsFromNarration, (_event, projectId: string) =>
+    getProjectStore().generateCaptionsFromNarration(projectId));
+  ipcMain.handle(IPC_CHANNELS.updateCaptionCue, (_event, projectId: string, captionId: string, input: UpdateCaptionCueInput) =>
+    getProjectStore().updateCaptionCue(projectId, captionId, input));
+  ipcMain.handle(IPC_CHANNELS.updateShotAudio, (_event, projectId: string, shotId: string, input: UpdateShotAudioInput) =>
+    getProjectStore().updateShotAudio(projectId, shotId, input));
+  ipcMain.handle(IPC_CHANNELS.chooseAndImportTimelineAudio, async (_event, projectId: string, role: 'MUSIC' | 'SFX') => {
+    const selection = await dialog.showOpenDialog({
+      title: `Import ${role === 'MUSIC' ? 'music' : 'sound effect'}`,
+      properties: ['openFile'],
+      filters: [{name: 'Audio', extensions: ['wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg']}],
+    });
+    if (selection.canceled || !selection.filePaths[0]) return null;
+    return getProjectStore().importTimelineAudio(projectId, role, selection.filePaths[0]);
+  });
   ipcMain.handle(IPC_CHANNELS.getEditorialWorkspace, (_event, projectId: string) =>
     getProjectStore().getEditorialWorkspace(projectId),
   );
@@ -595,12 +614,12 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Narra Studio' || result.apiVersion !== 11 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Narra Studio' || result.apiVersion !== 12 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Narra Studio\napiVersion=11\nprojectCount=${result.projectCount}\n`,
+      `renderer=Narra Studio\napiVersion=12\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     if (process.env.NARRA_SMOKE_EDITORIAL_UI === '1') {
@@ -724,6 +743,59 @@ void app.whenReady().then(async () => {
         if (generationResult.state !== 'completed') throw new Error(`Voice generation smoke received ${JSON.stringify(generationResult)}.`);
         writeFileSync(path.join(workspaceRoot, '.voice-generation-smoke-ok'), `${JSON.stringify(generationResult)}\n`, 'utf8');
       }
+    }
+    if (process.env.NARRA_SMOKE_TIMELINE_UI === '1') {
+      await mainWindow.webContents.executeJavaScript(`document.querySelector('.project-row:not(.archived)')?.click()`);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await mainWindow.webContents.executeJavaScript(`
+        [...document.querySelectorAll('.workspace-tabs button')]
+          .find((button) => button.textContent?.trim() === 'Timeline')
+          ?.click()
+      `);
+      await mainWindow.webContents.executeJavaScript(`
+        new Promise((resolve) => {
+          const startedAt = Date.now();
+          const prepare = () => {
+            const workspace = document.querySelector('.timeline-workspace');
+            if (!workspace && Date.now() - startedAt <= 5000) return setTimeout(prepare, 50);
+            if (document.querySelectorAll('.caption-cue-list button').length > 0) return resolve(true);
+            const generate = [...document.querySelectorAll('.timeline-toolbar button')]
+              .find((button) => button.textContent?.includes('Generate cues'));
+            if (!generate || generate.disabled) return resolve(false);
+            generate.click();
+            const waitForCues = () => {
+              if (document.querySelectorAll('.caption-cue-list button').length > 0) return resolve(true);
+              if (Date.now() - startedAt > 10000) return resolve(false);
+              setTimeout(waitForCues, 50);
+            };
+            waitForCues();
+          };
+          prepare();
+        })
+      `);
+      const timelineResult = (await mainWindow.webContents.executeJavaScript(`
+        new Promise((resolve) => {
+          const startedAt = Date.now();
+          const check = () => {
+            const workspace = document.querySelector('.timeline-workspace');
+            if (workspace || Date.now() - startedAt > 5000) {
+              resolve({
+                hasWorkspace: Boolean(workspace),
+                cueCount: document.querySelectorAll('.caption-cue-list button').length,
+                shotAudioCount: document.querySelectorAll('.shot-audio-list article').length,
+                hasPreflight: Boolean(document.querySelector('.preflight-banner')),
+                hasOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+              });
+              return;
+            }
+            setTimeout(check, 50);
+          };
+          check();
+        })
+      `)) as {hasWorkspace: boolean; cueCount: number; shotAudioCount: number; hasPreflight: boolean; hasOverflow: boolean};
+      if (!timelineResult.hasWorkspace || timelineResult.cueCount < 1 || timelineResult.shotAudioCount < 1 ||
+          !timelineResult.hasPreflight || timelineResult.hasOverflow) throw new Error(`Timeline UI smoke test received ${JSON.stringify(timelineResult)}.`);
+      writeFileSync(path.join(workspaceRoot, '.timeline-smoke-ok'), `${JSON.stringify(timelineResult)}\n`, 'utf8');
     }
     if (process.env.NARRA_SMOKE_SCREENSHOT) {
       if (process.env.NARRA_SMOKE_OPEN_FIRST_PROJECT === '1') {

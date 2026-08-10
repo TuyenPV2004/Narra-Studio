@@ -5,7 +5,10 @@ import {validateMediaFiles} from '../src/preflight';
 
 const bundle = ProjectBundleSchema.parse(bundleJson);
 const fixturePaths = new Set(
-  bundle.assets.flatMap((asset) => (asset.path ? [asset.path] : [])),
+  [
+    ...bundle.assets.flatMap((asset) => (asset.path ? [asset.path] : [])),
+    ...bundle.narrationSegments.flatMap((segment) => (segment.audioPath ? [segment.audioPath] : [])),
+  ],
 );
 
 describe('render preflight', () => {
@@ -23,5 +26,11 @@ describe('render preflight', () => {
       'Shot shot-power-flow / asset asset-power-flow-video is missing file assets/videos/power-flow-placeholder.mp4',
     );
   });
-});
 
+  it('blocks narration or captions that cannot cover the master timeline', () => {
+    const incomplete = ProjectBundleSchema.parse({...bundle, captions: []});
+    expect(validateMediaFiles(incomplete, (path) => fixturePaths.has(path))).toContain(
+      `Project ${bundle.project.id} has no caption cues`,
+    );
+  });
+});

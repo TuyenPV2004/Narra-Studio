@@ -187,6 +187,28 @@ export type VoiceWorkspace = {
   staleScopes: StaleScope[];
 };
 
+export type TimelinePreflightIssue = {
+  severity: 'ERROR' | 'WARNING';
+  code: string;
+  subjectId: string;
+  message: string;
+};
+
+export type TimelineWorkspace = {
+  projectId: string;
+  durationSec: number;
+  scenes: Scene[];
+  shots: Shot[];
+  assets: Asset[];
+  segments: NarrationSegment[];
+  captions: CaptionCue[];
+  preflightIssues: TimelinePreflightIssue[];
+  staleScopes: StaleScope[];
+};
+
+export type UpdateCaptionCueInput = Pick<CaptionCue, 'startMs' | 'endMs' | 'text'>;
+export type UpdateShotAudioInput = Pick<Shot, 'sourceAudioMode' | 'sourceAudioVolume'>;
+
 export type EditorialWorkspace = {
   projectId: string;
   researchBrief: string;
