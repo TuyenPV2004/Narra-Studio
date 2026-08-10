@@ -32,6 +32,21 @@ import {
   type CodexBridgeNotification,
   type JsonRpcId,
 } from './codex-bridge.js';
+import {
+  buildProjectQuestionPrompt,
+  buildProjectQuestionTranslationPrompt,
+  finalizeProjectQuestionResult,
+  normalizeSourceUrl,
+  parseProjectQuestionTranslation,
+  parseProjectQuestionResult,
+  PROJECT_QUESTION_EFFORT,
+  PROJECT_QUESTION_MODEL,
+  PROJECT_QUESTION_OUTPUT_SCHEMA,
+  PROJECT_QUESTION_TRANSLATION_OUTPUT_SCHEMA,
+  shouldRecordOpenedSource,
+  type OpenedProjectQuestionSource,
+  type ProjectQuestionGenerationResult,
+} from './project-question-generation.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 let projectStore: ProjectStore | null = null;
@@ -41,6 +56,30 @@ const activeAiRuns = new Map<string, {projectId: string; runId: string; structur
 const pendingCodexRequests = new Map<JsonRpcId, string>();
 const pendingTurnCompletions = new Map<string, CodexBridgeNotification>();
 const completedAgentMessages = new Map<string, string>();
+type PendingProjectQuestionGeneration = {
+  requestId: string;
+  threadId: string;
+  turnId: string | null;
+  openedSources: Map<string, OpenedProjectQuestionSource>;
+  cancelRequested: boolean;
+  timer: ReturnType<typeof setTimeout>;
+  resolve: (result: ProjectQuestionGenerationResult) => void;
+  reject: (error: Error) => void;
+};
+const projectQuestionGenerationsByRequest = new Map<string, PendingProjectQuestionGeneration>();
+const projectQuestionGenerationsByThread = new Map<string, PendingProjectQuestionGeneration>();
+const projectQuestionGenerationsByTurn = new Map<string, PendingProjectQuestionGeneration>();
+type PendingProjectQuestionTranslation = {
+  requestId: string;
+  threadId: string;
+  turnId: string | null;
+  timer: ReturnType<typeof setTimeout>;
+  resolve: (translation: string) => void;
+  reject: (error: Error) => void;
+};
+const projectQuestionTranslationsByRequest = new Map<string, PendingProjectQuestionTranslation>();
+const projectQuestionTranslationsByThread = new Map<string, PendingProjectQuestionTranslation>();
+const projectQuestionTranslationsByTurn = new Map<string, PendingProjectQuestionTranslation>();
 
 const getRepositoryRoot = (): string => app.isPackaged
   ? path.join(process.resourcesPath, 'narra-runtime')
@@ -90,6 +129,152 @@ const shouldForwardCodexNotification = ({method, params}: CodexBridgeNotificatio
 
 const broadcastCodexEvent = (payload: Record<string, unknown>): void => {
   for (const window of BrowserWindow.getAllWindows()) window.webContents.send(IPC_CHANNELS.codexEvent, payload);
+};
+
+const broadcastProjectQuestionProgress = (
+  pending: Pick<PendingProjectQuestionGeneration, 'requestId'>,
+  phase: 'CONNECTING' | 'RESEARCHING' | 'DRAFTING' | 'COMPLETED' | 'CANCELLED' | 'FAILED',
+  detail: Record<string, unknown> = {},
+): void => broadcastCodexEvent({type: 'projectQuestionGeneration', requestId: pending.requestId, phase, ...detail});
+
+const cleanupProjectQuestionGeneration = (pending: PendingProjectQuestionGeneration): void => {
+  clearTimeout(pending.timer);
+  projectQuestionGenerationsByRequest.delete(pending.requestId);
+  projectQuestionGenerationsByThread.delete(pending.threadId);
+  if (pending.turnId) {
+    projectQuestionGenerationsByTurn.delete(pending.turnId);
+    pendingTurnCompletions.delete(pending.turnId);
+    completedAgentMessages.delete(pending.turnId);
+  }
+};
+
+const findProjectQuestionGeneration = (notification: CodexBridgeNotification): PendingProjectQuestionGeneration | undefined => {
+  const params = asRecord(notification.params);
+  const turn = asRecord(params.turn);
+  const item = asRecord(params.item);
+  const turnId = typeof params.turnId === 'string' ? params.turnId : typeof turn.id === 'string' ? turn.id : null;
+  const threadId = typeof params.threadId === 'string'
+    ? params.threadId
+    : typeof turn.threadId === 'string'
+      ? turn.threadId
+      : typeof item.threadId === 'string' ? item.threadId : null;
+  return (turnId ? projectQuestionGenerationsByTurn.get(turnId) : undefined)
+    ?? (threadId ? projectQuestionGenerationsByThread.get(threadId) : undefined);
+};
+
+const trackProjectQuestionActivity = (notification: CodexBridgeNotification): void => {
+  const pending = findProjectQuestionGeneration(notification);
+  if (!pending) return;
+  const params = asRecord(notification.params);
+  if (notification.method === 'item/started' || notification.method === 'item/completed') {
+    const item = asRecord(params.item);
+    if (item.type === 'webSearch') {
+      const action = asRecord(item.action);
+      const url = typeof action.url === 'string' ? action.url : null;
+      if (shouldRecordOpenedSource(notification.method, action.type, url)) {
+        try {
+          const accessedAt = new Date().toISOString();
+          const normalizedUrl = normalizeSourceUrl(url);
+          if (!pending.openedSources.has(normalizedUrl)) {
+            pending.openedSources.set(normalizedUrl, {url, accessedAt});
+            broadcastProjectQuestionProgress(pending, 'RESEARCHING', {source: {url, accessedAt}});
+          }
+        } catch {
+          // Ignore malformed tool metadata; the final provenance check remains authoritative.
+        }
+      } else {
+        broadcastProjectQuestionProgress(pending, 'RESEARCHING');
+      }
+    }
+  }
+  if (notification.method === 'item/agentMessage/delta') {
+    broadcastProjectQuestionProgress(pending, 'DRAFTING');
+  }
+  if (notification.method !== 'turn/completed') return;
+  const turn = asRecord(params.turn);
+  const turnId = typeof turn.id === 'string' ? turn.id : pending.turnId;
+  if (!turnId) return;
+  if (turn.status === 'interrupted' || pending.cancelRequested) {
+    broadcastProjectQuestionProgress(pending, 'CANCELLED');
+    cleanupProjectQuestionGeneration(pending);
+    pending.reject(new Error('Đã dừng tạo câu hỏi dẫn dắt.'));
+    return;
+  }
+  if (turn.status !== 'completed') {
+    const error = asRecord(turn.error);
+    const message = typeof error.message === 'string' ? error.message : 'Codex không thể hoàn tất câu hỏi dẫn dắt.';
+    broadcastProjectQuestionProgress(pending, 'FAILED', {message});
+    cleanupProjectQuestionGeneration(pending);
+    pending.reject(new Error(message));
+    return;
+  }
+  try {
+    const message = completedAgentMessages.get(turnId);
+    if (!message) throw new Error('Codex hoàn tất nhưng không trả về kết quả có cấu trúc.');
+    const draft = parseProjectQuestionResult(JSON.parse(message));
+    const result = finalizeProjectQuestionResult(draft, pending.openedSources.values());
+    broadcastProjectQuestionProgress(pending, 'COMPLETED', {sources: result.sources});
+    cleanupProjectQuestionGeneration(pending);
+    pending.resolve(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Kết quả tạo câu hỏi không hợp lệ.';
+    broadcastProjectQuestionProgress(pending, 'FAILED', {message});
+    cleanupProjectQuestionGeneration(pending);
+    pending.reject(new Error(message));
+  }
+};
+
+const cleanupProjectQuestionTranslation = (pending: PendingProjectQuestionTranslation): void => {
+  clearTimeout(pending.timer);
+  projectQuestionTranslationsByRequest.delete(pending.requestId);
+  projectQuestionTranslationsByThread.delete(pending.threadId);
+  if (pending.turnId) {
+    projectQuestionTranslationsByTurn.delete(pending.turnId);
+    pendingTurnCompletions.delete(pending.turnId);
+    completedAgentMessages.delete(pending.turnId);
+  }
+};
+
+const findProjectQuestionTranslation = (
+  notification: CodexBridgeNotification,
+): PendingProjectQuestionTranslation | undefined => {
+  const params = asRecord(notification.params);
+  const turn = asRecord(params.turn);
+  const item = asRecord(params.item);
+  const turnId = typeof params.turnId === 'string' ? params.turnId : typeof turn.id === 'string' ? turn.id : null;
+  const threadId = typeof params.threadId === 'string'
+    ? params.threadId
+    : typeof turn.threadId === 'string'
+      ? turn.threadId
+      : typeof item.threadId === 'string' ? item.threadId : null;
+  return (turnId ? projectQuestionTranslationsByTurn.get(turnId) : undefined)
+    ?? (threadId ? projectQuestionTranslationsByThread.get(threadId) : undefined);
+};
+
+const trackProjectQuestionTranslation = (notification: CodexBridgeNotification): void => {
+  if (notification.method !== 'turn/completed') return;
+  const pending = findProjectQuestionTranslation(notification);
+  if (!pending) return;
+  const turn = asRecord(asRecord(notification.params).turn);
+  const turnId = typeof turn.id === 'string' ? turn.id : pending.turnId;
+  if (!turnId) return;
+  if (turn.status !== 'completed') {
+    const error = asRecord(turn.error);
+    const message = typeof error.message === 'string' ? error.message : 'Codex không thể hoàn tất bản dịch.';
+    cleanupProjectQuestionTranslation(pending);
+    pending.reject(new Error(message));
+    return;
+  }
+  try {
+    const message = completedAgentMessages.get(turnId);
+    if (!message) throw new Error('Codex hoàn tất nhưng không trả về bản dịch có cấu trúc.');
+    const translation = parseProjectQuestionTranslation(JSON.parse(message));
+    cleanupProjectQuestionTranslation(pending);
+    pending.resolve(translation);
+  } catch (error) {
+    cleanupProjectQuestionTranslation(pending);
+    pending.reject(new Error(error instanceof Error ? error.message : 'Bản dịch không hợp lệ.'));
+  }
 };
 
 const captureCompletedAgentMessage = (notification: CodexBridgeNotification): void => {
@@ -153,6 +338,8 @@ const getCodexBridge = (): CodexBridge => {
     codexBridge.on('notification', (notification: CodexBridgeNotification) => {
       captureCompletedAgentMessage(notification);
       completeTrackedAiRun(notification);
+      trackProjectQuestionActivity(notification);
+      trackProjectQuestionTranslation(notification);
       if (!shouldForwardCodexNotification(notification)) return;
       for (const window of BrowserWindow.getAllWindows()) {
         window.webContents.send(IPC_CHANNELS.codexEvent, {type: 'notification', ...notification});
@@ -210,6 +397,137 @@ const registerCodexHandlers = (): void => {
   });
   ipcMain.handle(IPC_CHANNELS.codexListModels, async () => getCodexBridge().listModels());
   ipcMain.handle(IPC_CHANNELS.codexReadRateLimits, async () => getCodexBridge().readRateLimits());
+  ipcMain.handle(IPC_CHANNELS.codexGenerateProjectQuestion, async (
+    _event,
+    input: {requestId: string; title: string},
+  ): Promise<ProjectQuestionGenerationResult> => {
+    const requestId = input.requestId?.trim();
+    const title = input.title?.trim();
+    if (!requestId || !/^[a-zA-Z0-9-]{8,80}$/.test(requestId)) throw new Error('Mã lượt tạo câu hỏi không hợp lệ.');
+    if (!title || title.length < 3 || title.length > 160) throw new Error('Tên dự án phải có từ 3 đến 160 ký tự.');
+    if (projectQuestionGenerationsByRequest.has(requestId)) throw new Error('Lượt tạo câu hỏi này đang chạy.');
+
+    const bridge = getCodexBridge();
+    broadcastCodexEvent({type: 'projectQuestionGeneration', requestId, phase: 'CONNECTING'});
+    const account = await bridge.readAccount();
+    if (!account.signedIn) throw new Error('Hãy đăng nhập Codex trong Không gian AI trước khi tạo câu hỏi.');
+    await bridge.assertModelAvailable(PROJECT_QUESTION_MODEL, PROJECT_QUESTION_EFFORT);
+    const thread = await bridge.startThread({cwd: getRepositoryRoot(), model: PROJECT_QUESTION_MODEL});
+
+    let resolveCompletion!: (result: ProjectQuestionGenerationResult) => void;
+    let rejectCompletion!: (error: Error) => void;
+    const completion = new Promise<ProjectQuestionGenerationResult>((resolve, reject) => {
+      resolveCompletion = resolve;
+      rejectCompletion = reject;
+    });
+    const pending: PendingProjectQuestionGeneration = {
+      requestId,
+      threadId: thread.threadId,
+      turnId: null,
+      openedSources: new Map(),
+      cancelRequested: false,
+      timer: setTimeout(() => {
+        const active = projectQuestionGenerationsByRequest.get(requestId);
+        if (!active) return;
+        broadcastProjectQuestionProgress(active, 'FAILED', {message: 'Lượt tạo câu hỏi đã quá thời gian 3 phút.'});
+        cleanupProjectQuestionGeneration(active);
+        active.reject(new Error('Lượt tạo câu hỏi đã quá thời gian 3 phút. Hãy thử lại.'));
+        if (active.turnId) void bridge.interruptTurn(active.threadId, active.turnId).catch(() => undefined);
+      }, 180_000),
+      resolve: resolveCompletion,
+      reject: rejectCompletion,
+    };
+    projectQuestionGenerationsByRequest.set(requestId, pending);
+    projectQuestionGenerationsByThread.set(thread.threadId, pending);
+    broadcastProjectQuestionProgress(pending, 'RESEARCHING');
+    try {
+      const turn = await bridge.startTurn({
+        threadId: thread.threadId,
+        text: buildProjectQuestionPrompt(title),
+        cwd: getRepositoryRoot(),
+        model: PROJECT_QUESTION_MODEL,
+        effort: PROJECT_QUESTION_EFFORT,
+        outputSchema: PROJECT_QUESTION_OUTPUT_SCHEMA,
+      });
+      pending.turnId = turn.turnId;
+      projectQuestionGenerationsByTurn.set(turn.turnId, pending);
+      if (pending.cancelRequested) await bridge.interruptTurn(thread.threadId, turn.turnId);
+      const earlyCompletion = pendingTurnCompletions.get(turn.turnId);
+      if (earlyCompletion) trackProjectQuestionActivity(earlyCompletion);
+      return await completion;
+    } catch (error) {
+      if (projectQuestionGenerationsByRequest.has(requestId)) {
+        const message = error instanceof Error ? error.message : 'Không thể bắt đầu tạo câu hỏi dẫn dắt.';
+        broadcastProjectQuestionProgress(pending, pending.cancelRequested ? 'CANCELLED' : 'FAILED', {message});
+        cleanupProjectQuestionGeneration(pending);
+      }
+      throw error;
+    }
+  });
+  ipcMain.handle(IPC_CHANNELS.codexTranslateProjectQuestion, async (
+    _event,
+    input: {requestId: string; question: string},
+  ): Promise<{translation: string}> => {
+    const requestId = input.requestId?.trim();
+    const question = input.question?.trim();
+    if (!requestId || !/^[a-zA-Z0-9-]{8,80}$/.test(requestId)) throw new Error('Mã lượt dịch câu hỏi không hợp lệ.');
+    if (!question || question.length > 240) throw new Error('Câu hỏi tiếng Anh phải có từ 1 đến 240 ký tự.');
+    if (projectQuestionTranslationsByRequest.has(requestId)) throw new Error('Lượt dịch câu hỏi này đang chạy.');
+
+    const bridge = getCodexBridge();
+    const account = await bridge.readAccount();
+    if (!account.signedIn) throw new Error('Hãy đăng nhập Codex trong Không gian AI trước khi dịch câu hỏi.');
+    await bridge.assertModelAvailable(PROJECT_QUESTION_MODEL, PROJECT_QUESTION_EFFORT);
+    const thread = await bridge.startThread({cwd: getRepositoryRoot(), model: PROJECT_QUESTION_MODEL});
+
+    let resolveCompletion!: (translation: string) => void;
+    let rejectCompletion!: (error: Error) => void;
+    const completion = new Promise<string>((resolve, reject) => {
+      resolveCompletion = resolve;
+      rejectCompletion = reject;
+    });
+    const pending: PendingProjectQuestionTranslation = {
+      requestId,
+      threadId: thread.threadId,
+      turnId: null,
+      timer: setTimeout(() => {
+        const active = projectQuestionTranslationsByRequest.get(requestId);
+        if (!active) return;
+        cleanupProjectQuestionTranslation(active);
+        active.reject(new Error('Lượt dịch câu hỏi đã quá thời gian 60 giây. Hãy thử lại.'));
+        if (active.turnId) void bridge.interruptTurn(active.threadId, active.turnId).catch(() => undefined);
+      }, 60_000),
+      resolve: resolveCompletion,
+      reject: rejectCompletion,
+    };
+    projectQuestionTranslationsByRequest.set(requestId, pending);
+    projectQuestionTranslationsByThread.set(thread.threadId, pending);
+    try {
+      const turn = await bridge.startTurn({
+        threadId: thread.threadId,
+        text: buildProjectQuestionTranslationPrompt(question),
+        cwd: getRepositoryRoot(),
+        model: PROJECT_QUESTION_MODEL,
+        effort: PROJECT_QUESTION_EFFORT,
+        outputSchema: PROJECT_QUESTION_TRANSLATION_OUTPUT_SCHEMA,
+      });
+      pending.turnId = turn.turnId;
+      projectQuestionTranslationsByTurn.set(turn.turnId, pending);
+      const earlyCompletion = pendingTurnCompletions.get(turn.turnId);
+      if (earlyCompletion) trackProjectQuestionTranslation(earlyCompletion);
+      return {translation: await completion};
+    } catch (error) {
+      if (projectQuestionTranslationsByRequest.has(requestId)) cleanupProjectQuestionTranslation(pending);
+      throw error;
+    }
+  });
+  ipcMain.handle(IPC_CHANNELS.codexInterruptProjectQuestion, async (_event, requestId: string) => {
+    const pending = projectQuestionGenerationsByRequest.get(requestId);
+    if (!pending) return {interrupted: false};
+    pending.cancelRequested = true;
+    if (pending.turnId) await getCodexBridge().interruptTurn(pending.threadId, pending.turnId);
+    return {interrupted: true};
+  });
   ipcMain.handle(IPC_CHANNELS.codexStartOrResumeThread, async (_event, projectId: string) => {
     const store = getProjectStore();
     const project = store.getProject(projectId).project;

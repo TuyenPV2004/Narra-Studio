@@ -2,6 +2,7 @@ import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProject
 import {contextBridge, ipcRenderer, webUtils} from 'electron';
 import type {CodexBridgeNotification} from './codex-bridge.js';
 import type {AiReasoningEffort, AiStage} from '@narra/contracts';
+import type {ProjectQuestionGenerationResult} from './project-question-generation.js';
 
 const channels = {
   listProjects: 'projects:list',
@@ -56,6 +57,9 @@ const channels = {
   codexStartDeviceLogin: 'codex:login-device',
   codexListModels: 'codex:model-list',
   codexReadRateLimits: 'codex:rate-limits-read',
+  codexGenerateProjectQuestion: 'codex:project-question-generate',
+  codexTranslateProjectQuestion: 'codex:project-question-translate',
+  codexInterruptProjectQuestion: 'codex:project-question-interrupt',
   codexStartOrResumeThread: 'codex:thread-start-or-resume',
   codexStartTurn: 'codex:turn-start',
   codexRunEditorialStage: 'codex:editorial-stage-run',
@@ -70,7 +74,7 @@ const channels = {
 
 const api = {
   runtime: 'electron',
-  version: 14,
+  version: 16,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -142,6 +146,12 @@ const api = {
   codexStartDeviceLogin: () => ipcRenderer.invoke(channels.codexStartDeviceLogin),
   codexListModels: () => ipcRenderer.invoke(channels.codexListModels),
   codexReadRateLimits: () => ipcRenderer.invoke(channels.codexReadRateLimits),
+  codexGenerateProjectQuestion: (input: {requestId: string; title: string}): Promise<ProjectQuestionGenerationResult> =>
+    ipcRenderer.invoke(channels.codexGenerateProjectQuestion, input),
+  codexTranslateProjectQuestion: (input: {requestId: string; question: string}): Promise<{translation: string}> =>
+    ipcRenderer.invoke(channels.codexTranslateProjectQuestion, input),
+  codexInterruptProjectQuestion: (requestId: string): Promise<{interrupted: boolean}> =>
+    ipcRenderer.invoke(channels.codexInterruptProjectQuestion, requestId),
   codexStartOrResumeThread: (projectId: string) => ipcRenderer.invoke(channels.codexStartOrResumeThread, projectId),
   codexGetWorkspace: (projectId: string) => ipcRenderer.invoke(channels.codexGetWorkspace, projectId),
   codexUpdateSettings: (projectId: string, input: {desiredModel: string; desiredEffort: AiReasoningEffort}) =>

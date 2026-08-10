@@ -30,7 +30,7 @@ import type {AiReasoningEffort, AiStage, AiProjectSettings} from '@narra/contrac
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 14;
+  readonly version: 16;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -100,6 +100,33 @@ interface NarraDesktopApi {
     defaultReasoningEffort: string | null;
   }>>;
   codexReadRateLimits: () => Promise<unknown>;
+  codexGenerateProjectQuestion: (input: {requestId: string; title: string}) => Promise<{
+    question: string | null;
+    editorialNote: string;
+    evidenceStatus: 'SUFFICIENT' | 'LIMITED' | 'INSUFFICIENT';
+    sources: Array<{
+      id: string;
+      title: string;
+      publisher: string;
+      url: string;
+      publishedAt: string | null;
+      accessedAt: string;
+      publisherType: 'GOVERNMENT' | 'REGULATOR' | 'ACADEMIC' | 'STANDARDS_BODY' | 'COMPANY' | 'JOURNALISM' | 'NGO' | 'OTHER';
+      sourceUse: 'EVIDENCE' | 'DISCOVERY_ONLY';
+      supports: Array<{
+        premise: string;
+        evidenceRole: 'PRIMARY' | 'SECONDARY';
+        limitations: string;
+      }>;
+      discoveryNote: string | null;
+      relevantInterests: string | null;
+    }>;
+    warnings: string[];
+    model: 'gpt-5.6-sol';
+    effort: 'medium';
+  }>;
+  codexTranslateProjectQuestion: (input: {requestId: string; question: string}) => Promise<{translation: string}>;
+  codexInterruptProjectQuestion: (requestId: string) => Promise<{interrupted: boolean}>;
   codexStartOrResumeThread: (projectId: string) => Promise<{threadId: string}>;
   codexGetWorkspace: (projectId: string) => Promise<AiWorkspace>;
   codexUpdateSettings: (
