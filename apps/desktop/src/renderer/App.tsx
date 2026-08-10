@@ -16,11 +16,11 @@ import {
   Plus,
   RefreshCw,
   Search,
-  Sparkles,
   WandSparkles,
   SlidersHorizontal,
   Settings2,
   TriangleAlert,
+  X,
 } from 'lucide-react';
 import {StoryboardWorkspaceView} from './StoryboardWorkspace';
 import {VoiceWorkspaceView} from './VoiceWorkspace';
@@ -29,24 +29,17 @@ import {ReviewWorkspaceView} from './ReviewWorkspace';
 import {AiWorkspaceView} from './AiWorkspace';
 import {TimelineWorkspaceView} from './TimelineWorkspace';
 import {SystemWorkspaceView} from './SystemWorkspace';
-
-const formatDate = (value: string | null): string =>
-  value ? new Intl.DateTimeFormat('en', {dateStyle: 'medium', timeStyle: 'short'}).format(new Date(value)) : 'Never';
-
-const formatLabel = (value: string): string => {
-  const normalized = value.replaceAll('_', ' ').toLowerCase();
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-};
+import {formatUiDate, formatUiLabel} from './ui-locale';
 
 const workspaceItems = [
-  {id: 'overview', label: 'Overview', icon: LayoutDashboard},
-  {id: 'ai', label: 'AI workspace', icon: WandSparkles},
-  {id: 'editorial', label: 'Editorial', icon: BookOpenText},
-  {id: 'storyboard', label: 'Storyboard & assets', icon: Clapperboard},
-  {id: 'voice', label: 'Voice & captions', icon: Captions},
-  {id: 'timeline', label: 'Timeline', icon: SlidersHorizontal},
-  {id: 'review', label: 'Review & render', icon: Film},
-  {id: 'system', label: 'System', icon: Settings2},
+  {id: 'overview', label: 'Tổng quan', icon: LayoutDashboard},
+  {id: 'ai', label: 'Không gian AI', icon: WandSparkles},
+  {id: 'editorial', label: 'Biên tập', icon: BookOpenText},
+  {id: 'storyboard', label: 'Storyboard & tài nguyên', icon: Clapperboard},
+  {id: 'voice', label: 'Lời đọc & phụ đề', icon: Captions},
+  {id: 'timeline', label: 'Dòng thời gian', icon: SlidersHorizontal},
+  {id: 'review', label: 'Duyệt & kết xuất', icon: Film},
+  {id: 'system', label: 'Hệ thống', icon: Settings2},
 ] as const;
 
 export const App = () => {
@@ -56,6 +49,7 @@ export const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [question, setQuestion] = useState('');
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'ai' | 'editorial' | 'storyboard' | 'voice' | 'timeline' | 'review' | 'system'>('overview');
 
   const activeProjects = useMemo(() => projects.filter(({archived}) => !archived), [projects]);
@@ -67,7 +61,7 @@ export const App = () => {
 
   useEffect(() => {
     void reloadProjects().catch((reason: unknown) => {
-      setError(reason instanceof Error ? reason.message : 'Could not load the local workspace.');
+      setError(reason instanceof Error ? reason.message : 'Không thể tải không gian làm việc local.');
     });
   }, []);
 
@@ -79,7 +73,7 @@ export const App = () => {
     try {
       await action();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'The local operation failed.');
+      setError(reason instanceof Error ? reason.message : 'Thao tác local không thành công.');
     } finally {
       setBusy(false);
     }
@@ -92,6 +86,7 @@ export const App = () => {
       setSelected(detail);
       setTitle('');
       setQuestion('');
+      setCreateDialogOpen(false);
       await reloadProjects();
     });
   };
@@ -128,7 +123,7 @@ export const App = () => {
   };
 
   const archiveProject = async (): Promise<void> => {
-    if (!selected || !window.confirm(`Archive “${selected.project.title}”? Files will not be deleted.`)) return;
+    if (!selected || !window.confirm(`Lưu trữ “${selected.project.title}”? Các tệp dự án sẽ không bị xóa.`)) return;
     await run(async () => {
       await window.narra.archiveProject(selected.project.id);
       setSelected(null);
@@ -136,50 +131,52 @@ export const App = () => {
     });
   };
 
+  useEffect(() => window.narra.onMenuAction((action) => {
+    if (action === 'NEW_PROJECT') setCreateDialogOpen(true);
+    if (action === 'OPEN_PROJECT') void chooseProject();
+    if (action === 'REFRESH_PROJECT' && selected) void refreshProject();
+  }), [selected?.project.id]);
+
+  useEffect(() => {
+    if (!createDialogOpen) return;
+    const closeOnEscape = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape' && !busy) setCreateDialogOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, [busy, createDialogOpen]);
+
   return (
     <main className="workspace-shell" id="main-content">
-      <header className="topbar">
-        <div className="brand-lockup">
-          <span className="brand-mark"><Sparkles aria-hidden="true" size={20} /></span>
-          <div><h1>Narra Studio</h1><p>Local documentary workspace</p></div>
-        </div>
-        <button className="secondary" disabled={busy} onClick={() => void chooseProject()}>
-          <FolderOpen aria-hidden="true" size={17} /> Open project folder
-        </button>
-      </header>
+      <h1 className="sr-only">Narra Studio</h1>
 
       {error && <div className="notice error-notice" role="alert">{error}</div>}
 
       <div className="workspace-grid">
         <aside className="project-rail">
-          <form className="create-card" onSubmit={(event) => void createProject(event)}>
-            <div className="rail-heading">
-              <span className="rail-icon"><Plus aria-hidden="true" size={17} /></span>
-              <div><h2>New project</h2><p>Start from a documentary question.</p></div>
-            </div>
-            <label>Title<input value={title} onChange={(event) => setTitle(event.target.value)} required /></label>
-            <label>Documentary question<textarea value={question} onChange={(event) => setQuestion(event.target.value)} required rows={3} /></label>
-            <button className="primary" disabled={busy || !title.trim() || !question.trim()} type="submit">
-              <Plus aria-hidden="true" size={17} /> Create project
+          <header className="project-rail-header">
+            <div><span className="section-label">Thư viện</span><h2>Dự án</h2></div>
+            <button className="secondary icon-button" aria-label="Tạo dự án mới" title="Tạo dự án mới (Ctrl+N)" onClick={() => setCreateDialogOpen(true)}>
+              <Plus aria-hidden="true" size={17} />
             </button>
-          </form>
+          </header>
 
-          <section className="project-list" aria-label="Active projects">
-            <div className="list-heading"><span>Projects</span><span className="count-badge">{activeProjects.length}</span></div>
-            {activeProjects.length === 0 && <p className="empty">No local projects yet.</p>}
+          <section className="project-list" aria-label="Dự án đang hoạt động">
+            <div className="list-heading"><span>Đang hoạt động</span><span className="count-badge">{activeProjects.length}</span></div>
+            {activeProjects.length === 0 && <p className="empty">Chưa có dự án local.</p>}
             {activeProjects.map((project) => (
               <button className={`project-row ${selected?.project.id === project.id ? 'selected' : ''}`} key={project.id} onClick={() => void openProject(project.id)}>
-                <strong>{project.title}</strong><span>{formatLabel(project.status)}</span>
+                <strong>{project.title}</strong><span>{formatUiLabel(project.status)}</span>
               </button>
             ))}
           </section>
 
           {archivedProjects.length > 0 && (
             <details className="archived-list">
-              <summary><Archive aria-hidden="true" size={15} /> Archived <span>{archivedProjects.length}</span></summary>
+              <summary><Archive aria-hidden="true" size={15} /> Đã lưu trữ <span>{archivedProjects.length}</span></summary>
               {archivedProjects.map((project) => (
                 <button className="project-row archived" key={project.id} onClick={() => void openProject(project.id)}>
-                  <strong>{project.title}</strong><span>Files retained</span>
+                  <strong>{project.title}</strong><span>Vẫn giữ tệp dự án</span>
                 </button>
               ))}
             </details>
@@ -190,41 +187,41 @@ export const App = () => {
           {!selected ? (
             <div className="welcome-panel">
               <span className="empty-illustration"><FileStack aria-hidden="true" size={28} /></span>
-              <p className="section-label">Project workspace</p>
-              <h2>Build a documentary with a clear audit trail.</h2>
-              <p>Create a project or open an existing folder. Narra keeps structured state in SQLite and media beside its artifacts.</p>
-              <button className="secondary" disabled={busy} onClick={() => void chooseProject()}><FolderOpen aria-hidden="true" size={17} /> Open an existing project</button>
+              <p className="section-label">Không gian dự án</p>
+              <h2>Xây dựng phim tài liệu với quy trình rõ ràng.</h2>
+              <p>Tạo dự án mới hoặc mở một thư mục có sẵn. Narra lưu trạng thái có cấu trúc trong SQLite và đặt media cạnh các artifact của dự án.</p>
+              <div className="welcome-actions"><button className="primary" disabled={busy} onClick={() => setCreateDialogOpen(true)}><Plus aria-hidden="true" size={17} /> Tạo dự án mới</button><button className="secondary" disabled={busy} onClick={() => void chooseProject()}><FolderOpen aria-hidden="true" size={17} /> Mở dự án có sẵn</button></div>
             </div>
           ) : (
             <>
               <header className="project-header">
                 <div>
                   <div className="status-line">
-                    <span className="status-pill"><CircleGauge aria-hidden="true" size={14} /> {formatLabel(selected.project.status)}</span>
+                    <span className="status-pill"><CircleGauge aria-hidden="true" size={14} /> {formatUiLabel(selected.project.status)}</span>
                     <span className={`health ${selected.project.validation?.status === 'VALID' ? 'valid' : 'invalid'}`}>
                       {selected.project.validation?.status === 'VALID' ? <CheckCircle2 aria-hidden="true" size={14} /> : <TriangleAlert aria-hidden="true" size={14} />}
-                      {selected.project.validation?.status ? formatLabel(selected.project.validation.status) : 'Not checked'}
+                      {selected.project.validation?.status ? formatUiLabel(selected.project.validation.status) : 'Chưa kiểm tra'}
                     </span>
                   </div>
                   <h2>{selected.project.title}</h2>
                   <p>{selected.project.question}</p>
                 </div>
                 <div className="actions">
-                  <button className="secondary" disabled={busy} onClick={() => void refreshProject()}><RefreshCw aria-hidden="true" size={16} /> Refresh artifacts</button>
-                  <button className="secondary" disabled={busy} onClick={() => void duplicateProject()}><Copy aria-hidden="true" size={16} /> Duplicate</button>
-                  {!selected.project.archived && <button className="danger ghost-danger" disabled={busy} onClick={() => void archiveProject()}><Archive aria-hidden="true" size={16} /> Archive</button>}
+                  <button className="secondary" disabled={busy} onClick={() => void refreshProject()}><RefreshCw aria-hidden="true" size={16} /> Làm mới artifact</button>
+                  <button className="secondary" disabled={busy} onClick={() => void duplicateProject()}><Copy aria-hidden="true" size={16} /> Nhân bản</button>
+                  {!selected.project.archived && <button className="danger ghost-danger" disabled={busy} onClick={() => void archiveProject()}><Archive aria-hidden="true" size={16} /> Lưu trữ</button>}
                 </div>
               </header>
 
               <dl className="metadata-grid">
-                <div><dt>Project ID</dt><dd>{selected.project.id}</dd></div>
-                <div><dt>Target</dt><dd>{selected.project.targetDurationSec / 60} min · {selected.project.aspectRatio}</dd></div>
-                <div><dt>Language</dt><dd>{selected.project.language}</dd></div>
-                <div><dt>Last opened</dt><dd>{formatDate(selected.project.lastOpenedAt)}</dd></div>
-                <div className="path-cell"><dt>Folder</dt><dd>{selected.project.rootPath}</dd></div>
+                <div><dt>Mã dự án</dt><dd>{selected.project.id}</dd></div>
+                <div><dt>Mục tiêu</dt><dd>{selected.project.targetDurationSec / 60} phút · {selected.project.aspectRatio}</dd></div>
+                <div><dt>Ngôn ngữ</dt><dd>{selected.project.language}</dd></div>
+                <div><dt>Mở gần nhất</dt><dd>{formatUiDate(selected.project.lastOpenedAt)}</dd></div>
+                <div className="path-cell"><dt>Thư mục</dt><dd>{selected.project.rootPath}</dd></div>
               </dl>
 
-              <nav className="workspace-tabs" aria-label="Project workspace">
+              <nav className="workspace-tabs" aria-label="Không gian dự án">
                 {workspaceItems.map(({id, label, icon: Icon}) => (
                   <button key={id} aria-selected={activeTab === id} onClick={() => setActiveTab(id)}><Icon aria-hidden="true" size={17} /><span>{label}</span></button>
                 ))}
@@ -233,8 +230,8 @@ export const App = () => {
               {activeTab === 'overview' ? (
                 <section className="validation-panel">
                   <div className="panel-heading">
-                    <div><p className="section-label">Artifact health</p><h3>{selected.artifactVersions.length} versioned artifacts</h3></div>
-                    <span>{formatDate(selected.project.validation?.checkedAt ?? null)}</span>
+                    <div><p className="section-label">Tình trạng artifact</p><h3>{selected.artifactVersions.length} artifact có phiên bản</h3></div>
+                    <span>{formatUiDate(selected.project.validation?.checkedAt ?? null)}</span>
                   </div>
                   {selected.project.validation?.issues.length ? (
                     <div className="issue-list">
@@ -245,21 +242,21 @@ export const App = () => {
                       ))}
                     </div>
                   ) : (
-                    <p className="healthy-message"><CheckCircle2 aria-hidden="true" size={18} /> All required artifacts match schema version 1.</p>
+                    <p className="healthy-message"><CheckCircle2 aria-hidden="true" size={18} /> Tất cả artifact bắt buộc đều khớp schema phiên bản 1.</p>
                   )}
 
                   <section className="artifact-table-section" aria-labelledby="artifact-table-title">
-                    <div className="table-heading"><div><p className="section-label">Project files</p><h3 id="artifact-table-title">Artifact register</h3></div><Search aria-hidden="true" size={18} /></div>
+                    <div className="table-heading"><div><p className="section-label">Tệp dự án</p><h3 id="artifact-table-title">Danh mục artifact</h3></div><Search aria-hidden="true" size={18} /></div>
                     <div className="table-scroll">
                       <table className="data-table">
-                        <thead><tr><th>Artifact</th><th>Schema</th><th>State</th><th>Updated</th></tr></thead>
+                        <thead><tr><th>Artifact</th><th>Schema</th><th>Trạng thái</th><th>Cập nhật</th></tr></thead>
                         <tbody>
                           {selected.artifactVersions.map((artifact) => (
                             <tr key={artifact.path}>
                               <td><FileStack aria-hidden="true" size={15} /><span>{artifact.path}</span></td>
                               <td>v{artifact.schemaVersion}</td>
-                              <td><span className={`table-status ${artifact.stale ? 'stale' : 'fresh'}`}>{artifact.stale ? 'Needs update' : 'Current'}</span></td>
-                              <td>{formatDate(artifact.updatedAt)}</td>
+                              <td><span className={`table-status ${artifact.stale ? 'stale' : 'fresh'}`}>{artifact.stale ? 'Cần cập nhật' : 'Mới nhất'}</span></td>
+                              <td>{formatUiDate(artifact.updatedAt)}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -291,6 +288,22 @@ export const App = () => {
           )}
         </section>
       </div>
+
+      {createDialogOpen && (
+        <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setCreateDialogOpen(false); }}>
+          <section className="create-project-dialog" role="dialog" aria-modal="true" aria-labelledby="create-project-title">
+            <header>
+              <div><p className="section-label">Dự án local</p><h2 id="create-project-title">Tạo dự án mới</h2><p>Bắt đầu bằng một câu hỏi phim tài liệu rõ ràng.</p></div>
+              <button className="dialog-close" aria-label="Đóng" disabled={busy} onClick={() => setCreateDialogOpen(false)}><X aria-hidden="true" size={19} /></button>
+            </header>
+            <form onSubmit={(event) => void createProject(event)}>
+              <label>Tên dự án<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} required /></label>
+              <label>Câu hỏi phim tài liệu<textarea value={question} onChange={(event) => setQuestion(event.target.value)} required rows={4} /></label>
+              <div className="dialog-actions"><button className="secondary" disabled={busy} type="button" onClick={() => setCreateDialogOpen(false)}>Hủy</button><button className="primary" disabled={busy || !title.trim() || !question.trim()} type="submit"><Plus aria-hidden="true" size={17} /> Tạo dự án</button></div>
+            </form>
+          </section>
+        </div>
+      )}
     </main>
   );
 };

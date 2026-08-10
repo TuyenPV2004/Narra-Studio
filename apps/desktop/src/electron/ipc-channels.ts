@@ -59,5 +59,6 @@ export const IPC_CHANNELS = {
   codexUpdateSettings: 'codex:settings-update',
   codexRespondServerRequest: 'codex:server-request-respond',
   openExternalUrl: 'system:open-external-url',
+  menuAction: 'system:menu-action',
   codexEvent: 'codex:event',
 } as const;

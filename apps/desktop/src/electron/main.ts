@@ -18,7 +18,7 @@ import {
   KokoroOnnxProvider,
 } from '@narra/project-store';
 import {getAiStageJsonSchema, type AiReasoningEffort, type AiStage} from '@narra/contracts';
-import {app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, shell} from 'electron';
+import {app, BrowserWindow, clipboard, dialog, ipcMain, Menu, net, protocol, shell, type MenuItemConstructorOptions} from 'electron';
 import {accessSync, constants, existsSync, writeFileSync} from 'node:fs';
 import {spawn} from 'node:child_process';
 import path from 'node:path';
@@ -383,7 +383,7 @@ const registerProjectHandlers = (): void => {
   );
   ipcMain.handle(IPC_CHANNELS.chooseAndOpenProject, async () => {
     const selection = await dialog.showOpenDialog({
-      title: 'Open Narra project folder',
+      title: 'Mở thư mục dự án Narra',
       properties: ['openDirectory'],
     });
     if (selection.canceled || !selection.filePaths[0]) return null;
@@ -394,7 +394,7 @@ const registerProjectHandlers = (): void => {
   );
   ipcMain.handle(IPC_CHANNELS.chooseAndImportStoryboard, async (_event, projectId: string) => {
     const selection = await dialog.showOpenDialog({
-      title: 'Import scenes.json and shots.json',
+      title: 'Nhập scenes.json và shots.json',
       properties: ['openFile', 'multiSelections'],
       filters: [{name: 'Narra JSON artifacts', extensions: ['json']}],
     });
@@ -415,7 +415,7 @@ const registerProjectHandlers = (): void => {
   );
   ipcMain.handle(IPC_CHANNELS.chooseAndImportAssetMedia, async (_event, projectId: string, assetId: string) => {
     const selection = await dialog.showOpenDialog({
-      title: 'Import asset media',
+      title: 'Nhập media cho tài nguyên',
       properties: ['openFile'],
       filters: [{name: 'Image and video', extensions: ['png', 'jpg', 'jpeg', 'svg', 'mp4', 'mov', 'webm', 'mkv']}],
     });
@@ -431,7 +431,7 @@ const registerProjectHandlers = (): void => {
     getProjectStore().getFlowWorkspace(projectId));
   ipcMain.handle(IPC_CHANNELS.chooseFlowWatchDirectory, async (_event, projectId: string) => {
     const selection = await dialog.showOpenDialog({
-      title: 'Choose Google Flow download folder',
+      title: 'Chọn thư mục tải xuống Google Flow',
       properties: ['openDirectory', 'createDirectory'],
     });
     if (selection.canceled || !selection.filePaths[0]) return null;
@@ -461,7 +461,7 @@ const registerProjectHandlers = (): void => {
   );
   ipcMain.handle(IPC_CHANNELS.chooseAndImportNarrationAudio, async (_event, projectId: string, segmentId: string) => {
     const selection = await dialog.showOpenDialog({
-      title: 'Import narration segment audio',
+      title: 'Nhập âm thanh cho đoạn lời đọc',
       properties: ['openFile'],
       filters: [{name: 'Audio', extensions: ['wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg']}],
     });
@@ -474,7 +474,7 @@ const registerProjectHandlers = (): void => {
     getProjectStore().generateMissingNarration(projectId, input));
   ipcMain.handle(IPC_CHANNELS.chooseAndImportCaptions, async (_event, projectId: string) => {
     const selection = await dialog.showOpenDialog({
-      title: 'Import captions or word timestamps',
+      title: 'Nhập phụ đề hoặc mốc thời gian theo từ',
       properties: ['openFile'],
       filters: [{name: 'Captions and timestamps', extensions: ['srt', 'vtt', 'json']}],
     });
@@ -494,7 +494,7 @@ const registerProjectHandlers = (): void => {
     getProjectStore().updateShotAudio(projectId, shotId, input));
   ipcMain.handle(IPC_CHANNELS.chooseAndImportTimelineAudio, async (_event, projectId: string, role: 'MUSIC' | 'SFX') => {
     const selection = await dialog.showOpenDialog({
-      title: `Import ${role === 'MUSIC' ? 'music' : 'sound effect'}`,
+      title: `Nhập ${role === 'MUSIC' ? 'nhạc' : 'hiệu ứng âm thanh'}`,
       properties: ['openFile'],
       filters: [{name: 'Audio', extensions: ['wav', 'mp3', 'm4a', 'aac', 'flac', 'ogg']}],
     });
@@ -540,7 +540,7 @@ const registerProjectHandlers = (): void => {
   });
   ipcMain.handle(IPC_CHANNELS.chooseAndAttachRenderOutput, async (_event, projectId: string, jobId: string) => {
     const selection = await dialog.showOpenDialog({
-      title: 'Attach completed render output',
+      title: 'Gắn video đã kết xuất',
       properties: ['openFile'],
       filters: [{name: 'Video', extensions: ['mp4', 'mov', 'mkv', 'webm']}],
     });
@@ -548,7 +548,7 @@ const registerProjectHandlers = (): void => {
     return getProjectStore().attachRenderOutput(projectId, jobId, selection.filePaths[0]);
   });
   ipcMain.handle(IPC_CHANNELS.chooseProjectBackupDirectory, async (_event, projectId: string) => {
-    const selection = await dialog.showOpenDialog({title: 'Choose project backup destination', properties: ['openDirectory', 'createDirectory']});
+    const selection = await dialog.showOpenDialog({title: 'Chọn nơi lưu bản sao dự án', properties: ['openDirectory', 'createDirectory']});
     if (selection.canceled || !selection.filePaths[0]) return null;
     return getProjectStore().createProjectBackup(projectId, selection.filePaths[0]);
   });
@@ -557,9 +557,9 @@ const registerProjectHandlers = (): void => {
     const repositoryRoot = getRepositoryRoot();
     try {
       accessSync(getProjectStore().workspaceRoot, constants.R_OK | constants.W_OK);
-      checks.push({id: 'workspace', label: 'Local workspace', status: 'PASS', detail: `${getProjectStore().listProjects().length} indexed projects; folder is readable and writable.`});
+      checks.push({id: 'workspace', label: 'Không gian làm việc trên máy', status: 'PASS', detail: `${getProjectStore().listProjects().length} dự án đã lập chỉ mục; thư mục có thể đọc và ghi.`});
     } catch (error) {
-      checks.push({id: 'workspace', label: 'Local workspace', status: 'FAIL', detail: error instanceof Error ? error.message : String(error), remediation: 'Choose a writable Narra workspace folder.'});
+      checks.push({id: 'workspace', label: 'Không gian làm việc trên máy', status: 'FAIL', detail: error instanceof Error ? error.message : String(error), remediation: 'Chọn một thư mục không gian Narra có quyền ghi.'});
     }
     try {
       const account = await getCodexBridge().readAccount();
@@ -567,27 +567,27 @@ const registerProjectHandlers = (): void => {
       const hasModel = models.some(({id}) => id === 'gpt-5.6-sol');
       checks.push({
         id: 'codex', label: 'Codex App Server', status: account.signedIn && hasModel ? 'PASS' : 'WARNING',
-        detail: account.signedIn ? `Signed in; GPT-5.6 Sol ${hasModel ? 'is available' : 'was not returned by model/list'}.` : 'Codex is available but not signed in.',
-        ...(account.signedIn && hasModel ? {} : {remediation: 'Open AI workspace and complete ChatGPT sign-in, then refresh diagnostics.'}),
+        detail: account.signedIn ? `Đã đăng nhập; GPT-5.6 Sol ${hasModel ? 'khả dụng' : 'không xuất hiện trong danh sách model'}.` : 'Codex khả dụng nhưng chưa đăng nhập.',
+        ...(account.signedIn && hasModel ? {} : {remediation: 'Mở Không gian AI, hoàn tất đăng nhập ChatGPT rồi làm mới chẩn đoán.'}),
       });
     } catch (error) {
-      checks.push({id: 'codex', label: 'Codex App Server', status: 'FAIL', detail: error instanceof Error ? error.message : String(error), remediation: 'Verify the Codex CLI installation and restart Narra Studio.'});
+      checks.push({id: 'codex', label: 'Codex App Server', status: 'FAIL', detail: error instanceof Error ? error.message : String(error), remediation: 'Kiểm tra cài đặt Codex CLI rồi khởi động lại Narra Studio.'});
     }
     const voice = getProjectStore().getVoiceRuntimeStatus();
     checks.push({
-      id: 'voice', label: 'Kokoro voice runtime', status: voice.available ? 'PASS' : 'WARNING',
-      detail: voice.available ? `Kokoro ${voice.modelVersion} is ready.` : `Missing: ${voice.missing.join(', ') || 'runtime files'}.`,
+      id: 'voice', label: 'Bộ máy giọng đọc Kokoro', status: voice.available ? 'PASS' : 'WARNING',
+      detail: voice.available ? `Kokoro ${voice.modelVersion} đã sẵn sàng.` : `Còn thiếu: ${voice.missing.join(', ') || 'các tệp runtime'}.`,
       ...(voice.available ? {} : {remediation: voice.setupCommand}),
     });
     const remotionRoot = path.join(repositoryRoot, 'remotion');
     const remotionCli = path.join(remotionRoot, 'node_modules/@remotion/cli/remotion-cli.js');
     if (!existsSync(remotionCli)) {
-      checks.push({id: 'remotion', label: 'Remotion runtime', status: 'FAIL', detail: `CLI not found in ${app.isPackaged ? 'packaged resources' : 'the repository'}.`, remediation: 'Rebuild the desktop package with Narra runtime resources.'});
+      checks.push({id: 'remotion', label: 'Bộ máy Remotion', status: 'FAIL', detail: `Không tìm thấy CLI trong ${app.isPackaged ? 'tài nguyên đã đóng gói' : 'repository'}.`, remediation: 'Đóng gói lại ứng dụng desktop kèm tài nguyên runtime Narra.'});
     } else {
       const remotion = await runVersionCheck(process.execPath, [remotionCli, 'versions'], remotionRoot);
-      checks.push({id: 'remotion', label: 'Remotion runtime', status: remotion.ok ? 'PASS' : 'FAIL', detail: remotion.detail, ...(remotion.ok ? {} : {remediation: 'Run pnpm install and rebuild the package.'})});
+      checks.push({id: 'remotion', label: 'Bộ máy Remotion', status: remotion.ok ? 'PASS' : 'FAIL', detail: remotion.detail, ...(remotion.ok ? {} : {remediation: 'Chạy pnpm install rồi build lại ứng dụng.'})});
       const ffmpeg = await runVersionCheck(process.execPath, [remotionCli, 'ffmpeg', '-version'], remotionRoot);
-      checks.push({id: 'ffmpeg', label: 'FFmpeg runtime', status: ffmpeg.ok ? 'PASS' : 'FAIL', detail: ffmpeg.detail, ...(ffmpeg.ok ? {} : {remediation: 'Repair the bundled Remotion FFmpeg runtime.'})});
+      checks.push({id: 'ffmpeg', label: 'Bộ máy FFmpeg', status: ffmpeg.ok ? 'PASS' : 'FAIL', detail: ffmpeg.detail, ...(ffmpeg.ok ? {} : {remediation: 'Sửa bộ máy FFmpeg đi kèm Remotion.'})});
     }
     return {checkedAt: new Date().toISOString(), appVersion: app.getVersion(), packaged: app.isPackaged, platform: `${process.platform} ${process.arch}`, checks};
   });
@@ -618,7 +618,58 @@ const createWindow = async (): Promise<BrowserWindow> => {
   return window;
 };
 
+const sendMenuAction = (action: 'NEW_PROJECT' | 'OPEN_PROJECT' | 'REFRESH_PROJECT'): void => {
+  BrowserWindow.getFocusedWindow()?.webContents.send(IPC_CHANNELS.menuAction, action);
+};
+
+const installApplicationMenu = (): void => {
+  const template: MenuItemConstructorOptions[] = [
+    {
+      label: 'Tệp',
+      submenu: [
+        {label: 'Tạo dự án mới…', accelerator: 'CmdOrCtrl+N', click: () => sendMenuAction('NEW_PROJECT')},
+        {label: 'Mở thư mục dự án…', accelerator: 'CmdOrCtrl+O', click: () => sendMenuAction('OPEN_PROJECT')},
+        {type: 'separator'},
+        {label: 'Làm mới dự án', accelerator: 'F5', click: () => sendMenuAction('REFRESH_PROJECT')},
+        {type: 'separator'},
+        {label: 'Thoát', role: 'quit'},
+      ],
+    },
+    {
+      label: 'Chỉnh sửa',
+      submenu: [
+        {label: 'Hoàn tác', role: 'undo'},
+        {label: 'Làm lại', role: 'redo'},
+        {type: 'separator'},
+        {label: 'Cắt', role: 'cut'},
+        {label: 'Sao chép', role: 'copy'},
+        {label: 'Dán', role: 'paste'},
+        {label: 'Chọn tất cả', role: 'selectAll'},
+      ],
+    },
+    {
+      label: 'Hiển thị',
+      submenu: [
+        {label: 'Phóng to', role: 'zoomIn'},
+        {label: 'Thu nhỏ', role: 'zoomOut'},
+        {label: 'Kích thước mặc định', role: 'resetZoom'},
+        {type: 'separator'},
+        {label: 'Toàn màn hình', role: 'togglefullscreen'},
+      ],
+    },
+    {
+      label: 'Cửa sổ',
+      submenu: [
+        {label: 'Thu nhỏ cửa sổ', role: 'minimize'},
+        {label: 'Đóng cửa sổ', role: 'close'},
+      ],
+    },
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+};
+
 void app.whenReady().then(async () => {
+  installApplicationMenu();
   const workspaceRoot =
     process.env.NARRA_WORKSPACE_ROOT ?? path.join(app.getPath('documents'), 'Narra Studio', 'projects');
   const repositoryRoot = getRepositoryRoot();
@@ -678,12 +729,12 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Narra Studio' || result.apiVersion !== 13 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Narra Studio' || result.apiVersion !== 14 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Narra Studio\napiVersion=13\nprojectCount=${result.projectCount}\n`,
+      `renderer=Narra Studio\napiVersion=14\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     if (process.env.NARRA_SMOKE_EDITORIAL_UI === '1') {
@@ -691,13 +742,13 @@ void app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 350));
       await mainWindow.webContents.executeJavaScript(`
         [...document.querySelectorAll('.workspace-tabs button')]
-          .find((button) => button.textContent?.trim() === 'Editorial')
+          .find((button) => button.textContent?.trim() === 'Biên tập')
           ?.click()
       `);
       await new Promise((resolve) => setTimeout(resolve, 450));
       await mainWindow.webContents.executeJavaScript(`
         [...document.querySelectorAll('.editorial-stage-tabs button')]
-          .find((button) => button.textContent?.trim() === 'Topic')
+          .find((button) => button.textContent?.trim() === 'Chủ đề')
           ?.click()
       `);
       const editorialResult = (await mainWindow.webContents.executeJavaScript(`({
@@ -718,7 +769,7 @@ void app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 350));
       await mainWindow.webContents.executeJavaScript(`
         [...document.querySelectorAll('.workspace-tabs button')]
-          .find((button) => button.textContent?.trim() === 'Storyboard & assets')
+          .find((button) => button.textContent?.trim() === 'Storyboard & tài nguyên')
           ?.click()
       `);
       const flowResult = (await mainWindow.webContents.executeJavaScript(`
@@ -752,7 +803,7 @@ void app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 350));
       await mainWindow.webContents.executeJavaScript(`
         [...document.querySelectorAll('.workspace-tabs button')]
-          .find((button) => button.textContent?.trim() === 'Voice & captions')
+          .find((button) => button.textContent?.trim() === 'Lời đọc & phụ đề')
           ?.click()
       `);
       const voiceResult = (await mainWindow.webContents.executeJavaScript(`
@@ -794,7 +845,7 @@ void app.whenReady().then(async () => {
               const message = document.querySelector('.success-notice')?.textContent?.trim() ?? '';
               const error = document.querySelector('.error-notice')?.textContent?.trim() ?? '';
               const versionAfter = document.querySelector('.audio-import-row strong')?.textContent?.trim() ?? '';
-              if (error || (message.includes('Generated') && versionAfter !== versionBefore)) {
+              if (error || (message.includes('Đã tạo') && versionAfter !== versionBefore)) {
                 resolve({state: error ? 'failed' : 'completed', versionBefore, versionAfter, message, error});
                 return;
               }
@@ -813,7 +864,7 @@ void app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 350));
       await mainWindow.webContents.executeJavaScript(`
         [...document.querySelectorAll('.workspace-tabs button')]
-          .find((button) => button.textContent?.trim() === 'Timeline')
+          .find((button) => button.textContent?.trim() === 'Dòng thời gian')
           ?.click()
       `);
       await mainWindow.webContents.executeJavaScript(`
@@ -824,7 +875,7 @@ void app.whenReady().then(async () => {
             if (!workspace && Date.now() - startedAt <= 5000) return setTimeout(prepare, 50);
             if (document.querySelectorAll('.caption-cue-list button').length > 0) return resolve(true);
             const generate = [...document.querySelectorAll('.timeline-toolbar button')]
-              .find((button) => button.textContent?.includes('Generate cues'));
+              .find((button) => button.textContent?.includes('Tạo cue'));
             if (!generate || generate.disabled) return resolve(false);
             generate.click();
             const waitForCues = () => {
@@ -866,7 +917,7 @@ void app.whenReady().then(async () => {
       await new Promise((resolve) => setTimeout(resolve, 350));
       await mainWindow.webContents.executeJavaScript(`
         [...document.querySelectorAll('.workspace-tabs button')]
-          .find((button) => button.textContent?.trim() === 'System')
+          .find((button) => button.textContent?.trim() === 'Hệ thống')
           ?.click()
       `);
       const systemResult = (await mainWindow.webContents.executeJavaScript(`
@@ -901,7 +952,17 @@ void app.whenReady().then(async () => {
         await new Promise((resolve) => setTimeout(resolve, 350));
       }
       if (process.env.NARRA_SMOKE_WORKSPACE_TAB) {
-        const tabLabel = JSON.stringify(process.env.NARRA_SMOKE_WORKSPACE_TAB);
+        const translatedTabs: Record<string, string> = {
+          Overview: 'Tổng quan',
+          'AI workspace': 'Không gian AI',
+          Editorial: 'Biên tập',
+          'Storyboard & assets': 'Storyboard & tài nguyên',
+          'Voice & captions': 'Lời đọc & phụ đề',
+          Timeline: 'Dòng thời gian',
+          'Review & render': 'Duyệt & kết xuất',
+          System: 'Hệ thống',
+        };
+        const tabLabel = JSON.stringify(translatedTabs[process.env.NARRA_SMOKE_WORKSPACE_TAB] ?? process.env.NARRA_SMOKE_WORKSPACE_TAB);
         await mainWindow.webContents.executeJavaScript(`
           [...document.querySelectorAll('.workspace-tabs button')]
             .find((button) => button.textContent?.trim() === ${tabLabel})
@@ -927,7 +988,7 @@ void app.whenReady().then(async () => {
             };
             const waitForCompletion = () => {
               const state = document.querySelector('.run-state')?.textContent?.trim();
-              if (state === 'Completed' || state === 'Failed' || state === 'Stopped') {
+              if (state === 'Hoàn thành' || state === 'Thất bại' || state === 'Đã dừng') {
                 resolve({state, responseLength: document.querySelector('.agent-response p')?.textContent?.length ?? 0});
                 return;
               }
@@ -940,10 +1001,10 @@ void app.whenReady().then(async () => {
             startWhenReady();
           })
         `) as {state: string; responseLength?: number};
-        if (aiResult.state !== 'Completed' || !aiResult.responseLength) {
+        if (aiResult.state !== 'Hoàn thành' || !aiResult.responseLength) {
           throw new Error(`AI workspace smoke received ${JSON.stringify(aiResult)}.`);
         }
-      } else if (process.env.NARRA_SMOKE_WORKSPACE_TAB === 'AI workspace') {
+      } else if (process.env.NARRA_SMOKE_WORKSPACE_TAB === 'AI workspace' || process.env.NARRA_SMOKE_WORKSPACE_TAB === 'Không gian AI') {
         const aiReady = await mainWindow.webContents.executeJavaScript(`
           new Promise((resolve) => {
             const startedAt = Date.now();
@@ -957,7 +1018,7 @@ void app.whenReady().then(async () => {
         `) as boolean;
         if (!aiReady) throw new Error('AI workspace did not finish loading for smoke capture.');
       }
-      await new Promise((resolve) => setTimeout(resolve, process.env.NARRA_SMOKE_WORKSPACE_TAB === 'AI workspace' ? 1500 : 600));
+      await new Promise((resolve) => setTimeout(resolve, process.env.NARRA_SMOKE_WORKSPACE_TAB === 'AI workspace' || process.env.NARRA_SMOKE_WORKSPACE_TAB === 'Không gian AI' ? 1500 : 600));
       await mainWindow.webContents.executeJavaScript('window.scrollTo({top: 0, behavior: "instant"})');
       const screenshot = await mainWindow.webContents.capturePage();
       writeFileSync(process.env.NARRA_SMOKE_SCREENSHOT, screenshot.toPNG());

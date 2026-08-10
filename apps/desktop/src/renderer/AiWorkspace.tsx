@@ -37,16 +37,16 @@ type ServerRequest = {id: number | string; method: string; params: unknown};
 type RunState = 'IDLE' | 'STARTING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'CANCELLED';
 
 const stageOptions: Array<{value: AiStage; label: string}> = [
-  {value: 'DISCOVER', label: 'Discover topics'},
-  {value: 'RESEARCH', label: 'Research'},
-  {value: 'THESIS', label: 'Develop thesis'},
-  {value: 'OUTLINE', label: 'Build outline'},
-  {value: 'SCRIPT', label: 'Draft script'},
-  {value: 'STORYBOARD', label: 'Plan storyboard'},
+  {value: 'DISCOVER', label: 'Khám phá chủ đề'},
+  {value: 'RESEARCH', label: 'Nghiên cứu'},
+  {value: 'THESIS', label: 'Phát triển luận đề'},
+  {value: 'OUTLINE', label: 'Xây dựng dàn ý'},
+  {value: 'SCRIPT', label: 'Soạn kịch bản'},
+  {value: 'STORYBOARD', label: 'Lập storyboard'},
 ];
 
 const runStatusLabel = (status: RunState): string => ({
-  IDLE: 'Ready', STARTING: 'Starting', RUNNING: 'Running', COMPLETED: 'Completed', FAILED: 'Failed', CANCELLED: 'Stopped',
+  IDLE: 'Sẵn sàng', STARTING: 'Đang bắt đầu', RUNNING: 'Đang chạy', COMPLETED: 'Hoàn thành', FAILED: 'Thất bại', CANCELLED: 'Đã dừng',
 })[status];
 
 const formatElapsed = (seconds: number): string => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
@@ -117,7 +117,7 @@ const ServerRequestPanel = ({request, onResolved}: {request: ServerRequest; onRe
       await window.narra.codexRespondServerRequest(request.id, result);
       onResolved();
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not answer the Codex request.');
+      setError(reason instanceof Error ? reason.message : 'Không thể trả lời yêu cầu của Codex.');
     } finally {
       setBusy(false);
     }
@@ -128,7 +128,7 @@ const ServerRequestPanel = ({request, onResolved}: {request: ServerRequest; onRe
     <section className="ai-request-card" aria-labelledby="ai-request-title">
       <div className="ai-request-heading">
         <MessageSquareText aria-hidden="true" size={18} />
-        <div><p className="section-label">Input needed</p><h4 id="ai-request-title">Codex is waiting for your decision</h4></div>
+        <div><p className="section-label">Cần thông tin</p><h4 id="ai-request-title">Codex đang chờ quyết định của anh</h4></div>
       </div>
       {isUserInput ? (
         <form onSubmit={(event) => {
@@ -141,15 +141,15 @@ const ServerRequestPanel = ({request, onResolved}: {request: ServerRequest; onRe
         }}>
           {questions.map((question, index) => {
             const id = typeof question.id === 'string' ? question.id : `question-${index + 1}`;
-            const label = typeof question.question === 'string' ? question.question : 'Your answer';
+            const label = typeof question.question === 'string' ? question.question : 'Câu trả lời của anh';
             const options = Array.isArray(question.options) ? question.options as Array<Record<string, unknown>> : [];
             return (
               <label key={id}>{label}
                 {options.length > 0 ? (
                   <select required value={answers[id] ?? ''} onChange={(event) => setAnswers((current) => ({...current, [id]: event.target.value}))}>
-                    <option value="">Select an answer</option>
+                    <option value="">Chọn một câu trả lời</option>
                     {options.map((option, optionIndex) => {
-                      const value = typeof option.label === 'string' ? option.label : `Option ${optionIndex + 1}`;
+                      const value = typeof option.label === 'string' ? option.label : `Lựa chọn ${optionIndex + 1}`;
                       return <option key={value} value={value}>{value}</option>;
                     })}
                   </select>
@@ -159,20 +159,20 @@ const ServerRequestPanel = ({request, onResolved}: {request: ServerRequest; onRe
               </label>
             );
           })}
-          {questions.length === 0 && <p className="muted-copy">Codex requested additional input.</p>}
+          {questions.length === 0 && <p className="muted-copy">Codex yêu cầu thêm thông tin.</p>}
           {error && <p className="field-error" role="alert">{error}</p>}
           <div className="ai-request-actions">
-            <button className="primary" disabled={busy || questions.length === 0} type="submit">Send answer</button>
-            <button className="secondary" disabled={busy} type="button" onClick={() => void respond({answers: {}})}>Cancel request</button>
+            <button className="primary" disabled={busy || questions.length === 0} type="submit">Gửi câu trả lời</button>
+            <button className="secondary" disabled={busy} type="button" onClick={() => void respond({answers: {}})}>Hủy yêu cầu</button>
           </div>
         </form>
       ) : (
         <>
-          <p className="muted-copy">{typeof params.reason === 'string' ? params.reason : 'Codex requested approval to continue.'}</p>
+          <p className="muted-copy">{typeof params.reason === 'string' ? params.reason : 'Codex cần được phê duyệt để tiếp tục.'}</p>
           {error && <p className="field-error" role="alert">{error}</p>}
           <div className="ai-request-actions">
-            <button className="primary" disabled={busy} onClick={() => void respond({decision: 'accept'})}>Approve</button>
-            <button className="secondary" disabled={busy} onClick={() => void respond({decision: 'decline'})}>Decline</button>
+            <button className="primary" disabled={busy} onClick={() => void respond({decision: 'accept'})}>Phê duyệt</button>
+            <button className="secondary" disabled={busy} onClick={() => void respond({decision: 'decline'})}>Từ chối</button>
           </div>
         </>
       )}
@@ -225,7 +225,7 @@ export const AiWorkspaceView = ({projectId, projectQuestion, targetDurationSec, 
       setAccount(accountResult.value);
       if (accountResult.value.signedIn) setConnectionNotice(null);
     }
-    else setConnectionError(accountResult.reason instanceof Error ? accountResult.reason.message : 'Could not connect to Codex.');
+    else setConnectionError(accountResult.reason instanceof Error ? accountResult.reason.message : 'Không thể kết nối với Codex.');
     if (modelsResult.status === 'fulfilled') setModels(modelsResult.value);
     if (rateResult.status === 'fulfilled') setRateLimits(rateResult.value);
   };
@@ -233,7 +233,7 @@ export const AiWorkspaceView = ({projectId, projectQuestion, targetDurationSec, 
   useEffect(() => {
     setLoading(true);
     Promise.all([loadWorkspace(), refreshConnection()])
-      .catch((reason: unknown) => setConnectionError(reason instanceof Error ? reason.message : 'Could not load AI workspace.'))
+      .catch((reason: unknown) => setConnectionError(reason instanceof Error ? reason.message : 'Không thể tải không gian AI.'))
       .finally(() => setLoading(false));
   }, [projectId]);
 
@@ -274,7 +274,7 @@ export const AiWorkspaceView = ({projectId, projectQuestion, targetDurationSec, 
       await window.narra.codexUpdateSettings(projectId, {desiredModel: nextModel, desiredEffort: nextEffort});
       await loadWorkspace();
     } catch (reason) {
-      setFormError(reason instanceof Error ? reason.message : 'Could not save model settings.');
+      setFormError(reason instanceof Error ? reason.message : 'Không thể lưu thiết lập model.');
     }
   };
 
@@ -292,7 +292,7 @@ export const AiWorkspaceView = ({projectId, projectQuestion, targetDurationSec, 
       await loadWorkspace();
     } catch (reason) {
       setRunState('FAILED');
-      setFormError(reason instanceof Error ? reason.message : 'Could not start the Codex run.');
+      setFormError(reason instanceof Error ? reason.message : 'Không thể bắt đầu lượt chạy Codex.');
       await loadWorkspace();
     }
   };
@@ -300,19 +300,19 @@ export const AiWorkspaceView = ({projectId, projectQuestion, targetDurationSec, 
   const currentPrompt = buildPrompt({request, audience, language: outputLanguage, durationMin, format, style, stage});
 
   if (loading) {
-    return <section className="ai-workspace ai-loading"><LoaderCircle className="spin" aria-hidden="true" size={24} /><p>Connecting to the local AI workspace…</p></section>;
+    return <section className="ai-workspace ai-loading"><LoaderCircle className="spin" aria-hidden="true" size={24} /><p>Đang kết nối không gian AI trên máy…</p></section>;
   }
 
   return (
     <section className="ai-workspace">
       <header className="ai-toolbar">
-        <div><p className="section-label"><Sparkles aria-hidden="true" size={14} /> AI workspace</p><h3>Research and develop the story inside Narra</h3><p>Uses your ChatGPT subscription through the local Codex App Server.</p></div>
+        <div><p className="section-label"><Sparkles aria-hidden="true" size={14} /> Không gian AI</p><h3>Nghiên cứu và phát triển câu chuyện ngay trong Narra</h3><p>Sử dụng gói ChatGPT của anh qua Codex App Server trên máy.</p></div>
         <div className="ai-connection-actions">
           <span className={`connection-pill ${account?.signedIn ? 'ready' : 'offline'}`}>
             {account?.signedIn ? <CheckCircle2 aria-hidden="true" size={14} /> : <TriangleAlert aria-hidden="true" size={14} />}
-            {account?.signedIn ? `${account.planType ?? 'ChatGPT'} connected` : 'Sign-in required'}
+            {account?.signedIn ? `Đã kết nối ${account.planType ?? 'ChatGPT'}` : 'Cần đăng nhập'}
           </span>
-          <button className="secondary icon-button" aria-label="Refresh Codex connection" onClick={() => void refreshConnection()}><RefreshCw aria-hidden="true" size={16} /></button>
+          <button className="secondary icon-button" aria-label="Làm mới kết nối Codex" onClick={() => void refreshConnection()}><RefreshCw aria-hidden="true" size={16} /></button>
         </div>
       </header>
 
@@ -320,30 +320,30 @@ export const AiWorkspaceView = ({projectId, projectQuestion, targetDurationSec, 
       {connectionNotice && <div className="notice progress-notice" role="status"><LogIn aria-hidden="true" size={17} /> <span>{connectionNotice}</span></div>}
       {!account?.signedIn && (
         <section className="ai-login-card">
-          <div><p className="section-label">ChatGPT connection</p><h4>Connect Codex to continue</h4><p>Authentication is handled by Codex. Narra does not store your credential.</p></div>
+          <div><p className="section-label">Kết nối ChatGPT</p><h4>Kết nối Codex để tiếp tục</h4><p>Codex xử lý việc xác thực. Narra không lưu thông tin đăng nhập của anh.</p></div>
           <div className="ai-login-actions">
-            <button className="primary" onClick={() => void window.narra.codexStartBrowserLogin().then(() => setConnectionNotice('Complete sign-in in the browser, then refresh the connection.')).catch((reason: unknown) => setConnectionError(reason instanceof Error ? reason.message : 'Could not start sign-in.'))}><LogIn aria-hidden="true" size={16} /> Sign in with browser</button>
-            <button className="secondary" onClick={() => void window.narra.codexStartDeviceLogin().then((result) => setDeviceCode(result.userCode ?? null)).catch((reason: unknown) => setConnectionError(reason instanceof Error ? reason.message : 'Could not start device sign-in.'))}>Use device code</button>
+            <button className="primary" onClick={() => void window.narra.codexStartBrowserLogin().then(() => setConnectionNotice('Hoàn tất đăng nhập trong trình duyệt, sau đó làm mới kết nối.')).catch((reason: unknown) => setConnectionError(reason instanceof Error ? reason.message : 'Không thể bắt đầu đăng nhập.'))}><LogIn aria-hidden="true" size={16} /> Đăng nhập bằng trình duyệt</button>
+            <button className="secondary" onClick={() => void window.narra.codexStartDeviceLogin().then((result) => setDeviceCode(result.userCode ?? null)).catch((reason: unknown) => setConnectionError(reason instanceof Error ? reason.message : 'Không thể bắt đầu đăng nhập thiết bị.'))}>Dùng mã thiết bị</button>
           </div>
-          {deviceCode && <p className="device-code">Device code: <strong>{deviceCode}</strong></p>}
+          {deviceCode && <p className="device-code">Mã thiết bị: <strong>{deviceCode}</strong></p>}
         </section>
       )}
 
       <div className="ai-layout">
         <form className="ai-composer" onSubmit={(event) => { event.preventDefault(); void submitPrompt(currentPrompt); }}>
-          <div className="ai-section-heading"><div><p className="section-label"><Bot aria-hidden="true" size={14} /> Prompt</p><h4>Creative brief</h4></div><span>{request.trim().length} characters</span></div>
-          <label htmlFor="ai-stage">Workflow stage<select id="ai-stage" value={stage} onChange={(event) => setStage(event.target.value as AiStage)}>{stageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-          <label htmlFor="ai-request">What should Codex work on?<textarea id="ai-request" rows={7} required value={request} onChange={(event) => setRequest(event.target.value)} placeholder="Describe the documentary question, angle, or research task." /><small>Be specific about the decision you need from this run.</small></label>
+          <div className="ai-section-heading"><div><p className="section-label"><Bot aria-hidden="true" size={14} /> Prompt</p><h4>Đề bài sáng tạo</h4></div><span>{request.trim().length} ký tự</span></div>
+          <label htmlFor="ai-stage">Giai đoạn công việc<select id="ai-stage" value={stage} onChange={(event) => setStage(event.target.value as AiStage)}>{stageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+          <label htmlFor="ai-request">Anh muốn Codex thực hiện việc gì?<textarea id="ai-request" rows={7} required value={request} onChange={(event) => setRequest(event.target.value)} placeholder="Mô tả câu hỏi phim tài liệu, góc tiếp cận hoặc nhiệm vụ nghiên cứu." /><small>Nêu rõ quyết định anh cần nhận được từ lượt chạy này.</small></label>
           <div className="ai-form-grid">
-            <label htmlFor="ai-audience">Audience<input id="ai-audience" required value={audience} onChange={(event) => setAudience(event.target.value)} /></label>
-            <label htmlFor="ai-language">Language<input id="ai-language" required value={outputLanguage} onChange={(event) => setOutputLanguage(event.target.value)} /></label>
-            <label htmlFor="ai-duration">Duration (minutes)<input id="ai-duration" min={1} max={60} type="number" value={durationMin} onChange={(event) => setDurationMin(Number(event.target.value))} /></label>
-            <label htmlFor="ai-format">Format<select id="ai-format" value={format} onChange={(event) => setFormat(event.target.value)}><option>Cinematic explainer</option><option>Mini-documentary</option><option>Investigative essay</option><option>Historical narrative</option></select></label>
+            <label htmlFor="ai-audience">Khán giả<input id="ai-audience" required value={audience} onChange={(event) => setAudience(event.target.value)} /></label>
+            <label htmlFor="ai-language">Ngôn ngữ đầu ra<input id="ai-language" required value={outputLanguage} onChange={(event) => setOutputLanguage(event.target.value)} /></label>
+            <label htmlFor="ai-duration">Thời lượng (phút)<input id="ai-duration" min={1} max={60} type="number" value={durationMin} onChange={(event) => setDurationMin(Number(event.target.value))} /></label>
+            <label htmlFor="ai-format">Định dạng<select id="ai-format" value={format} onChange={(event) => setFormat(event.target.value)}><option value="Cinematic explainer">Phim giải thích điện ảnh</option><option value="Mini-documentary">Phim tài liệu ngắn</option><option value="Investigative essay">Tiểu luận điều tra</option><option value="Historical narrative">Tự sự lịch sử</option></select></label>
           </div>
-          <label htmlFor="ai-style">Style<input id="ai-style" required value={style} onChange={(event) => setStyle(event.target.value)} /></label>
+          <label htmlFor="ai-style">Phong cách<input id="ai-style" required value={style} onChange={(event) => setStyle(event.target.value)} /></label>
 
           <fieldset className="ai-model-settings">
-            <legend><Settings2 aria-hidden="true" size={15} /> Model settings</legend>
+            <legend><Settings2 aria-hidden="true" size={15} /> Thiết lập model</legend>
             <div className="ai-form-grid">
               <label htmlFor="ai-model">Model<select id="ai-model" value={model} onChange={(event) => {
                 const nextModel = event.target.value;
@@ -351,53 +351,53 @@ export const AiWorkspaceView = ({projectId, projectQuestion, targetDurationSec, 
                 const nextEffort = (next?.supportedReasoningEfforts.some((item) => item.reasoningEffort === effort) ? effort : next?.defaultReasoningEffort ?? 'medium') as AiReasoningEffort;
                 setModel(nextModel); setEffort(nextEffort); void saveSettings(nextModel, nextEffort);
               }}>{models.map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>)}</select></label>
-              <label htmlFor="ai-effort">Reasoning<select id="ai-effort" value={effort} onChange={(event) => { const next = event.target.value as AiReasoningEffort; setEffort(next); void saveSettings(model, next); }}>{availableEfforts.map((item) => <option key={item.reasoningEffort} value={item.reasoningEffort}>{item.reasoningEffort}</option>)}</select></label>
+              <label htmlFor="ai-effort">Mức suy luận<select id="ai-effort" value={effort} onChange={(event) => { const next = event.target.value as AiReasoningEffort; setEffort(next); void saveSettings(model, next); }}>{availableEfforts.map((item) => <option key={item.reasoningEffort} value={item.reasoningEffort}>{item.reasoningEffort}</option>)}</select></label>
             </div>
-            <div className="model-meta"><span><Gauge aria-hidden="true" size={14} /> {summarizeRateLimits(rateLimits)}</span><span>{selectedModel?.description || 'Select an available model.'}</span></div>
+            <div className="model-meta"><span><Gauge aria-hidden="true" size={14} /> {summarizeRateLimits(rateLimits)}</span><span>{selectedModel?.description || 'Chọn một model khả dụng.'}</span></div>
           </fieldset>
 
-          {!modelAvailable && <p className="field-error" role="alert">The selected model and reasoning level are not available. Choose one of the listed combinations.</p>}
+          {!modelAvailable && <p className="field-error" role="alert">Model và mức suy luận đã chọn không khả dụng. Hãy chọn một tổ hợp trong danh sách.</p>}
           {formError && <p className="field-error" role="alert">{formError}</p>}
           <div className="composer-actions">
             <button className="primary run-button" disabled={!account?.signedIn || !modelAvailable || !request.trim() || isRunning} type="submit">
               {isRunning ? <LoaderCircle className="spin" aria-hidden="true" size={17} /> : <Play aria-hidden="true" size={17} />}
-              {isRunning ? 'Codex is working' : 'Start AI run'}
+              {isRunning ? 'Codex đang làm việc' : 'Bắt đầu chạy AI'}
             </button>
-            {isRunning && <button className="danger" type="button" onClick={() => void window.narra.codexInterruptTurn(projectId)}><CircleStop aria-hidden="true" size={16} /> Stop</button>}
-            {!isRunning && lastPrompt && <button className="secondary" type="button" onClick={() => void submitPrompt(lastPrompt)}><RotateCcw aria-hidden="true" size={16} /> Retry last run</button>}
+            {isRunning && <button className="danger" type="button" onClick={() => void window.narra.codexInterruptTurn(projectId)}><CircleStop aria-hidden="true" size={16} /> Dừng</button>}
+            {!isRunning && lastPrompt && <button className="secondary" type="button" onClick={() => void submitPrompt(lastPrompt)}><RotateCcw aria-hidden="true" size={16} /> Chạy lại lượt gần nhất</button>}
           </div>
         </form>
 
         <div className="ai-run-column">
           <section className="ai-run-panel" aria-live="polite">
-            <header><div><p className="section-label"><Activity aria-hidden="true" size={14} /> Current run</p><h4>{runStatusLabel(runState)}</h4></div><span className={`run-state ${runState.toLowerCase()}`}>{runStatusLabel(runState)}</span></header>
+            <header><div><p className="section-label"><Activity aria-hidden="true" size={14} /> Lượt chạy hiện tại</p><h4>{runStatusLabel(runState)}</h4></div><span className={`run-state ${runState.toLowerCase()}`}>{runStatusLabel(runState)}</span></header>
             <div className="run-metrics"><span><Clock3 aria-hidden="true" size={14} /> {formatElapsed(elapsed)}</span><span>{model} · {effort}</span><span>{stageOptions.find((item) => item.value === stage)?.label}</span></div>
             {pendingRequest && <ServerRequestPanel request={pendingRequest} onResolved={() => setPendingRequest(null)} />}
             <div className={`agent-response ${response ? '' : 'empty-response'}`}>
-              <div className="response-heading"><MessageSquareText aria-hidden="true" size={16} /><strong>Codex response</strong></div>
-              {response ? <FormattedResponse content={response} /> : <p>Start a run to see the streamed response here.</p>}
+              <div className="response-heading"><MessageSquareText aria-hidden="true" size={16} /><strong>Phản hồi từ Codex</strong></div>
+              {response ? <FormattedResponse content={response} /> : <p>Bắt đầu một lượt chạy để xem phản hồi trực tiếp tại đây.</p>}
             </div>
           </section>
 
           <section className="ai-activity-panel">
-            <header><div><p className="section-label"><Search aria-hidden="true" size={14} /> Activity</p><h4>Research and tool progress</h4></div><span>{activities.length}</span></header>
+            <header><div><p className="section-label"><Search aria-hidden="true" size={14} /> Hoạt động</p><h4>Tiến trình nghiên cứu và công cụ</h4></div><span>{activities.length}</span></header>
             <div className="activity-list">
-              {activities.length === 0 && <p className="activity-empty">Searches and tool activity will appear here without exposing raw model reasoning.</p>}
+              {activities.length === 0 && <p className="activity-empty">Hoạt động tìm kiếm và công cụ sẽ xuất hiện tại đây mà không hiển thị suy luận thô của model.</p>}
               {activities.map((activity) => (
                 <article className={`activity-item ${activity.kind}`} key={activity.id}>
                   {activity.kind === 'search' ? <Globe2 aria-hidden="true" size={16} /> : activity.kind === 'error' ? <TriangleAlert aria-hidden="true" size={16} /> : <Activity aria-hidden="true" size={16} />}
                   <div><strong>{activity.title}</strong><p>{activity.detail}</p></div>
-                  {activity.url && <button className="source-link" aria-label={`Open source ${activity.detail}`} onClick={() => void window.narra.openExternalUrl(activity.url!)}><ExternalLink aria-hidden="true" size={15} /></button>}
+                  {activity.url && <button className="source-link" aria-label={`Mở nguồn ${activity.detail}`} onClick={() => void window.narra.openExternalUrl(activity.url!)}><ExternalLink aria-hidden="true" size={15} /></button>}
                 </article>
               ))}
             </div>
           </section>
 
-          {sources.length > 0 && <section className="ai-sources-panel"><header><p className="section-label"><Globe2 aria-hidden="true" size={14} /> Sources opened</p><span>{sources.length}</span></header>{sources.map((source) => <button key={source.url} onClick={() => void window.narra.openExternalUrl(source.url!)}><span>{source.detail}</span><ExternalLink aria-hidden="true" size={15} /></button>)}</section>}
+          {sources.length > 0 && <section className="ai-sources-panel"><header><p className="section-label"><Globe2 aria-hidden="true" size={14} /> Nguồn đã mở</p><span>{sources.length}</span></header>{sources.map((source) => <button key={source.url} onClick={() => void window.narra.openExternalUrl(source.url!)}><span>{source.detail}</span><ExternalLink aria-hidden="true" size={15} /></button>)}</section>}
 
           <section className="ai-history-panel">
-            <header><div><p className="section-label">Recent runs</p><h4>Project history</h4></div><span>{workspace?.runs.length ?? 0}</span></header>
-            {(workspace?.runs.length ?? 0) === 0 ? <p className="activity-empty">No AI runs have been saved for this project.</p> : workspace?.runs.slice(0, 6).map((run: AiRun) => <article key={run.id}><span className={`run-dot ${run.status.toLowerCase()}`} /><div><strong>{stageOptions.find((item) => item.value === run.stage)?.label ?? run.stage}</strong><p>{run.prompt}</p></div><small>{run.status.replaceAll('_', ' ').toLowerCase()}</small></article>)}
+            <header><div><p className="section-label">Lượt chạy gần đây</p><h4>Lịch sử dự án</h4></div><span>{workspace?.runs.length ?? 0}</span></header>
+            {(workspace?.runs.length ?? 0) === 0 ? <p className="activity-empty">Dự án này chưa lưu lượt chạy AI nào.</p> : workspace?.runs.slice(0, 6).map((run: AiRun) => <article key={run.id}><span className={`run-dot ${run.status.toLowerCase()}`} /><div><strong>{stageOptions.find((item) => item.value === run.stage)?.label ?? run.stage}</strong><p>{run.prompt}</p></div><small>{runStatusLabel(run.status as RunState)}</small></article>)}
           </section>
         </div>
       </div>

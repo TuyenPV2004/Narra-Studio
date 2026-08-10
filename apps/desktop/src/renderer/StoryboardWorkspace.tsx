@@ -3,6 +3,7 @@ import type {CreateAssetTaskInput, FlowCandidate, FlowWorkspace, ProjectDetail, 
 import type {DragEvent, FormEvent} from 'react';
 import {useEffect, useMemo, useState} from 'react';
 import {Check, Copy, Download, ExternalLink, FileUp, FolderOpen, RefreshCw, Upload, WandSparkles, X} from 'lucide-react';
+import {formatUiLabel} from './ui-locale';
 
 type Props = {
   projectId: string;
@@ -18,17 +19,12 @@ const candidatePreviewUrl = (projectId: string, candidateId: string): string =>
 const formatDuration = (seconds?: number): string =>
   seconds === undefined ? '—' : `${seconds.toFixed(seconds < 10 ? 2 : 1)}s`;
 
-const formatLabel = (value: string): string => {
-  const normalized = value.replaceAll('_', ' ').toLowerCase();
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-};
-
 const statusActions = (status: Asset['status']): Array<{label: string; next: Asset['status']; tone?: 'danger'}> => {
-  if (status === 'PLANNED') return [{label: 'Send to creator', next: 'AWAITING_HUMAN'}];
-  if (status === 'IMPORTED') return [{label: 'Select', next: 'SELECTED'}, {label: 'QA pass', next: 'QA_PASS'}, {label: 'Reject', next: 'REJECTED', tone: 'danger'}];
-  if (status === 'SELECTED') return [{label: 'QA pass', next: 'QA_PASS'}, {label: 'QA fail', next: 'QA_FAIL', tone: 'danger'}, {label: 'Reject', next: 'REJECTED', tone: 'danger'}];
-  if (status === 'QA_PASS') return [{label: 'Reopen QA', next: 'QA_FAIL', tone: 'danger'}];
-  if (status === 'QA_FAIL' || status === 'REJECTED') return [{label: 'Request replacement', next: 'AWAITING_HUMAN'}];
+  if (status === 'PLANNED') return [{label: 'Gửi người sáng tạo', next: 'AWAITING_HUMAN'}];
+  if (status === 'IMPORTED') return [{label: 'Chọn', next: 'SELECTED'}, {label: 'QA đạt', next: 'QA_PASS'}, {label: 'Từ chối', next: 'REJECTED', tone: 'danger'}];
+  if (status === 'SELECTED') return [{label: 'QA đạt', next: 'QA_PASS'}, {label: 'QA không đạt', next: 'QA_FAIL', tone: 'danger'}, {label: 'Từ chối', next: 'REJECTED', tone: 'danger'}];
+  if (status === 'QA_PASS') return [{label: 'Mở lại QA', next: 'QA_FAIL', tone: 'danger'}];
+  if (status === 'QA_FAIL' || status === 'REJECTED') return [{label: 'Yêu cầu thay thế', next: 'AWAITING_HUMAN'}];
   return [];
 };
 
@@ -55,7 +51,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
   };
 
   useEffect(() => {
-    void load().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Could not load storyboard.'));
+    void load().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Không thể tải storyboard.'));
   }, [projectId]);
 
   useEffect(() => {
@@ -96,7 +92,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
       if (next) setWorkspace(next);
       onProjectRefresh(await window.narra.getProject(projectId));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Storyboard operation failed.');
+      setError(reason instanceof Error ? reason.message : 'Thao tác storyboard không thành công.');
     } finally {
       setBusy(false);
     }
@@ -110,44 +106,44 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
       await action();
       onProjectRefresh(await window.narra.getProject(projectId));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Google Flow assisted operation failed.');
+      setError(reason instanceof Error ? reason.message : 'Thao tác hỗ trợ Google Flow không thành công.');
     } finally {
       setBusy(false);
     }
   };
 
   const prepareFlow = (): Promise<void> => runFlow(async () => {
-    if (!selectedShot) throw new Error('Select a shot first.');
+    if (!selectedShot) throw new Error('Hãy chọn một shot trước.');
     const next = await window.narra.prepareFlowAssetTask(projectId, {
       shotId: selectedShot.id,
       kind: selectedShot.visualType === 'AI_VIDEO' ? 'VIDEO' : 'IMAGE',
     });
     setWorkspace(next);
     setFlowWorkspace(await window.narra.getFlowWorkspace(projectId));
-    setMessage(selectedAsset ? 'Flow prompt package regenerated. Existing media remains available until replacement.' : 'Flow prompt package created.');
+    setMessage(selectedAsset ? 'Đã tạo lại gói prompt Flow. Media hiện có vẫn được giữ đến khi thay thế.' : 'Đã tạo gói prompt Flow.');
   });
 
   const chooseWatchDirectory = (): Promise<void> => runFlow(async () => {
     const next = await window.narra.chooseFlowWatchDirectory(projectId);
     if (next) {
       setFlowWorkspace(next);
-      setMessage('Google Flow download folder saved locally.');
+      setMessage('Đã lưu thư mục tải xuống Google Flow trên máy.');
     }
   });
 
   const scanCandidates = (): Promise<void> => runFlow(async () => {
     setFlowWorkspace(await window.narra.scanFlowCandidates(projectId));
-    setMessage('Download folder scanned. New files are listed as candidates only.');
+    setMessage('Đã quét thư mục tải xuống. Tệp mới chỉ được liệt kê dưới dạng ứng viên.');
   });
 
   const copyPrompt = (value: string, label: string): Promise<void> => runFlow(async () => {
     await window.narra.copyText(value);
-    setMessage(`${label} copied to clipboard.`);
+    setMessage(`Đã sao chép ${label} vào bảng nhớ tạm.`);
   });
 
   const openFlow = (): Promise<void> => runFlow(async () => {
     await window.narra.openExternalUrl(flowWorkspace?.flowUrl ?? 'https://labs.google/fx/tools/flow');
-    setMessage('Google Flow opened in your browser. Narra does not click Generate or spend credits.');
+    setMessage('Đã mở Google Flow trong trình duyệt. Narra không tự nhấn Tạo hoặc sử dụng credit.');
   });
 
   const confirmCandidate = (candidate: FlowCandidate): void => {
@@ -157,16 +153,16 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
   };
 
   const selectCandidate = (): Promise<void> => runFlow(async () => {
-    if (!candidateToConfirm || !candidateAssetId) throw new Error('Choose the target asset task before importing.');
+    if (!candidateToConfirm || !candidateAssetId) throw new Error('Hãy chọn tác vụ tài nguyên đích trước khi nhập.');
     setWorkspace(await window.narra.selectFlowCandidate(projectId, candidateToConfirm.id, candidateAssetId));
     setFlowWorkspace(await window.narra.getFlowWorkspace(projectId));
     setCandidateToConfirm(null);
-    setMessage('Flow candidate copied into the project and selected. Run asset QA when ready.');
+    setMessage('Đã sao chép ứng viên Flow vào dự án và chọn. Hãy chạy QA tài nguyên khi sẵn sàng.');
   });
 
   const rejectCandidate = (candidateId: string): Promise<void> => runFlow(async () => {
     setFlowWorkspace(await window.narra.rejectFlowCandidate(projectId, candidateId));
-    setMessage('Candidate rejected; the source download was not deleted.');
+    setMessage('Đã từ chối ứng viên; tệp tải xuống nguồn không bị xóa.');
   });
 
   const createTask = async (event: FormEvent): Promise<void> => {
@@ -188,54 +184,54 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
     try {
       setExportedPath(await window.narra.exportStoryboardRenderInput(projectId));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not export render input.');
+      setError(reason instanceof Error ? reason.message : 'Không thể xuất dữ liệu kết xuất.');
     } finally {
       setBusy(false);
     }
   };
 
-  if (!workspace) return <div className="storyboard-empty">Loading storyboard…</div>;
+  if (!workspace) return <div className="storyboard-empty">Đang tải storyboard…</div>;
 
   return (
-    <section className="storyboard-workspace" aria-busy={busy} aria-label="Storyboard and asset manager">
+    <section className="storyboard-workspace" aria-busy={busy} aria-label="Storyboard và trình quản lý tài nguyên">
       <header className="storyboard-toolbar">
         <div>
           <p className="section-label">Storyboard</p>
-          <p>{workspace.scenes.length} scenes · {workspace.shots.length} shots · {workspace.assets.length} assets</p>
+          <p>{workspace.scenes.length} cảnh · {workspace.shots.length} shot · {workspace.assets.length} tài nguyên</p>
         </div>
-        <div className="scope-row" aria-label="Downstream freshness">
+        <div className="scope-row" aria-label="Mức cập nhật của dữ liệu phía sau">
           {workspace.staleScopes.map((scope) => (
-            <span className={`scope-chip ${scope.stale ? 'stale' : 'fresh'}`} key={scope.scope} title={scope.reason ?? 'Up to date'}>
-              {formatLabel(scope.scope)} · {scope.stale ? 'Needs update' : 'Current'}
+            <span className={`scope-chip ${scope.stale ? 'stale' : 'fresh'}`} key={scope.scope} title={scope.reason ?? 'Đã cập nhật'}>
+              {formatUiLabel(scope.scope)} · {scope.stale ? 'Cần cập nhật' : 'Hiện hành'}
             </span>
           ))}
           <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.chooseAndImportStoryboard(projectId))}>
-            <FileUp aria-hidden="true" size={16} /> Import storyboard
+            <FileUp aria-hidden="true" size={16} /> Nhập storyboard
           </button>
           <button
             className="secondary"
             disabled={busy || workspace.shots.length === 0}
             onClick={() => void exportRenderInput()}
-          ><Download aria-hidden="true" size={16} /> Export render input</button>
+          ><Download aria-hidden="true" size={16} /> Xuất dữ liệu kết xuất</button>
         </div>
       </header>
 
       {error && <div className="notice error-notice" role="alert">{error}</div>}
-      {busy && <div className="notice progress-notice" role="status">Updating the local workspace…</div>}
+      {busy && <div className="notice progress-notice" role="status">Đang cập nhật không gian làm việc trên máy…</div>}
       {message && <div className="notice success-notice" aria-live="polite">{message}</div>}
-      {exportedPath && <div className="notice success-notice" role="status">Render input saved to {exportedPath}</div>}
+      {exportedPath && <div className="notice success-notice" role="status">Đã lưu dữ liệu kết xuất tại {exportedPath}</div>}
 
       {workspace.scenes.length === 0 ? (
         <div className="storyboard-empty">
-          <h3>No storyboard imported</h3>
-          <p>Select both <code>scenes.json</code> and <code>shots.json</code> generated by Codex.</p>
+          <h3>Chưa nhập storyboard</h3>
+          <p>Chọn đồng thời <code>scenes.json</code> và <code>shots.json</code> do Codex tạo.</p>
         </div>
       ) : (
         <div className="storyboard-columns">
-          <nav className="scene-browser" aria-label="Scenes and shots">
+          <nav className="scene-browser" aria-label="Cảnh và shot">
             {workspace.scenes.map((scene) => (
               <section className="scene-block" key={scene.id}>
-                <header><span>Scene {scene.order + 1}</span><strong>{scene.title}</strong><small>{formatDuration(scene.durationSec)}</small></header>
+                <header><span>Cảnh {scene.order + 1}</span><strong>{scene.title}</strong><small>{formatDuration(scene.durationSec)}</small></header>
                 {(shotsByScene.get(scene.id) ?? []).map((shot) => {
                   const asset = workspace.assets.find(({id}) => id === shot.assetId);
                   return (
@@ -246,8 +242,8 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                       onClick={() => setSelectedShotId(shot.id)}
                     >
                       <span className="shot-order">{shot.order + 1}</span>
-                      <span><strong>{formatLabel(shot.visualType)}</strong><small>{shot.visualPurpose}</small></span>
-                      <span className={`asset-dot ${asset?.status.toLowerCase().replaceAll('_', '-') ?? 'missing'}`} title={asset?.status ?? 'No asset'} />
+                      <span><strong>{formatUiLabel(shot.visualType)}</strong><small>{shot.visualPurpose}</small></span>
+                      <span className={`asset-dot ${asset?.status.toLowerCase().replaceAll('_', '-') ?? 'missing'}`} title={asset ? formatUiLabel(asset.status) : 'Chưa có tài nguyên'} />
                     </button>
                   );
                 })}
@@ -263,87 +259,87 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                   <span className="status-pill">{formatDuration(selectedShot.durationSec)}</span>
                 </header>
                 <dl className="shot-facts">
-                  <div><dt>Scene</dt><dd>{selectedScene.title}</dd></div>
-                  <div><dt>Visual type</dt><dd>{formatLabel(selectedShot.visualType)}</dd></div>
-                  <div><dt>Route</dt><dd>{selectedShot.assetRoute ?? 'Not specified'}</dd></div>
-                  <div><dt>Evidence</dt><dd>{selectedShot.evidenceRequired ? 'Required' : 'Not required'}</dd></div>
+                  <div><dt>Cảnh</dt><dd>{selectedScene.title}</dd></div>
+                  <div><dt>Loại hình ảnh</dt><dd>{formatUiLabel(selectedShot.visualType)}</dd></div>
+                  <div><dt>Tuyến tài nguyên</dt><dd>{selectedShot.assetRoute ?? 'Chưa chỉ định'}</dd></div>
+                  <div><dt>Bằng chứng</dt><dd>{selectedShot.evidenceRequired ? 'Bắt buộc' : 'Không bắt buộc'}</dd></div>
                 </dl>
 
                 {!needsAsset(selectedShot.visualType) ? (
-                  <div className="storyboard-empty compact"><p>This shot is rendered from structured data and does not require imported media.</p></div>
+                  <div className="storyboard-empty compact"><p>Shot này được kết xuất từ dữ liệu có cấu trúc và không cần media nhập ngoài.</p></div>
                 ) : !selectedAsset ? (
                   <form className="asset-task-form" onSubmit={(event) => void createTask(event)}>
-                    <div><p className="section-label">Asset task</p><h3>Create prompt package</h3></div>
+                    <div><p className="section-label">Tác vụ tài nguyên</p><h3>Tạo gói prompt</h3></div>
                     <div className="flow-quick-start">
                       <WandSparkles aria-hidden="true" size={20} />
-                      <div><strong>Google Flow Assisted</strong><p>Create both Nano Banana image and Veo video prompts from this approved shot.</p></div>
-                      <button className="primary" disabled={busy} type="button" onClick={() => void prepareFlow()}>Prepare Flow package</button>
+                      <div><strong>Google Flow có hỗ trợ</strong><p>Tạo cả prompt ảnh Nano Banana và video Veo từ shot đã duyệt này.</p></div>
+                      <button className="primary" disabled={busy} type="button" onClick={() => void prepareFlow()}>Chuẩn bị gói Flow</button>
                     </div>
                     <div className="form-pair">
-                      <label>Kind<select value={task.kind} onChange={(event) => setTask({...task, kind: event.target.value as 'IMAGE' | 'VIDEO'})}><option value="IMAGE">Image</option><option value="VIDEO">Video</option></select></label>
-                      <label>Provider<select value={task.provider} onChange={(event) => setTask({...task, provider: event.target.value as CreateAssetTaskInput['provider']})}><option value="GOOGLE_FLOW">Google Flow</option><option value="STOCK">Stock</option><option value="LOCAL">Local</option><option value="OTHER">Other</option></select></label>
+                      <label>Loại<select value={task.kind} onChange={(event) => setTask({...task, kind: event.target.value as 'IMAGE' | 'VIDEO'})}><option value="IMAGE">Ảnh</option><option value="VIDEO">Video</option></select></label>
+                      <label>Nhà cung cấp<select value={task.provider} onChange={(event) => setTask({...task, provider: event.target.value as CreateAssetTaskInput['provider']})}><option value="GOOGLE_FLOW">Google Flow</option><option value="STOCK">Kho media</option><option value="LOCAL">Trên máy</option><option value="OTHER">Khác</option></select></label>
                     </div>
-                    <label>Visual brief<textarea rows={2} value={task.brief} onChange={(event) => setTask({...task, brief: event.target.value})} required /></label>
-                    <label>Generation/search prompt<textarea rows={4} value={task.prompt} onChange={(event) => setTask({...task, prompt: event.target.value})} required /></label>
-                    <label>Negative prompt<textarea rows={2} value={task.negativePrompt ?? ''} onChange={(event) => setTask({...task, negativePrompt: event.target.value})} /></label>
-                    <label>Rights note<input value={task.rightsNote} onChange={(event) => setTask({...task, rightsNote: event.target.value})} required /></label>
-                    <button className="primary" disabled={busy} type="submit"><WandSparkles aria-hidden="true" size={16} /> Create asset task</button>
+                    <label>Mô tả hình ảnh<textarea rows={2} value={task.brief} onChange={(event) => setTask({...task, brief: event.target.value})} required /></label>
+                    <label>Prompt tạo/tìm kiếm<textarea rows={4} value={task.prompt} onChange={(event) => setTask({...task, prompt: event.target.value})} required /></label>
+                    <label>Prompt loại trừ<textarea rows={2} value={task.negativePrompt ?? ''} onChange={(event) => setTask({...task, negativePrompt: event.target.value})} /></label>
+                    <label>Ghi chú bản quyền<input value={task.rightsNote} onChange={(event) => setTask({...task, rightsNote: event.target.value})} required /></label>
+                    <button className="primary" disabled={busy} type="submit"><WandSparkles aria-hidden="true" size={16} /> Tạo tác vụ tài nguyên</button>
                   </form>
                 ) : (
                   <section className="asset-detail">
                     <div className="asset-status-bar">
-                      <div><p className="section-label">Asset</p><h3>{selectedAsset.id}</h3></div>
-                      <span className={`health ${selectedAsset.status === 'QA_PASS' ? 'valid' : 'pending'}`}>{formatLabel(selectedAsset.status)}</span>
+                      <div><p className="section-label">Tài nguyên</p><h3>{selectedAsset.id}</h3></div>
+                      <span className={`health ${selectedAsset.status === 'QA_PASS' ? 'valid' : 'pending'}`}>{formatUiLabel(selectedAsset.status)}</span>
                     </div>
 
                     {selectedAsset.path ? (
                       <div className="media-preview">
                         {selectedAsset.kind === 'VIDEO' ? <video controls src={previewUrl(projectId, selectedAsset.id)} /> : <img alt={selectedShot.visualPurpose} src={previewUrl(projectId, selectedAsset.id)} />}
                       </div>
-                    ) : <div className="media-preview empty-preview">No media imported</div>}
+                    ) : <div className="media-preview empty-preview">Chưa nhập media</div>}
 
                     {selectedAsset.task && (
                       <details className="prompt-package" open>
-                        <summary>Prompt package · {formatLabel(selectedAsset.task.provider)}</summary>
+                        <summary>Gói prompt · {formatUiLabel(selectedAsset.task.provider)}</summary>
                         <p>{selectedAsset.task.brief}</p>
                         <pre>{selectedAsset.task.prompt}</pre>
-                        {selectedAsset.task.negativePrompt && <small>Negative: {selectedAsset.task.negativePrompt}</small>}
+                        {selectedAsset.task.negativePrompt && <small>Loại trừ: {selectedAsset.task.negativePrompt}</small>}
                       </details>
                     )}
 
                     {selectedAsset.task?.flow && (
                       <section className="flow-assistant-panel" aria-label="Google Flow assisted workflow">
                         <header>
-                          <div><p className="section-label">Google Flow Assisted</p><h3>{selectedAsset.task.flow.shotToken}</h3></div>
+                          <div><p className="section-label">Google Flow có hỗ trợ</p><h3>{selectedAsset.task.flow.shotToken}</h3></div>
                           <span className="status-pill">Prompt v{selectedAsset.task.flow.version}</span>
                         </header>
                         <dl className="flow-settings-grid">
-                          <div><dt>Image model</dt><dd>{selectedAsset.task.flow.imageModel}</dd></div>
-                          <div><dt>Video model</dt><dd>{selectedAsset.task.flow.videoModel}</dd></div>
-                          <div><dt>Aspect</dt><dd>{selectedAsset.task.flow.aspectRatio}</dd></div>
-                          <div><dt>Clip length</dt><dd>{selectedAsset.task.flow.generationDurationSec}s</dd></div>
+                          <div><dt>Model ảnh</dt><dd>{selectedAsset.task.flow.imageModel}</dd></div>
+                          <div><dt>Model video</dt><dd>{selectedAsset.task.flow.videoModel}</dd></div>
+                          <div><dt>Tỷ lệ</dt><dd>{selectedAsset.task.flow.aspectRatio}</dd></div>
+                          <div><dt>Độ dài clip</dt><dd>{selectedAsset.task.flow.generationDurationSec}s</dd></div>
                         </dl>
                         <div className="flow-prompt-grid">
-                          <article><header><strong>Image prompt</strong><button className="secondary" onClick={() => void copyPrompt(selectedAsset.task!.flow!.imagePrompt, 'Image prompt')}><Copy aria-hidden="true" size={15} /> Copy</button></header><p>{selectedAsset.task.flow.imagePrompt}</p></article>
-                          <article><header><strong>Video prompt</strong><button className="secondary" onClick={() => void copyPrompt(selectedAsset.task!.flow!.videoPrompt, 'Video prompt')}><Copy aria-hidden="true" size={15} /> Copy</button></header><p>{selectedAsset.task.flow.videoPrompt}</p></article>
+                          <article><header><strong>Prompt ảnh</strong><button className="secondary" onClick={() => void copyPrompt(selectedAsset.task!.flow!.imagePrompt, 'prompt ảnh')}><Copy aria-hidden="true" size={15} /> Sao chép</button></header><p>{selectedAsset.task.flow.imagePrompt}</p></article>
+                          <article><header><strong>Prompt video</strong><button className="secondary" onClick={() => void copyPrompt(selectedAsset.task!.flow!.videoPrompt, 'prompt video')}><Copy aria-hidden="true" size={15} /> Sao chép</button></header><p>{selectedAsset.task.flow.videoPrompt}</p></article>
                         </div>
-                        <details className="flow-negative"><summary>Negative guidance and ingredients</summary><p>{selectedAsset.task.flow.negativeGuidance}</p><small>{selectedAsset.task.flow.ingredients.join(' · ') || 'No reference ingredients required.'}</small></details>
+                        <details className="flow-negative"><summary>Hướng dẫn loại trừ và thành phần</summary><p>{selectedAsset.task.flow.negativeGuidance}</p><small>{selectedAsset.task.flow.ingredients.join(' · ') || 'Không cần thành phần tham chiếu.'}</small></details>
                         <div className="flow-action-row">
-                          <button className="primary" disabled={busy} onClick={() => void openFlow()}><ExternalLink aria-hidden="true" size={16} /> Open Google Flow</button>
-                          {selectedAsset.status === 'PLANNED' && <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.updateAssetStatus(projectId, selectedAsset.id, {status: 'AWAITING_HUMAN'}))}><Check aria-hidden="true" size={16} /> Mark as generating</button>}
-                          <button className="secondary" disabled={busy} onClick={() => void prepareFlow()}><RefreshCw aria-hidden="true" size={16} /> Regenerate prompt</button>
+                          <button className="primary" disabled={busy} onClick={() => void openFlow()}><ExternalLink aria-hidden="true" size={16} /> Mở Google Flow</button>
+                          {selectedAsset.status === 'PLANNED' && <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.updateAssetStatus(projectId, selectedAsset.id, {status: 'AWAITING_HUMAN'}))}><Check aria-hidden="true" size={16} /> Đánh dấu đang tạo</button>}
+                          <button className="secondary" disabled={busy} onClick={() => void prepareFlow()}><RefreshCw aria-hidden="true" size={16} /> Tạo lại prompt</button>
                         </div>
 
                         <section className="flow-inbox">
-                          <header><div><strong>Download inbox</strong><small>{flowWorkspace?.watchDirectory ?? 'No folder selected'}</small></div><div><button className="secondary" disabled={busy} onClick={() => void chooseWatchDirectory()}><FolderOpen aria-hidden="true" size={16} /> Choose folder</button><button className="secondary" disabled={busy || !flowWorkspace?.watchDirectory} onClick={() => void scanCandidates()}><RefreshCw aria-hidden="true" size={16} /> Scan now</button></div></header>
+                          <header><div><strong>Hộp thư tải xuống</strong><small>{flowWorkspace?.watchDirectory ?? 'Chưa chọn thư mục'}</small></div><div><button className="secondary" disabled={busy} onClick={() => void chooseWatchDirectory()}><FolderOpen aria-hidden="true" size={16} /> Chọn thư mục</button><button className="secondary" disabled={busy || !flowWorkspace?.watchDirectory} onClick={() => void scanCandidates()}><RefreshCw aria-hidden="true" size={16} /> Quét ngay</button></div></header>
                           <div className="flow-candidate-grid">
                             {flowCandidates.map((candidate) => <article className="flow-candidate" key={candidate.id}>
                               <div className="candidate-preview">{candidate.kind === 'VIDEO' ? <video controls preload="metadata" src={candidatePreviewUrl(projectId, candidate.id)} /> : <img loading="lazy" alt={`Flow candidate ${candidate.fileName}`} src={candidatePreviewUrl(projectId, candidate.id)} />}</div>
-                              <div className="candidate-copy"><strong>{candidate.fileName}</strong><small>{formatLabel(candidate.kind)} · {(candidate.fileSizeBytes / 1024 / 1024).toFixed(1)} MB</small><span className={`table-status ${candidate.status === 'SELECTED' ? 'fresh' : 'stale'}`}>{formatLabel(candidate.status)}</span>{candidate.suggestedShotId && <small>Suggested: {candidate.suggestedShotId}</small>}</div>
-                              <div className="candidate-actions"><button className="primary" disabled={busy || candidate.status === 'SELECTED'} onClick={() => confirmCandidate(candidate)}><Check aria-hidden="true" size={15} /> Review mapping</button><button className="danger" disabled={busy || candidate.status === 'SELECTED'} onClick={() => void rejectCandidate(candidate.id)}><X aria-hidden="true" size={15} /> Reject</button></div>
+                              <div className="candidate-copy"><strong>{candidate.fileName}</strong><small>{formatUiLabel(candidate.kind)} · {(candidate.fileSizeBytes / 1024 / 1024).toFixed(1)} MB</small><span className={`table-status ${candidate.status === 'SELECTED' ? 'fresh' : 'stale'}`}>{formatUiLabel(candidate.status)}</span>{candidate.suggestedShotId && <small>Đề xuất: {candidate.suggestedShotId}</small>}</div>
+                              <div className="candidate-actions"><button className="primary" disabled={busy || candidate.status === 'SELECTED'} onClick={() => confirmCandidate(candidate)}><Check aria-hidden="true" size={15} /> Duyệt ánh xạ</button><button className="danger" disabled={busy || candidate.status === 'SELECTED'} onClick={() => void rejectCandidate(candidate.id)}><X aria-hidden="true" size={15} /> Từ chối</button></div>
                             </article>)}
                           </div>
-                          {flowCandidates.length === 0 && <p className="flow-empty">Download an image/video from Flow, preferably with token <code>{selectedAsset.task.flow.shotToken}</code> in its filename, then scan.</p>}
+                          {flowCandidates.length === 0 && <p className="flow-empty">Tải ảnh/video từ Flow, nên có mã <code>{selectedAsset.task.flow.shotToken}</code> trong tên tệp, sau đó quét.</p>}
                         </section>
                       </section>
                     )}
@@ -356,18 +352,18 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                         onDragLeave={() => setDragActive(false)}
                         onDrop={(event) => void importDroppedFile(event)}
                       >
-                        <p>Drop a replacement file here, or choose one from disk.</p>
-                        <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.chooseAndImportAssetMedia(projectId, selectedAsset.id))}><Upload aria-hidden="true" size={16} /> Import media</button>
+                        <p>Thả tệp thay thế vào đây hoặc chọn một tệp trên máy.</p>
+                        <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.chooseAndImportAssetMedia(projectId, selectedAsset.id))}><Upload aria-hidden="true" size={16} /> Nhập media</button>
                       </div>
                     ) : null}
 
                     {selectedAsset.metadata && (
                       <dl className="media-metadata">
-                        <div><dt>Format</dt><dd>{selectedAsset.metadata.format}</dd></div>
+                        <div><dt>Định dạng</dt><dd>{selectedAsset.metadata.format}</dd></div>
                         <div><dt>Codec</dt><dd>{selectedAsset.metadata.videoCodec ?? selectedAsset.metadata.audioCodec ?? '—'}</dd></div>
-                        <div><dt>Resolution</dt><dd>{selectedAsset.metadata.width && selectedAsset.metadata.height ? `${selectedAsset.metadata.width}×${selectedAsset.metadata.height}` : '—'}</dd></div>
-                        <div><dt>Aspect</dt><dd>{selectedAsset.metadata.aspectRatio ?? '—'}</dd></div>
-                        <div><dt>Duration</dt><dd>{formatDuration(selectedAsset.metadata.durationSec)}</dd></div>
+                        <div><dt>Độ phân giải</dt><dd>{selectedAsset.metadata.width && selectedAsset.metadata.height ? `${selectedAsset.metadata.width}×${selectedAsset.metadata.height}` : '—'}</dd></div>
+                        <div><dt>Tỷ lệ</dt><dd>{selectedAsset.metadata.aspectRatio ?? '—'}</dd></div>
+                        <div><dt>Thời lượng</dt><dd>{formatDuration(selectedAsset.metadata.durationSec)}</dd></div>
                       </dl>
                     )}
 
@@ -384,19 +380,19 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                   </section>
                 )}
               </>
-            ) : <div className="storyboard-empty">Select a shot to inspect it.</div>}
+            ) : <div className="storyboard-empty">Chọn một shot để xem chi tiết.</div>}
           </article>
         </div>
       )}
       {candidateToConfirm && (
         <div className="modal-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCandidateToConfirm(null); }}>
           <section className="candidate-dialog" role="dialog" aria-modal="true" aria-labelledby="candidate-dialog-title">
-            <header><div><p className="section-label">Confirm Flow import</p><h3 id="candidate-dialog-title">Map candidate to an asset task</h3></div><button className="icon-button" aria-label="Close candidate dialog" onClick={() => setCandidateToConfirm(null)}><X aria-hidden="true" size={17} /></button></header>
+            <header><div><p className="section-label">Xác nhận nhập từ Flow</p><h3 id="candidate-dialog-title">Ánh xạ ứng viên vào tác vụ tài nguyên</h3></div><button className="icon-button" aria-label="Đóng hộp thoại ứng viên" onClick={() => setCandidateToConfirm(null)}><X aria-hidden="true" size={17} /></button></header>
             <div className="dialog-preview">{candidateToConfirm.kind === 'VIDEO' ? <video controls src={candidatePreviewUrl(projectId, candidateToConfirm.id)} /> : <img alt={candidateToConfirm.fileName} src={candidatePreviewUrl(projectId, candidateToConfirm.id)} />}</div>
             <p className="candidate-file-name">{candidateToConfirm.fileName}</p>
-            <label>Target shot and asset task<select value={candidateAssetId} onChange={(event) => setCandidateAssetId(event.target.value)}><option value="">Select a target…</option>{workspace.assets.filter((asset) => asset.kind === candidateToConfirm.kind && asset.task?.provider === 'GOOGLE_FLOW').map((asset) => <option key={asset.id} value={asset.id}>{asset.shotId} · {asset.id}</option>)}</select></label>
-            <div className="dialog-note"><strong>No automatic approval</strong><p>Narra will copy this file into the project, attach prompt provenance, and set it to Selected. Asset QA remains pending.</p></div>
-            <footer><button className="secondary" onClick={() => setCandidateToConfirm(null)}>Cancel</button><button className="primary" disabled={busy || !candidateAssetId} onClick={() => void selectCandidate()}><Check aria-hidden="true" size={16} /> Import and select</button></footer>
+            <label>Shot và tác vụ tài nguyên đích<select value={candidateAssetId} onChange={(event) => setCandidateAssetId(event.target.value)}><option value="">Chọn đích…</option>{workspace.assets.filter((asset) => asset.kind === candidateToConfirm.kind && asset.task?.provider === 'GOOGLE_FLOW').map((asset) => <option key={asset.id} value={asset.id}>{asset.shotId} · {asset.id}</option>)}</select></label>
+            <div className="dialog-note"><strong>Không tự động phê duyệt</strong><p>Narra sẽ sao chép tệp này vào dự án, gắn nguồn gốc prompt và đặt trạng thái Đã chọn. QA tài nguyên vẫn đang chờ.</p></div>
+            <footer><button className="secondary" onClick={() => setCandidateToConfirm(null)}>Hủy</button><button className="primary" disabled={busy || !candidateAssetId} onClick={() => void selectCandidate()}><Check aria-hidden="true" size={16} /> Nhập và chọn</button></footer>
           </section>
         </div>
       )}

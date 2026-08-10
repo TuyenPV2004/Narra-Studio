@@ -42,24 +42,19 @@ h1 { margin: 0; font-size: 1.08rem; font-weight: 700; letter-spacing: -.01em; }
 h2 { margin: 9px 0; font-size: clamp(1.45rem, 2vw, 2rem); font-weight: 650; line-height: 1.18; letter-spacing: -.025em; }
 h3 { margin: 3px 0 0; font-size: 1rem; font-weight: 650; line-height: 1.35; }
 
-.workspace-shell { width: 100%; min-height: 100vh; padding: 0 20px 28px; }
-.topbar { display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 24px; border-bottom: 1px solid var(--border); }
-.brand-lockup { display: flex; align-items: center; gap: 11px; }
-.brand-lockup p { margin: 2px 0 0; color: var(--text-muted); font-size: .76rem; }
-.brand-mark, .rail-icon, .empty-illustration { display: grid; place-items: center; color: var(--brand); background: var(--brand-soft); }
-.brand-mark { width: 36px; height: 36px; border: 1px solid #dfe2ff; border-radius: 10px; }
+.workspace-shell { width: 100%; min-height: 100vh; padding: 16px 18px 24px; }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; margin: -1px; padding: 0; border: 0; clip: rect(0, 0, 0, 0); white-space: nowrap; }
+.workspace-shell > .notice { margin-bottom: 12px; }
+.empty-illustration { display: grid; place-items: center; color: var(--brand); background: var(--brand-soft); }
 
-.workspace-grid { display: grid; grid-template-columns: 288px minmax(0, 1fr); gap: 16px; min-height: calc(100vh - 96px); padding-top: 16px; }
+.workspace-grid { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 14px; min-height: calc(100vh - 40px); }
 .project-rail, .project-panel { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-sm); }
 .project-rail { align-self: start; overflow: hidden; }
 .project-panel { min-width: 0; overflow: hidden; }
 
-.create-card { display: grid; gap: 13px; padding: 17px; border-bottom: 1px solid var(--border); background: var(--surface-subtle); }
-.rail-heading { display: flex; align-items: center; gap: 10px; }
-.rail-heading h2 { margin: 0; font-size: .92rem; font-weight: 650; }
-.rail-heading p { margin: 2px 0 0; color: var(--text-muted); font-size: .72rem; }
-.rail-icon { width: 32px; height: 32px; border-radius: 8px; }
-
+.project-rail-header { display: flex; min-height: 68px; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 14px; border-bottom: 1px solid var(--border); background: var(--surface-subtle); }
+.project-rail-header h2 { margin: 2px 0 0; font-size: .94rem; letter-spacing: -.01em; }
+.project-rail-header .icon-button { width: 38px; min-height: 38px; padding: 0; }
 label { display: grid; gap: 6px; color: var(--text-secondary); font-size: .76rem; font-weight: 550; }
 input, textarea, select { width: 100%; border: 1px solid var(--border-strong); border-radius: 7px; color: var(--text); background: #fff; padding: 9px 10px; resize: vertical; transition: border-color .16s ease, box-shadow .16s ease, background .16s ease; }
 input:hover, textarea:hover, select:hover { border-color: #aeb8c7; }
@@ -98,6 +93,7 @@ select { appearance: none; padding-right: 32px; background-image: linear-gradien
 .welcome-panel { display: flex; max-width: 690px; min-height: 590px; flex-direction: column; align-items: flex-start; justify-content: center; padding: 72px; }
 .welcome-panel h2 { max-width: 560px; font-size: 2.15rem; }
 .welcome-panel > p:not(.section-label) { max-width: 600px; margin: 6px 0 22px; color: var(--text-secondary); font-size: .94rem; line-height: 1.65; }
+.welcome-actions { display: flex; flex-wrap: wrap; gap: 9px; }
 .empty-illustration { width: 52px; height: 52px; margin-bottom: 22px; border: 1px solid #dfe2ff; border-radius: 14px; }
 
 .section-label { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--brand); font-size: .72rem; font-weight: 650; line-height: 1.4; }
@@ -524,13 +520,24 @@ select { appearance: none; padding-right: 32px; background-image: linear-gradien
 .backup-result code { overflow: hidden; color: #3d5960; text-overflow: ellipsis; white-space: nowrap; }
 progress { width: 100%; height: 8px; accent-color: var(--brand); }
 
+.modal-backdrop { position: fixed; z-index: 1000; inset: 0; display: grid; place-items: center; padding: 24px; background: rgba(15, 23, 42, .52); }
+.create-project-dialog { width: min(520px, 100%); overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); box-shadow: var(--shadow-md); animation: dialog-enter .18s ease-out; }
+.create-project-dialog > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; padding: 22px 22px 18px; border-bottom: 1px solid var(--border); }
+.create-project-dialog h2 { margin: 3px 0 5px; font-size: 1.35rem; }
+.create-project-dialog header p:last-child { margin: 0; color: var(--text-secondary); font-size: .8rem; }
+.create-project-dialog form { display: grid; gap: 15px; padding: 20px 22px 22px; }
+.dialog-close { display: grid; width: 40px; min-height: 40px; place-items: center; flex: 0 0 auto; border: 0; border-radius: 8px; color: var(--text-muted); background: transparent; }
+.dialog-close:hover:not(:disabled) { color: var(--text); background: var(--surface-hover); }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; padding-top: 3px; }
+@keyframes dialog-enter { from { opacity: 0; transform: translateY(8px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }
 
 @media (max-width: 1160px) {
   .workspace-shell { padding-inline: 12px; }
-  .workspace-grid { grid-template-columns: 250px minmax(0, 1fr); }
+  .workspace-grid { grid-template-columns: 204px minmax(0, 1fr); }
   .project-header, .storyboard-toolbar, .voice-toolbar { flex-direction: column; }
   .actions, .scope-row, .voice-actions { justify-content: flex-start; }
   .metadata-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }

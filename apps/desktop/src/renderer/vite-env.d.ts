@@ -30,7 +30,7 @@ import type {AiReasoningEffort, AiStage, AiProjectSettings} from '@narra/contrac
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 13;
+  readonly version: 14;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -117,6 +117,7 @@ interface NarraDesktopApi {
   codexInterruptTurn: (projectId: string) => Promise<{interrupted: true}>;
   codexRespondServerRequest: (id: number | string, result: unknown) => Promise<{accepted: true}>;
   openExternalUrl: (url: string) => Promise<{opened: true}>;
+  onMenuAction: (listener: (action: 'NEW_PROJECT' | 'OPEN_PROJECT' | 'REFRESH_PROJECT') => void) => () => void;
   onCodexEvent: (listener: (event: Record<string, unknown>) => void) => () => void;
 }
 

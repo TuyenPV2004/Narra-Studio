@@ -13,7 +13,7 @@ describe('AiWorkspaceView', () => {
       />,
     );
 
-    expect(markup).toContain('Connecting to the local AI workspace');
+    expect(markup).toContain('Đang kết nối không gian AI trên máy');
     expect(markup).toContain('ai-loading');
   });
 });

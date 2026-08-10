@@ -1,6 +1,7 @@
 import type {ProjectDetail, VoiceWorkspace} from '@narra/project-store';
 import {useEffect, useRef, useState} from 'react';
 import {AudioLines, Captions, Clock3, Gauge, Mic2, RefreshCw, Sparkles, Upload} from 'lucide-react';
+import {formatUiLabel} from './ui-locale';
 
 type Props = {
   projectId: string;
@@ -12,11 +13,6 @@ const formatSeconds = (value: number | null | undefined): string =>
 
 const narrationUrl = (projectId: string, segmentId: string): string =>
   `narra-media://narration/${encodeURIComponent(projectId)}/${encodeURIComponent(segmentId)}`;
-
-const formatLabel = (value: string): string => {
-  const normalized = value.replaceAll('_', ' ').toLowerCase();
-  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
-};
 
 const Waveform = ({src, label}: {src: string; label: string}) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -84,7 +80,7 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
   };
 
   useEffect(() => {
-    void load().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Could not load voice workspace.'));
+    void load().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Không thể tải không gian lời đọc.'));
   }, [projectId]);
 
   const selected = workspace?.segments.find(({id}) => id === selectedId);
@@ -105,71 +101,71 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
       if (next) setWorkspace(next);
       onProjectRefresh(await window.narra.getProject(projectId));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Voice operation failed.');
+      setError(reason instanceof Error ? reason.message : 'Thao tác lời đọc không thành công.');
     } finally {
       setBusy(false);
     }
   };
 
   const generateSelected = (): Promise<void> => run(async () => {
-    if (!selected) throw new Error('Select a narration segment first.');
+    if (!selected) throw new Error('Hãy chọn một đoạn lời đọc trước.');
     const next = await window.narra.generateNarrationSegment(projectId, {
       segmentId: selected.id,
       presetId,
       speed,
       ...(pronunciationNotes.trim() ? {pronunciationNotes: pronunciationNotes.trim()} : {}),
     });
-    setMessage(`Generated ${selected.id} locally with Kokoro. Review the audio before fitting the timeline.`);
+    setMessage(`Đã tạo ${selected.id} bằng Kokoro trên máy. Hãy nghe duyệt trước khi khớp dòng thời gian.`);
     return next;
   });
 
   const generateMissing = (): Promise<void> => run(async () => {
     const next = await window.narra.generateMissingNarration(projectId, {presetId, speed});
-    setMessage('Generated all narration segments that did not already have audio. Existing segment versions were preserved.');
+    setMessage('Đã tạo các đoạn lời đọc còn thiếu âm thanh. Phiên bản của các đoạn hiện có được giữ nguyên.');
     return next;
   });
 
-  if (!workspace) return <div className="voice-empty">Loading voice workspace…</div>;
+  if (!workspace) return <div className="voice-empty">Đang tải không gian lời đọc…</div>;
 
   const warning = workspace.timelineWarnings.find(({sceneId}) => sceneId === selected?.sceneId);
   const issues = workspace.qaIssues.filter(({segmentId}) => segmentId === selectedId);
   const audioReady = workspace.segments.length > 0 && workspace.segments.every(({audioPath, durationSec}) => audioPath && durationSec);
 
   return (
-    <section className="voice-workspace" aria-busy={busy} aria-label="Voice, captions and timeline sync">
+    <section className="voice-workspace" aria-busy={busy} aria-label="Lời đọc, phụ đề và đồng bộ dòng thời gian">
       <header className="voice-toolbar">
         <div>
-          <p className="section-label">Voice and captions</p>
-          <p>{workspace.segments.length} segments · {workspace.captions.length} cues · {workspace.qaIssues.length} QA issues</p>
+          <p className="section-label">Lời đọc và phụ đề</p>
+          <p>{workspace.segments.length} đoạn · {workspace.captions.length} cue · {workspace.qaIssues.length} vấn đề QA</p>
         </div>
         <div className="voice-actions">
-          <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.syncNarrationSegments(projectId))}><RefreshCw aria-hidden="true" size={16} /> Sync from storyboard</button>
-          <button className="secondary" disabled={busy || !workspace.runtime.available || workspace.segments.every(({audioPath}) => audioPath)} onClick={() => void generateMissing()}><Sparkles aria-hidden="true" size={16} /> Generate missing</button>
-          <button className="secondary" disabled={busy || workspace.segments.length === 0} onClick={() => void run(() => window.narra.chooseAndImportCaptions(projectId))}><Captions aria-hidden="true" size={16} /> Import captions</button>
-          <button className="primary" disabled={busy || !audioReady} onClick={() => void run(() => window.narra.fitTimelineToNarration(projectId))}><Clock3 aria-hidden="true" size={16} /> Fit timeline to audio</button>
+          <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.syncNarrationSegments(projectId))}><RefreshCw aria-hidden="true" size={16} /> Đồng bộ từ storyboard</button>
+          <button className="secondary" disabled={busy || !workspace.runtime.available || workspace.segments.every(({audioPath}) => audioPath)} onClick={() => void generateMissing()}><Sparkles aria-hidden="true" size={16} /> Tạo phần còn thiếu</button>
+          <button className="secondary" disabled={busy || workspace.segments.length === 0} onClick={() => void run(() => window.narra.chooseAndImportCaptions(projectId))}><Captions aria-hidden="true" size={16} /> Nhập phụ đề</button>
+          <button className="primary" disabled={busy || !audioReady} onClick={() => void run(() => window.narra.fitTimelineToNarration(projectId))}><Clock3 aria-hidden="true" size={16} /> Khớp dòng thời gian</button>
         </div>
       </header>
 
       {error && <div className="notice error-notice" role="alert">{error}</div>}
-      {busy && <div className="notice progress-notice" role="status">Updating narration and timeline…</div>}
+      {busy && <div className="notice progress-notice" role="status">Đang cập nhật lời đọc và dòng thời gian…</div>}
       {message && <div className="notice success-notice" aria-live="polite">{message}</div>}
 
-      <section className={`voice-runtime-card ${workspace.runtime.available ? 'ready' : 'missing'}`} aria-label="Local voice runtime status">
+      <section className={`voice-runtime-card ${workspace.runtime.available ? 'ready' : 'missing'}`} aria-label="Trạng thái bộ máy giọng đọc cục bộ">
         <Mic2 aria-hidden="true" size={20} />
-        <div><strong>{workspace.runtime.available ? 'Kokoro local runtime ready' : 'Kokoro local runtime needs setup'}</strong><p>{workspace.runtime.licenseSummary}</p>{!workspace.runtime.available && <small>Missing: {workspace.runtime.missing.join(', ')}</small>}</div>
-        <span className={`health ${workspace.runtime.available ? 'valid' : 'pending'}`}>{workspace.runtime.available ? `Model ${workspace.runtime.modelVersion}` : 'Unavailable'}</span>
+        <div><strong>{workspace.runtime.available ? 'Kokoro trên máy đã sẵn sàng' : 'Kokoro trên máy cần được thiết lập'}</strong><p>{workspace.runtime.licenseSummary}</p>{!workspace.runtime.available && <small>Còn thiếu: {workspace.runtime.missing.join(', ')}</small>}</div>
+        <span className={`health ${workspace.runtime.available ? 'valid' : 'pending'}`}>{workspace.runtime.available ? `Model ${workspace.runtime.modelVersion}` : 'Chưa khả dụng'}</span>
         {!workspace.runtime.available && <code>{workspace.runtime.setupCommand}</code>}
       </section>
 
       {workspace.segments.length === 0 ? (
         <div className="voice-empty">
-          <h3>No narration segments</h3>
-          <p>Import a storyboard, then sync one editable narration segment per scene.</p>
-          <button className="primary" disabled={busy} onClick={() => void run(() => window.narra.syncNarrationSegments(projectId))}>Create segments</button>
+          <h3>Chưa có đoạn lời đọc</h3>
+          <p>Nhập storyboard, sau đó đồng bộ một đoạn lời đọc có thể chỉnh sửa cho mỗi cảnh.</p>
+          <button className="primary" disabled={busy} onClick={() => void run(() => window.narra.syncNarrationSegments(projectId))}>Tạo các đoạn</button>
         </div>
       ) : (
         <div className="voice-columns">
-          <nav className="segment-list" aria-label="Narration segments">
+          <nav className="segment-list" aria-label="Các đoạn lời đọc">
             {workspace.segments.map((segment) => {
               const segmentWarning = workspace.timelineWarnings.find(({sceneId}) => sceneId === segment.sceneId);
               const issueCount = workspace.qaIssues.filter(({segmentId}) => segmentId === segment.id).length;
@@ -182,9 +178,9 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
                 >
                   <span className="segment-order">VO {String(segment.order + 1).padStart(2, '0')}</span>
                   <strong>{segment.text}</strong>
-                  <small>{formatLabel(segment.status)} · {formatSeconds(segment.durationSec)}</small>
+                  <small>{formatUiLabel(segment.status)} · {formatSeconds(segment.durationSec)}</small>
                   <span className={`timing-state ${(segmentWarning?.kind ?? 'MISSING_AUDIO').toLowerCase()}`}>
-                    {issueCount > 0 ? `${issueCount} QA` : segmentWarning ? formatLabel(segmentWarning.kind) : 'Missing audio'}
+                    {issueCount > 0 ? `${issueCount} QA` : segmentWarning ? formatUiLabel(segmentWarning.kind) : 'Thiếu âm thanh'}
                   </span>
                 </button>
               );
@@ -195,76 +191,76 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
             {selected ? (
               <>
                 <header className="inspector-heading">
-                  <div><p className="section-label">Narration segment</p><h3>{selected.id}</h3></div>
-                  <span className={`health ${selected.status === 'READY' ? 'valid' : 'pending'}`}>{formatLabel(selected.status)}</span>
+                  <div><p className="section-label">Đoạn lời đọc</p><h3>{selected.id}</h3></div>
+                  <span className={`health ${selected.status === 'READY' ? 'valid' : 'pending'}`}>{formatUiLabel(selected.status)}</span>
                 </header>
 
-                <section className="narration-copy" aria-label="Narration text">
+                <section className="narration-copy" aria-label="Nội dung lời đọc">
                   <p>{selected.text}</p>
-                  {selected.pronunciationNotes && <small>Pronunciation: {selected.pronunciationNotes}</small>}
+                  {selected.pronunciationNotes && <small>Phát âm: {selected.pronunciationNotes}</small>}
                 </section>
 
-                <section className="voice-generation-card" aria-label="Kokoro voice settings">
-                  <header><div><p className="section-label">Local generation</p><h3>Kokoro voice and delivery</h3></div><Gauge aria-hidden="true" size={20} /></header>
+                <section className="voice-generation-card" aria-label="Thiết lập giọng Kokoro">
+                  <header><div><p className="section-label">Tạo trên máy</p><h3>Giọng đọc và cách thể hiện Kokoro</h3></div><Gauge aria-hidden="true" size={20} /></header>
                   <div className="voice-generation-fields">
-                    <label>Voice preset<select value={presetId} onChange={(event) => {
+                    <label>Mẫu giọng<select value={presetId} onChange={(event) => {
                       const nextId = event.target.value;
                       setPresetId(nextId);
                       const preset = workspace.presets.find(({id}) => id === nextId);
                       if (preset) setSpeed(preset.defaultSpeed);
                     }}>{workspace.presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select><small>{workspace.presets.find(({id}) => id === presetId)?.description}</small></label>
-                    <label>Speed <output>{speed.toFixed(2)}×</output><input aria-label="Narration speed" type="range" min="0.8" max="1.2" step="0.01" value={speed} onChange={(event) => setSpeed(Number(event.target.value))} /></label>
+                    <label>Tốc độ <output>{speed.toFixed(2)}×</output><input aria-label="Tốc độ lời đọc" type="range" min="0.8" max="1.2" step="0.01" value={speed} onChange={(event) => setSpeed(Number(event.target.value))} /></label>
                   </div>
-                  <label>Pronunciation dictionary<textarea rows={3} value={pronunciationNotes} onChange={(event) => setPronunciationNotes(event.target.value)} placeholder="OpenAI=Open A I; API=A P I" /><small>Use one <code>term=spoken form</code> entry per line or separate entries with semicolons.</small></label>
-                  <div className="voice-generation-actions"><button className="primary" disabled={busy || !workspace.runtime.available} onClick={() => void generateSelected()}><Sparkles aria-hidden="true" size={16} /> {selected.audioPath ? 'Regenerate segment' : 'Generate segment'}</button><span>Runs fully local. Existing audio is replaced with a new segment version only after generation succeeds.</span></div>
+                  <label>Từ điển phát âm<textarea rows={3} value={pronunciationNotes} onChange={(event) => setPronunciationNotes(event.target.value)} placeholder="OpenAI=Open A I; API=A P I" /><small>Mỗi dòng dùng một mục <code>từ=cách đọc</code>, hoặc ngăn cách các mục bằng dấu chấm phẩy.</small></label>
+                  <div className="voice-generation-actions"><button className="primary" disabled={busy || !workspace.runtime.available} onClick={() => void generateSelected()}><Sparkles aria-hidden="true" size={16} /> {selected.audioPath ? 'Tạo lại đoạn' : 'Tạo đoạn'}</button><span>Chạy hoàn toàn trên máy. Âm thanh cũ chỉ được thay bằng phiên bản mới sau khi tạo thành công.</span></div>
                 </section>
 
                 {selected.audioPath ? (
                   <div className="audio-review"><Waveform src={narrationUrl(projectId, selected.id)} label={`Waveform for ${selected.id}`} /><audio className="audio-player" controls preload="metadata" src={narrationUrl(projectId, selected.id)} /></div>
                 ) : (
-                  <div className="audio-placeholder">No audio imported for this segment.</div>
+                  <div className="audio-placeholder">Đoạn này chưa có âm thanh.</div>
                 )}
 
                 <div className="audio-import-row">
                   <div>
-                    <strong>{selected.audioPath ? `Audio version ${selected.version}` : 'Manual import fallback'}</strong>
-                    <p>Use this when audio was recorded or generated by another reviewed provider.</p>
+                    <strong>{selected.audioPath ? `Phiên bản âm thanh ${selected.version}` : 'Phương án nhập thủ công'}</strong>
+                    <p>Dùng khi âm thanh được thu hoặc tạo bởi một nhà cung cấp khác đã được duyệt.</p>
                   </div>
                   <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.chooseAndImportNarrationAudio(projectId, selected.id))}>
-                    <Upload aria-hidden="true" size={16} /> {selected.audioPath ? 'Replace segment audio' : 'Import segment audio'}
+                    <Upload aria-hidden="true" size={16} /> {selected.audioPath ? 'Thay âm thanh đoạn' : 'Nhập âm thanh đoạn'}
                   </button>
                 </div>
 
                 {selected.generation && (
                   <details className="voice-provenance" open>
-                    <summary>Generation provenance · {selected.generation.model} {selected.generation.modelVersion}</summary>
-                    <dl><div><dt>Voice</dt><dd>{selected.generation.voice}</dd></div><div><dt>Language</dt><dd>{selected.generation.language}</dd></div><div><dt>Speed</dt><dd>{selected.generation.speed.toFixed(2)}×</dd></div><div><dt>Target</dt><dd>{selected.generation.loudnessTargetLufs} LUFS</dd></div></dl>
+                    <summary>Nguồn gốc tạo âm thanh · {selected.generation.model} {selected.generation.modelVersion}</summary>
+                    <dl><div><dt>Giọng</dt><dd>{selected.generation.voice}</dd></div><div><dt>Ngôn ngữ</dt><dd>{selected.generation.language}</dd></div><div><dt>Tốc độ</dt><dd>{selected.generation.speed.toFixed(2)}×</dd></div><div><dt>Mục tiêu</dt><dd>{selected.generation.loudnessTargetLufs} LUFS</dd></div></dl>
                     <p>{selected.generation.normalizedText}</p>
                   </details>
                 )}
 
                 <dl className="voice-metadata">
-                  <div><dt>Planned</dt><dd>{formatSeconds(selected.plannedDurationSec)}</dd></div>
-                  <div><dt>Actual</dt><dd>{formatSeconds(selected.durationSec)}</dd></div>
+                  <div><dt>Dự kiến</dt><dd>{formatSeconds(selected.plannedDurationSec)}</dd></div>
+                  <div><dt>Thực tế</dt><dd>{formatSeconds(selected.durationSec)}</dd></div>
                   <div><dt>Codec</dt><dd>{selected.audioMetadata?.audioCodec ?? '—'}</dd></div>
-                  <div><dt>Sample rate</dt><dd>{selected.audioMetadata?.sampleRate ? `${selected.audioMetadata.sampleRate} Hz` : '—'}</dd></div>
-                  <div><dt>Channels</dt><dd>{selected.audioMetadata?.channels ?? '—'}</dd></div>
-                  <div><dt>Container</dt><dd>{selected.audioMetadata?.format ?? '—'}</dd></div>
+                  <div><dt>Tần số mẫu</dt><dd>{selected.audioMetadata?.sampleRate ? `${selected.audioMetadata.sampleRate} Hz` : '—'}</dd></div>
+                  <div><dt>Số kênh</dt><dd>{selected.audioMetadata?.channels ?? '—'}</dd></div>
+                  <div><dt>Định dạng chứa</dt><dd>{selected.audioMetadata?.format ?? '—'}</dd></div>
                 </dl>
 
                 {warning && (
                   <div className={`timing-warning ${warning.kind.toLowerCase()}`}>
-                    <strong>{formatLabel(warning.kind)}</strong>
+                    <strong>{formatUiLabel(warning.kind)}</strong>
                     <p>{warning.message}</p>
                   </div>
                 )}
 
                 {issues.length > 0 && (
-                  <section className="voice-qa-list" aria-label="Transcript mismatch issues">
-                    <p className="section-label">Transcript QA</p>
+                  <section className="voice-qa-list" aria-label="Các vấn đề sai lệch bản chép lời">
+                    <p className="section-label">QA bản chép lời</p>
                     {issues.map((issue) => (
                       <article key={`${issue.segmentId}-${issue.message}`}>
-                        <strong>{formatLabel(issue.severity)} · {Math.round(issue.similarity * 100)}% match</strong>
+                        <strong>{formatUiLabel(issue.severity)} · khớp {Math.round(issue.similarity * 100)}%</strong>
                         <p>{issue.message}</p>
                       </article>
                     ))}
@@ -277,8 +273,8 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
       )}
 
       <section className="caption-summary">
-        <div><p className="section-label"><AudioLines aria-hidden="true" size={15} /> Caption input</p><h3>SRT, WebVTT or word timestamps JSON</h3></div>
-        <p>Word JSON may use <code>startMs/endMs</code> or seconds-based <code>start/end</code>. Set <code>timebase: "segment"</code> when each segment starts at zero.</p>
+        <div><p className="section-label"><AudioLines aria-hidden="true" size={15} /> Dữ liệu phụ đề</p><h3>SRT, WebVTT hoặc JSON mốc thời gian theo từ</h3></div>
+        <p>JSON theo từ có thể dùng <code>startMs/endMs</code> hoặc <code>start/end</code> theo giây. Đặt <code>timebase: "segment"</code> khi mỗi đoạn bắt đầu từ 0.</p>
       </section>
     </section>
   );

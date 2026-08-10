@@ -64,12 +64,13 @@ const channels = {
   codexUpdateSettings: 'codex:settings-update',
   codexRespondServerRequest: 'codex:server-request-respond',
   openExternalUrl: 'system:open-external-url',
+  menuAction: 'system:menu-action',
   codexEvent: 'codex:event',
 } as const;
 
 const api = {
   runtime: 'electron',
-  version: 13,
+  version: 14,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -153,6 +154,11 @@ const api = {
   codexRespondServerRequest: (id: number | string, result: unknown) =>
     ipcRenderer.invoke(channels.codexRespondServerRequest, id, result),
   openExternalUrl: (url: string) => ipcRenderer.invoke(channels.openExternalUrl, url),
+  onMenuAction: (listener: (action: 'NEW_PROJECT' | 'OPEN_PROJECT' | 'REFRESH_PROJECT') => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, action: 'NEW_PROJECT' | 'OPEN_PROJECT' | 'REFRESH_PROJECT') => listener(action);
+    ipcRenderer.on(channels.menuAction, handler);
+    return () => ipcRenderer.removeListener(channels.menuAction, handler);
+  },
   onCodexEvent: (listener: (event: CodexBridgeNotification | Record<string, unknown>) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: CodexBridgeNotification | Record<string, unknown>) =>
       listener(payload);
