@@ -28,4 +28,7 @@ export type {
   AiWorkspace,
   CreateAiRunInput,
   UpdateAiRunInput,
+  EditorialStage,
+  SelectTopicInput,
+  SaveOutlineInput,
 } from './types.js';

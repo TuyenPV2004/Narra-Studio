@@ -22,6 +22,14 @@ import {
   ThesisSchema,
   ThesisCandidateCollectionSchema,
   TopicCandidateCollectionSchema,
+  DiscoverOutputSchema,
+  ResearchOutputSchema,
+  ThesisOutputSchema,
+  OutlineOutputSchema,
+  ScriptOutputSchema,
+  StoryboardOutputSchema,
+  normalizeAiStageOutput,
+  type AiStage,
   type Asset,
   type AiProjectSettings,
   type AiRun,
@@ -79,6 +87,8 @@ import type {
   AiWorkspace,
   CreateAiRunInput,
   UpdateAiRunInput,
+  SelectTopicInput,
+  SaveOutlineInput,
 } from './types.js';
 
 type ProjectRow = {
@@ -855,7 +865,162 @@ export class ProjectStore {
       sources: SourceCollectionSchema.parse(parseJson(path.join(project.rootPath, 'research/sources.json'))).items,
       facts: FactCollectionSchema.parse(parseJson(path.join(project.rootPath, 'research/facts.json'))).items,
       claims: ClaimCollectionSchema.parse(parseJson(path.join(project.rootPath, 'script/claims.json'))).items,
+      sourceCards: AiSourceCardCollectionSchema.parse(parseJson(path.join(project.rootPath, 'ai/source_cards.json'))).items,
+      topicCandidates: TopicCandidateCollectionSchema.parse(parseJson(path.join(project.rootPath, 'research/topic_candidates.json'))).items,
+      thesisCandidates: ThesisCandidateCollectionSchema.parse(parseJson(path.join(project.rootPath, 'thesis/thesis_candidates.json'))).items,
+      outlineSections: OutlineSectionCollectionSchema.parse(parseJson(path.join(project.rootPath, 'script/outline.json'))).items
+        .sort((left, right) => left.order - right.order),
+      scriptQaReport: existsSync(path.join(project.rootPath, 'script/qa_report.md'))
+        ? readFileSync(path.join(project.rootPath, 'script/qa_report.md'), 'utf8')
+        : '',
     };
+  }
+
+  applyEditorialStageOutput(projectId: string, stage: AiStage, runId: string, output: unknown): void {
+    const project = this.getProject(projectId).project;
+    const run = this.getAiWorkspace(projectId).runs.find(({id}) => id === runId);
+    if (!run || run.stage !== stage) throw new Error(`AI run ${runId} does not own stage ${stage}.`);
+    const gate = this.gateForEditorialStage(stage);
+    this.assertGateWritable(projectId, gate);
+    const now = isoNow();
+    const normalizedOutput = normalizeAiStageOutput(output);
+    const collection = <T>(items: T[]) => ({schemaVersion: 1 as const, projectId, updatedAt: now, items});
+    const assertOwners = (items: Array<{projectId: string; runId?: string}>) => {
+      if (items.some((item) => item.projectId !== projectId || ('runId' in item && item.runId !== runId))) {
+        throw new Error(`Structured ${stage} output contains a mismatched projectId or runId.`);
+      }
+    };
+
+    if (stage === 'DISCOVER') {
+      const value = DiscoverOutputSchema.parse(normalizedOutput);
+      assertOwners(value.topicCandidates);
+      atomicWriteJson(path.join(project.rootPath, 'research/topic_candidates.json'), collection(value.topicCandidates));
+    } else if (stage === 'RESEARCH') {
+      const value = ResearchOutputSchema.parse(normalizedOutput);
+      assertOwners([...value.sources, ...value.facts, ...value.sourceCards]);
+      const sourceIds = new Set(value.sources.map(({id}) => id));
+      const factIds = new Set(value.facts.map(({id}) => id));
+      for (const fact of value.facts) {
+        if (fact.sourceIds.some((id) => !sourceIds.has(id))) throw new Error(`Fact ${fact.id} references an unknown source.`);
+      }
+      for (const card of value.sourceCards) {
+        if (card.sourceId && !sourceIds.has(card.sourceId)) throw new Error(`Source card ${card.id} references an unknown source.`);
+        if (card.supportsFactIds.some((id) => !factIds.has(id))) throw new Error(`Source card ${card.id} references an unknown fact.`);
+      }
+      atomicWriteJson(path.join(project.rootPath, 'research/sources.json'), collection(value.sources));
+      atomicWriteJson(path.join(project.rootPath, 'research/facts.json'), collection(value.facts));
+      atomicWriteJson(path.join(project.rootPath, 'ai/source_cards.json'), collection(value.sourceCards));
+      const checklist = value.evidenceChecklist.map((item) => `- [${item.passed ? 'x' : ' '}] ${item.label}: ${item.note}`).join('\n');
+      const packet = [
+        '# Research packet', '', '## Research questions', ...value.researchQuestions.map((item) => `- ${item}`), '',
+        '## Summary', value.researchSummary, '', '## Counterpoints', ...value.counterpoints.map((item) => `- ${item}`), '',
+        '## Open questions', ...value.openQuestions.map((item) => `- ${item}`), '', '## Evidence checklist', checklist, '',
+        '## Source IDs', ...value.sources.map((item) => `- ${item.id}: ${item.title}`), '',
+      ].join('\n');
+      atomicWriteText(path.join(project.rootPath, 'research/research_packet.md'), packet);
+    } else if (stage === 'THESIS') {
+      const value = ThesisOutputSchema.parse(normalizedOutput);
+      assertOwners(value.candidates);
+      const factIds = new Set(FactCollectionSchema.parse(parseJson(path.join(project.rootPath, 'research/facts.json'))).items.map(({id}) => id));
+      for (const candidate of value.candidates) {
+        if (candidate.supportingFactIds.some((id) => !factIds.has(id))) throw new Error(`Thesis ${candidate.id} references an unknown fact.`);
+      }
+      atomicWriteJson(path.join(project.rootPath, 'thesis/thesis_candidates.json'), collection(value.candidates));
+    } else if (stage === 'OUTLINE') {
+      const value = OutlineOutputSchema.parse(normalizedOutput);
+      assertOwners(value.sections);
+      this.assertUniqueOrders(value.sections, 'Outline');
+      atomicWriteJson(path.join(project.rootPath, 'script/outline.json'), collection(value.sections));
+      this.writeOutlineMarkdown(project.rootPath, value.sections);
+    } else if (stage === 'SCRIPT') {
+      const value = ScriptOutputSchema.parse(normalizedOutput);
+      assertOwners(value.claims);
+      const factIds = new Set(FactCollectionSchema.parse(parseJson(path.join(project.rootPath, 'research/facts.json'))).items.map(({id}) => id));
+      for (const claim of value.claims) {
+        if (claim.factIds.some((id) => !factIds.has(id))) throw new Error(`Claim ${claim.id} references an unknown fact.`);
+      }
+      const claimIds = new Set(value.claims.map(({id}) => id));
+      if (value.qa.unsupportedClaimIds.some((id) => !claimIds.has(id))) throw new Error('Script QA references an unknown claim.');
+      atomicWriteText(path.join(project.rootPath, 'script/script_v1.md'), `${value.scriptMarkdown.trimEnd()}\n`);
+      atomicWriteJson(path.join(project.rootPath, 'script/claims.json'), collection(value.claims));
+      const report = [
+        '# Script QA report', '', `Estimated duration: ${value.qa.estimatedDurationSec.toFixed(1)} seconds`, '',
+        '## Unsupported claims', ...(value.qa.unsupportedClaimIds.length ? value.qa.unsupportedClaimIds.map((id) => `- ${id}`) : ['- None']), '',
+        '## Warnings', ...(value.qa.warnings.length ? value.qa.warnings.map((item) => `- ${item}`) : ['- None']), '',
+      ].join('\n');
+      atomicWriteText(path.join(project.rootPath, 'script/qa_report.md'), report);
+    } else {
+      const value = StoryboardOutputSchema.parse(normalizedOutput);
+      assertOwners([...value.scenes, ...value.shots]);
+      this.assertUniqueOrders(value.scenes, 'Scene');
+      const claimIds = new Set(ClaimCollectionSchema.parse(parseJson(path.join(project.rootPath, 'script/claims.json'))).items.map(({id}) => id));
+      if (value.scenes.some((scene) => scene.claimIds.some((id) => !claimIds.has(id))) ||
+          value.shots.some((shot) => shot.claimIds?.some((id) => !claimIds.has(id)))) {
+        throw new Error('Storyboard references an unknown claim.');
+      }
+      atomicWriteJson(path.join(project.rootPath, 'storyboard/scenes.json'), collection(value.scenes));
+      atomicWriteJson(path.join(project.rootPath, 'storyboard/shots.json'), collection(value.shots));
+    }
+
+    this.revokeApprovalChain(projectId, gate, `${stage.toLowerCase()} artifact changed`);
+    if (stage === 'STORYBOARD') this.markScopes(projectId, ['ASSETS', 'AUDIO', 'CAPTIONS', 'RENDER'], 'Storyboard changed');
+    else if (['SCRIPT', 'OUTLINE'].includes(stage)) this.markScopes(projectId, ['ASSETS', 'AUDIO', 'CAPTIONS', 'RENDER'], `${stage.toLowerCase()} changed`);
+    else this.markScopes(projectId, ['ASSETS', 'AUDIO', 'CAPTIONS', 'RENDER'], `${stage.toLowerCase()} changed`);
+    this.refreshProject(projectId);
+  }
+
+  selectTopicCandidate(projectId: string, candidateId: string, input: SelectTopicInput): EditorialWorkspace {
+    this.assertGateWritable(projectId, 'TOPIC');
+    const project = this.getProject(projectId).project;
+    const filePath = path.join(project.rootPath, 'research/topic_candidates.json');
+    const current = TopicCandidateCollectionSchema.parse(parseJson(filePath));
+    if (!current.items.some(({id}) => id === candidateId)) throw new Error(`Topic candidate ${candidateId} was not found.`);
+    const now = isoNow();
+    const items = current.items.map((item) => item.id === candidateId
+      ? {...item, ...input, selected: true}
+      : {...item, selected: false});
+    atomicWriteJson(filePath, TopicCandidateCollectionSchema.parse({...current, updatedAt: now, items}));
+    this.revokeApprovalChain(projectId, 'TOPIC', 'Selected topic changed');
+    this.refreshProject(projectId);
+    return this.getEditorialWorkspace(projectId);
+  }
+
+  selectThesisCandidate(projectId: string, candidateId: string, statement: string): EditorialWorkspace {
+    this.assertGateWritable(projectId, 'THESIS');
+    const project = this.getProject(projectId).project;
+    const candidates = ThesisCandidateCollectionSchema.parse(parseJson(path.join(project.rootPath, 'thesis/thesis_candidates.json'))).items;
+    if (!candidates.some(({id}) => id === candidateId)) throw new Error(`Thesis candidate ${candidateId} was not found.`);
+    const normalized = statement.trim();
+    if (!normalized) throw new Error('Selected thesis cannot be empty.');
+    atomicWriteJson(path.join(project.rootPath, 'thesis/thesis.json'), {
+      schemaVersion: 1, projectId, updatedAt: isoNow(), statement: normalized,
+    });
+    this.revokeApprovalChain(projectId, 'THESIS', 'Selected thesis changed');
+    this.markScopes(projectId, ['ASSETS', 'AUDIO', 'CAPTIONS', 'RENDER'], 'Selected thesis changed');
+    this.refreshProject(projectId);
+    return this.getEditorialWorkspace(projectId);
+  }
+
+  saveOutline(projectId: string, input: SaveOutlineInput): EditorialWorkspace {
+    this.assertGateWritable(projectId, 'SCRIPT');
+    const project = this.getProject(projectId).project;
+    const current = OutlineSectionCollectionSchema.parse(parseJson(path.join(project.rootPath, 'script/outline.json')));
+    const byId = new Map(current.items.map((item) => [item.id, item]));
+    const items = input.map((item, order) => {
+      const existing = byId.get(item.id);
+      if (!existing) throw new Error(`Outline section ${item.id} was not found.`);
+      return {...existing, ...item, order};
+    });
+    if (items.length !== current.items.length || new Set(items.map(({id}) => id)).size !== items.length) {
+      throw new Error('Outline save must contain every section exactly once.');
+    }
+    const next = OutlineSectionCollectionSchema.parse({...current, updatedAt: isoNow(), items});
+    atomicWriteJson(path.join(project.rootPath, 'script/outline.json'), next);
+    this.writeOutlineMarkdown(project.rootPath, next.items);
+    this.revokeApprovalChain(projectId, 'SCRIPT', 'Outline changed');
+    this.markScopes(projectId, ['ASSETS', 'AUDIO', 'CAPTIONS', 'RENDER'], 'Outline changed');
+    this.refreshProject(projectId);
+    return this.getEditorialWorkspace(projectId);
   }
 
   saveEditorialDocument(projectId: string, document: EditorialDocument, content: string): EditorialWorkspace {
@@ -1333,17 +1498,79 @@ export class ProjectStore {
     }
   }
 
+  private gateForEditorialStage(stage: AiStage): ApprovalGate {
+    if (stage === 'DISCOVER' || stage === 'RESEARCH') return 'TOPIC';
+    if (stage === 'THESIS') return 'THESIS';
+    if (stage === 'OUTLINE' || stage === 'SCRIPT') return 'SCRIPT';
+    return 'STORYBOARD';
+  }
+
+  private assertGateWritable(projectId: string, gate: ApprovalGate): void {
+    this.ensureApprovalRows(projectId);
+    const row = this.database.prepare('SELECT status FROM approvals WHERE project_id = ? AND gate = ?')
+      .get(projectId, gate) as {status: ApprovalRecord['status']} | undefined;
+    if (row?.status === 'APPROVED') {
+      throw new Error(`${gate} is approved. Revoke that approval before replacing its artifact.`);
+    }
+  }
+
+  private assertUniqueOrders(items: Array<{order: number}>, label: string): void {
+    const orders = items.map(({order}) => order);
+    if (new Set(orders).size !== orders.length || [...orders].sort((a, b) => a - b).some((order, index) => order !== index)) {
+      throw new Error(`${label} order must be unique and contiguous from zero.`);
+    }
+  }
+
+  private writeOutlineMarkdown(projectRoot: string, sections: Array<{
+    order: number;
+    title: string;
+    objective: string;
+    claimIds: string[];
+    sourceIds: string[];
+    targetDurationSec: number;
+    contentNotes?: string | undefined;
+  }>): void {
+    const markdown = [...sections].sort((left, right) => left.order - right.order).flatMap((section) => [
+      `## ${section.order + 1}. ${section.title}`,
+      '',
+      `- Objective: ${section.objective}`,
+      `- Target duration: ${section.targetDurationSec} seconds`,
+      `- Claims: ${section.claimIds.join(', ') || 'None yet'}`,
+      `- Sources: ${section.sourceIds.join(', ') || 'None yet'}`,
+      ...(section.contentNotes ? ['', section.contentNotes] : []),
+      '',
+    ]).join('\n');
+    atomicWriteText(path.join(projectRoot, 'script/outline.md'), `# Documentary outline\n\n${markdown}`);
+  }
+
   private getGateReadiness(projectId: string, gate: ApprovalGate): {ready: boolean; message: string} {
     const project = this.getProject(projectId).project;
     this.ensurePhase5Artifacts(project.rootPath);
-    if (gate === 'TOPIC') return {ready: true, message: 'Topic and documentary question are ready.'};
+    if (gate === 'TOPIC') {
+      const candidates = TopicCandidateCollectionSchema.parse(parseJson(path.join(project.rootPath, 'research/topic_candidates.json'))).items;
+      const ready = candidates.length === 0 || candidates.filter(({selected}) => selected).length === 1;
+      return {
+        ready,
+        message: ready
+          ? candidates.length === 0 ? 'Documentary question is ready.' : 'One topic is selected and ready.'
+          : 'Select exactly one topic before approval.',
+      };
+    }
     if (gate === 'THESIS') {
       const ready = ThesisSchema.parse(parseJson(path.join(project.rootPath, 'thesis/thesis.json'))).statement.trim().length > 0;
       return {ready, message: ready ? 'Thesis document is ready.' : 'Write and save the thesis before approval.'};
     }
     if (gate === 'SCRIPT') {
-      const ready = readFileSync(path.join(project.rootPath, 'script/script_v1.md'), 'utf8').trim().length > 0;
-      return {ready, message: ready ? 'Script document is ready.' : 'Write and save the script before approval.'};
+      const hasScript = readFileSync(path.join(project.rootPath, 'script/script_v1.md'), 'utf8').trim().length > 0;
+      const claims = ClaimCollectionSchema.parse(parseJson(path.join(project.rootPath, 'script/claims.json'))).items;
+      const unsupported = claims.filter(({status}) => status !== 'SUPPORTED');
+      const ready = hasScript && unsupported.length === 0;
+      return {
+        ready,
+        message: ready
+          ? 'Script and claim mapping are ready.'
+          : !hasScript ? 'Write and save the script before approval.' : `Resolve ${unsupported.length} unsupported claim(s) before approval.`,
+      };
     }
     if (gate === 'STORYBOARD') {
       const workspace = this.getStoryboardWorkspace(projectId);

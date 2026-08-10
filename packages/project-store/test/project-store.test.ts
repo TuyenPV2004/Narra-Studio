@@ -106,6 +106,37 @@ describe('ProjectStore', () => {
     expect(persisted).not.toContain('token');
   });
 
+  it('validates structured editorial output before writing and protects an approved topic', () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Structured Editorial', question: 'Which angle can the evidence support?'});
+    const projectId = created.project.id;
+    const discoverRun = store.createAiRun(projectId, {stage: 'DISCOVER', prompt: 'Discover defensible topics.'});
+    const topic = (id: string, rank: number) => ({
+      id, projectId, runId: discoverRun.id, title: `Topic ${rank}`, hook: 'A concrete tension.', angle: 'Follow the evidence.',
+      rationale: 'Primary evidence and visual material are available.',
+      scores: {viewPotential: 80, storyDepth: 82, visualPotential: 75, sourceQuality: 90, evergreenValue: 78, originalAngle: 72, adSafety: 95},
+      recommendationRank: rank, sourceIds: [], risks: ['The latest data may change.'],
+    });
+    store.applyEditorialStageOutput(projectId, 'DISCOVER', discoverRun.id, {topicCandidates: [topic('topic-one', 1), topic('topic-two', 2)]});
+    let editorial = store.selectTopicCandidate(projectId, 'topic-one', {
+      title: 'Edited topic', hook: 'An edited hook.', angle: 'An edited angle.', rationale: 'A creator-reviewed rationale.',
+    });
+    expect(editorial.topicCandidates.find(({id}) => id === 'topic-one')).toMatchObject({selected: true, title: 'Edited topic'});
+
+    const researchRun = store.createAiRun(projectId, {stage: 'RESEARCH', prompt: 'Research the selected topic.'});
+    const sourcesPath = path.join(created.project.rootPath, 'research/sources.json');
+    const before = readFileSync(sourcesPath, 'utf8');
+    expect(() => store.applyEditorialStageOutput(projectId, 'RESEARCH', researchRun.id, {sources: []})).toThrow();
+    expect(readFileSync(sourcesPath, 'utf8')).toBe(before);
+
+    store.approveGate(projectId, 'TOPIC', 'Creator approved the selected topic.');
+    expect(() => store.applyEditorialStageOutput(projectId, 'DISCOVER', discoverRun.id, {
+      topicCandidates: [topic('topic-three', 1), topic('topic-four', 2)],
+    })).toThrow('Revoke');
+    editorial = store.getEditorialWorkspace(projectId);
+    expect(editorial.topicCandidates.find(({selected}) => selected)?.id).toBe('topic-one');
+  });
+
   it('duplicates project artifacts with a new project id and archives without deleting files', () => {
     const store = createStore();
     const original = store.createProject({title: 'Original Story', question: 'What happened?'});

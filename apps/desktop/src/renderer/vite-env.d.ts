@@ -14,12 +14,14 @@ import type {
   RenderTarget,
   ReviewWorkspace,
   AiWorkspace,
+  SelectTopicInput,
+  SaveOutlineInput,
 } from '@narra/project-store';
 import type {AiReasoningEffort, AiStage, AiProjectSettings} from '@narra/contracts';
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 8;
+  readonly version: 9;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -41,6 +43,9 @@ interface NarraDesktopApi {
   fitTimelineToNarration: (projectId: string) => Promise<VoiceWorkspace>;
   getEditorialWorkspace: (projectId: string) => Promise<EditorialWorkspace>;
   saveEditorialDocument: (projectId: string, document: EditorialDocument, content: string) => Promise<EditorialWorkspace>;
+  selectTopicCandidate: (projectId: string, candidateId: string, input: SelectTopicInput) => Promise<EditorialWorkspace>;
+  selectThesisCandidate: (projectId: string, candidateId: string, statement: string) => Promise<EditorialWorkspace>;
+  saveOutline: (projectId: string, input: SaveOutlineInput) => Promise<EditorialWorkspace>;
   getReviewWorkspace: (projectId: string) => Promise<ReviewWorkspace>;
   approveGate: (projectId: string, gate: ApprovalGate, note: string) => Promise<ReviewWorkspace>;
   revokeGate: (projectId: string, gate: ApprovalGate, note: string) => Promise<ReviewWorkspace>;
@@ -79,6 +84,10 @@ interface NarraDesktopApi {
   codexStartTurn: (
     projectId: string,
     input: {text: string; stage: AiStage},
+  ) => Promise<{threadId: string; turnId: string; runId: string}>;
+  codexRunEditorialStage: (
+    projectId: string,
+    input: {stage: AiStage; instruction: string},
   ) => Promise<{threadId: string; turnId: string; runId: string}>;
   codexInterruptTurn: (projectId: string) => Promise<{interrupted: true}>;
   codexRespondServerRequest: (id: number | string, result: unknown) => Promise<{accepted: true}>;

@@ -6,9 +6,11 @@ import {
   type CreateProjectInput,
   type ApprovalGate,
   type EditorialDocument,
+  type SelectTopicInput,
+  type SaveOutlineInput,
   type RenderTarget,
 } from '@narra/project-store';
-import type {AiReasoningEffort, AiStage} from '@narra/contracts';
+import {getAiStageJsonSchema, type AiReasoningEffort, type AiStage} from '@narra/contracts';
 import {app, BrowserWindow, dialog, ipcMain, net, protocol, shell} from 'electron';
 import {writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -27,9 +29,10 @@ const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 let projectStore: ProjectStore | null = null;
 let jobRunner: LocalJobRunner | null = null;
 let codexBridge: CodexBridge | null = null;
-const activeAiRuns = new Map<string, {projectId: string; runId: string}>();
+const activeAiRuns = new Map<string, {projectId: string; runId: string; structuredStage?: AiStage}>();
 const pendingCodexRequests = new Map<JsonRpcId, string>();
 const pendingTurnCompletions = new Map<string, CodexBridgeNotification>();
+const completedAgentMessages = new Map<string, string>();
 
 protocol.registerSchemesAsPrivileged([
   {scheme: 'narra-media', privileges: {standard: true, secure: true, supportFetchAPI: true, stream: true}},
@@ -59,6 +62,20 @@ const shouldForwardCodexNotification = ({method, params}: CodexBridgeNotificatio
   return true;
 };
 
+const broadcastCodexEvent = (payload: Record<string, unknown>): void => {
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send(IPC_CHANNELS.codexEvent, payload);
+};
+
+const captureCompletedAgentMessage = (notification: CodexBridgeNotification): void => {
+  if (notification.method !== 'item/completed') return;
+  const params = asRecord(notification.params);
+  const item = asRecord(params.item);
+  const turnId = typeof params.turnId === 'string' ? params.turnId : null;
+  if (turnId && item.type === 'agentMessage' && typeof item.text === 'string') {
+    completedAgentMessages.set(turnId, item.text);
+  }
+};
+
 const completeTrackedAiRun = (notification: CodexBridgeNotification): void => {
   if (notification.method !== 'turn/completed') return;
   const turn = asRecord(asRecord(notification.params).turn);
@@ -73,7 +90,24 @@ const completeTrackedAiRun = (notification: CodexBridgeNotification): void => {
   const status = turn.status;
   const completedAt = new Date().toISOString();
   if (status === 'completed') {
-    getProjectStore().updateAiRun(tracked.projectId, tracked.runId, {status: 'COMPLETED', completedAt});
+    try {
+      if (tracked.structuredStage) {
+        const message = completedAgentMessages.get(turnId);
+        if (!message) throw new Error('Codex completed without a structured agent message.');
+        getProjectStore().applyEditorialStageOutput(tracked.projectId, tracked.structuredStage, tracked.runId, JSON.parse(message));
+        broadcastCodexEvent({type: 'editorialStageCompleted', projectId: tracked.projectId, stage: tracked.structuredStage, runId: tracked.runId});
+      }
+      getProjectStore().updateAiRun(tracked.projectId, tracked.runId, {status: 'COMPLETED', completedAt});
+    } catch (error) {
+      getProjectStore().updateAiRun(tracked.projectId, tracked.runId, {
+        status: 'FAILED', completedAt,
+        error: {code: 'SCHEMA_INVALID', message: error instanceof Error ? error.message : 'Structured output is invalid.', retryable: true},
+      });
+      broadcastCodexEvent({
+        type: 'editorialStageFailed', projectId: tracked.projectId, stage: tracked.structuredStage,
+        runId: tracked.runId, message: error instanceof Error ? error.message : 'Structured output is invalid.',
+      });
+    }
   } else if (status === 'interrupted') {
     getProjectStore().updateAiRun(tracked.projectId, tracked.runId, {status: 'CANCELLED', completedAt});
   } else {
@@ -84,12 +118,14 @@ const completeTrackedAiRun = (notification: CodexBridgeNotification): void => {
       error: {code: 'APP_SERVER_ERROR', message: typeof error.message === 'string' ? error.message : 'Codex turn failed.', retryable: true},
     });
   }
+  completedAgentMessages.delete(turnId);
 };
 
 const getCodexBridge = (): CodexBridge => {
   if (!codexBridge) {
     codexBridge = new CodexBridge({executable: process.env.NARRA_CODEX_EXECUTABLE || 'codex'});
     codexBridge.on('notification', (notification: CodexBridgeNotification) => {
+      captureCompletedAgentMessage(notification);
       completeTrackedAiRun(notification);
       if (!shouldForwardCodexNotification(notification)) return;
       for (const window of BrowserWindow.getAllWindows()) {
@@ -217,6 +253,68 @@ const registerCodexHandlers = (): void => {
       throw error;
     }
   });
+  ipcMain.handle(IPC_CHANNELS.codexRunEditorialStage, async (
+    _event,
+    projectId: string,
+    input: {stage: AiStage; instruction: string},
+  ) => {
+    const store = getProjectStore();
+    const project = store.getProject(projectId).project;
+    const review = store.getReviewWorkspace(projectId);
+    const requiredPrevious: Partial<Record<AiStage, ApprovalGate>> = {
+      THESIS: 'TOPIC', OUTLINE: 'THESIS', SCRIPT: 'THESIS', STORYBOARD: 'SCRIPT',
+    };
+    const requiredGate = requiredPrevious[input.stage];
+    if (requiredGate && review.approvals.find(({gate}) => gate === requiredGate)?.status !== 'APPROVED') {
+      throw new Error(`${requiredGate} must be approved before running ${input.stage.toLowerCase()}.`);
+    }
+    let settings = store.getAiProjectSettings(projectId);
+    const bridge = getCodexBridge();
+    const prompt = input.instruction.trim();
+    if (!prompt) throw new Error('Stage instruction cannot be empty.');
+    const run = store.createAiRun(projectId, {stage: input.stage, prompt});
+    try {
+      await bridge.assertModelAvailable(settings.desiredModel, settings.desiredEffort);
+      const skill = (await bridge.listSkills(project.rootPath, true)).find(({name}) => name === 'narra');
+      if (!skill) throw new Error('Narra skill is not available to Codex for this project.');
+      if (!settings.threadId) {
+        const thread = await bridge.startThread({cwd: project.rootPath, model: settings.desiredModel});
+        settings = store.updateAiProjectSettings(projectId, {threadId: thread.threadId});
+      } else {
+        await bridge.resumeThread(settings.threadId);
+      }
+      const stageName = input.stage.toLowerCase();
+      const structuredPrompt = [
+        `$narra stage=${stageName} project=${project.rootPath}`,
+        `Work only on project ${projectId}. The owning AI run ID is ${run.id}.`,
+        'Return only the final JSON object required by the supplied output schema. Do not write or modify project files.',
+        prompt,
+      ].join('\n\n');
+      const result = await bridge.startTurn({
+        threadId: settings.threadId!, text: structuredPrompt, cwd: project.rootPath,
+        model: settings.desiredModel || DEFAULT_CODEX_MODEL,
+        effort: settings.desiredEffort || DEFAULT_CODEX_EFFORT,
+        outputSchema: getAiStageJsonSchema(input.stage), skill,
+      });
+      activeAiRuns.set(result.turnId, {projectId, runId: run.id, structuredStage: input.stage});
+      store.updateAiRun(projectId, run.id, {
+        status: 'RUNNING', actualModel: settings.desiredModel, actualEffort: settings.desiredEffort,
+        threadId: settings.threadId, turnId: result.turnId, startedAt: new Date().toISOString(),
+      });
+      store.updateAiProjectSettings(projectId, {
+        lastStage: input.stage, lastTurnId: result.turnId, lastConnectionStatus: 'READY',
+      });
+      const earlyCompletion = pendingTurnCompletions.get(result.turnId);
+      if (earlyCompletion) {
+        pendingTurnCompletions.delete(result.turnId);
+        completeTrackedAiRun(earlyCompletion);
+      }
+      return {...result, threadId: settings.threadId, runId: run.id};
+    } catch (error) {
+      store.updateAiRun(projectId, run.id, {status: 'FAILED', completedAt: new Date().toISOString(), error: codexRunError(error)});
+      throw error;
+    }
+  });
   ipcMain.handle(IPC_CHANNELS.codexInterruptTurn, async (_event, projectId: string) => {
     const settings = getProjectStore().getAiProjectSettings(projectId);
     if (!settings.threadId || !settings.lastTurnId) throw new Error('Project does not have an active Codex turn.');
@@ -341,6 +439,12 @@ const registerProjectHandlers = (): void => {
     (_event, projectId: string, document: EditorialDocument, content: string) =>
       getProjectStore().saveEditorialDocument(projectId, document, content),
   );
+  ipcMain.handle(IPC_CHANNELS.selectTopicCandidate, (_event, projectId: string, candidateId: string, input: SelectTopicInput) =>
+    getProjectStore().selectTopicCandidate(projectId, candidateId, input));
+  ipcMain.handle(IPC_CHANNELS.selectThesisCandidate, (_event, projectId: string, candidateId: string, statement: string) =>
+    getProjectStore().selectThesisCandidate(projectId, candidateId, statement));
+  ipcMain.handle(IPC_CHANNELS.saveOutline, (_event, projectId: string, input: SaveOutlineInput) =>
+    getProjectStore().saveOutline(projectId, input));
   ipcMain.handle(IPC_CHANNELS.getReviewWorkspace, (_event, projectId: string) =>
     getProjectStore().getReviewWorkspace(projectId),
   );
@@ -450,14 +554,41 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Narra Studio' || result.apiVersion !== 8 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Narra Studio' || result.apiVersion !== 9 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Narra Studio\napiVersion=8\nprojectCount=${result.projectCount}\n`,
+      `renderer=Narra Studio\napiVersion=9\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
+    if (process.env.NARRA_SMOKE_EDITORIAL_UI === '1') {
+      await mainWindow.webContents.executeJavaScript(`document.querySelector('.project-row:not(.archived)')?.click()`);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await mainWindow.webContents.executeJavaScript(`
+        [...document.querySelectorAll('.workspace-tabs button')]
+          .find((button) => button.textContent?.trim() === 'Editorial')
+          ?.click()
+      `);
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      await mainWindow.webContents.executeJavaScript(`
+        [...document.querySelectorAll('.editorial-stage-tabs button')]
+          .find((button) => button.textContent?.trim() === 'Topic')
+          ?.click()
+      `);
+      const editorialResult = (await mainWindow.webContents.executeJavaScript(`({
+        hasWorkspace: Boolean(document.querySelector('.editorial-workspace')),
+        stageTabCount: document.querySelectorAll('.editorial-stage-tabs button').length,
+        topicCardCount: document.querySelectorAll('.topic-card').length,
+        selectedTopicCount: document.querySelectorAll('.topic-card.selected').length,
+        hasOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      })`)) as {hasWorkspace: boolean; stageTabCount: number; topicCardCount: number; selectedTopicCount: number; hasOverflow: boolean};
+      if (!editorialResult.hasWorkspace || editorialResult.stageTabCount !== 6 || editorialResult.topicCardCount < 2 ||
+          editorialResult.selectedTopicCount !== 1 || editorialResult.hasOverflow) {
+        throw new Error(`Editorial smoke test received ${JSON.stringify(editorialResult)}.`);
+      }
+      writeFileSync(path.join(workspaceRoot, '.editorial-smoke-ok'), `${JSON.stringify(editorialResult)}\n`, 'utf8');
+    }
     if (process.env.NARRA_SMOKE_SCREENSHOT) {
       if (process.env.NARRA_SMOKE_OPEN_FIRST_PROJECT === '1') {
         await mainWindow.webContents.executeJavaScript(`document.querySelector('.project-row:not(.archived)')?.click()`);

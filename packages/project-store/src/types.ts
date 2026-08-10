@@ -10,6 +10,11 @@ import type {
   Scene,
   Shot,
   SourceCollection,
+  AiSourceCard,
+  TopicCandidate,
+  ThesisCandidate,
+  OutlineSection,
+  AiStage,
 } from '@narra/contracts';
 
 export type CreateProjectInput = {
@@ -128,7 +133,19 @@ export type EditorialWorkspace = {
   sources: SourceCollection['items'];
   facts: FactCollection['items'];
   claims: ClaimCollection['items'];
+  sourceCards: AiSourceCard[];
+  topicCandidates: TopicCandidate[];
+  thesisCandidates: ThesisCandidate[];
+  outlineSections: OutlineSection[];
+  scriptQaReport: string;
 };
+
+export type EditorialStage = AiStage;
+
+export type SelectTopicInput = Pick<TopicCandidate, 'title' | 'hook' | 'angle' | 'rationale'>;
+
+export type SaveOutlineInput = Array<Pick<OutlineSection,
+  'id' | 'title' | 'objective' | 'claimIds' | 'sourceIds' | 'targetDurationSec' | 'contentNotes'>>;
 
 export type EditorialDocument = 'RESEARCH' | 'THESIS' | 'SCRIPT';
 

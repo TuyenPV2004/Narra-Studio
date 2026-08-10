@@ -179,6 +179,7 @@ export const TopicCandidateSchema = z.object({
   recommendationRank: z.number().int().positive(),
   sourceIds: z.array(IdSchema),
   risks: z.array(z.string().min(1)),
+  selected: z.boolean().optional(),
 });
 
 export const ThesisCandidateSchema = z.object({
@@ -274,12 +275,18 @@ export const DiscoverOutputSchema = z.object({
 });
 
 export const ResearchOutputSchema = z.object({
+  researchQuestions: z.array(z.string().min(1)).min(1),
   sources: z.array(SourceSchema).min(1),
   facts: z.array(FactSchema).min(1),
   sourceCards: z.array(AiSourceCardSchema).min(1),
   researchSummary: z.string().min(1),
   counterpoints: z.array(z.string().min(1)),
   openQuestions: z.array(z.string().min(1)),
+  evidenceChecklist: z.array(z.object({
+    label: z.string().min(1),
+    passed: z.boolean(),
+    note: z.string().min(1),
+  })).min(1),
 });
 
 export const ThesisOutputSchema = z.object({
@@ -313,6 +320,49 @@ export const StoryboardOutputSchema = z
       }
     }
   });
+
+export const getAiStageOutputSchema = (stage: AiStage) => {
+  switch (stage) {
+    case 'DISCOVER': return DiscoverOutputSchema;
+    case 'RESEARCH': return ResearchOutputSchema;
+    case 'THESIS': return ThesisOutputSchema;
+    case 'OUTLINE': return OutlineOutputSchema;
+    case 'SCRIPT': return ScriptOutputSchema;
+    case 'STORYBOARD': return StoryboardOutputSchema;
+  }
+};
+
+export const getAiStageJsonSchema = (stage: AiStage): Record<string, unknown> =>
+  makeStructuredOutputSchema(
+    z.toJSONSchema(getAiStageOutputSchema(stage), {target: 'draft-7'}) as Record<string, unknown>,
+  );
+
+const makeStructuredOutputSchema = (value: unknown): Record<string, unknown> => {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return value as Record<string, unknown>;
+  const source = value as Record<string, unknown>;
+  const next = Object.fromEntries(Object.entries(source).map(([key, item]) => [
+    key,
+    Array.isArray(item) ? item.map((entry) => entry && typeof entry === 'object' ? makeStructuredOutputSchema(entry) : entry)
+      : item && typeof item === 'object' ? makeStructuredOutputSchema(item) : item,
+  ]));
+  if (source.properties && typeof source.properties === 'object' && !Array.isArray(source.properties)) {
+    const properties = next.properties as Record<string, unknown>;
+    const originallyRequired = new Set(Array.isArray(source.required) ? source.required : []);
+    for (const key of Object.keys(properties)) {
+      if (!originallyRequired.has(key)) properties[key] = {anyOf: [properties[key], {type: 'null'}]};
+    }
+    next.required = Object.keys(properties);
+  }
+  return next;
+};
+
+export const normalizeAiStageOutput = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(normalizeAiStageOutput);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+    .filter(([, item]) => item !== null)
+    .map(([key, item]) => [key, normalizeAiStageOutput(item)]));
+};
 
 export type AiProjectSettings = z.infer<typeof AiProjectSettingsSchema>;
 export type AiStage = z.infer<typeof AiStageSchema>;

@@ -10,6 +10,8 @@ import {
   ScriptOutputSchema,
   StoryboardOutputSchema,
   ThesisOutputSchema,
+  getAiStageJsonSchema,
+  normalizeAiStageOutput,
 } from '../src/index.js';
 
 const now = '2026-08-10T00:00:00.000Z';
@@ -73,8 +75,10 @@ describe('AI workspace contracts', () => {
   it('accepts structured outputs for every editorial stage', () => {
     expect(DiscoverOutputSchema.safeParse({topicCandidates: [topic, {...topic, id: 'topic-two', recommendationRank: 2}]}).success).toBe(true);
     expect(ResearchOutputSchema.safeParse({
+      researchQuestions: ['Which evidence would change the conclusion?'],
       sources: [source], facts: [fact], sourceCards: [sourceCard], researchSummary: 'Evidence summary.',
       counterpoints: ['A counterpoint.'], openQuestions: ['What changes next?'],
+      evidenceChecklist: [{label: 'Primary evidence', passed: true, note: 'A primary source was opened.'}],
     }).success).toBe(true);
     expect(ThesisOutputSchema.safeParse({candidates: [thesis, {...thesis, id: 'thesis-two'}]}).success).toBe(true);
     expect(OutlineOutputSchema.safeParse({sections: [outlineSection]}).success).toBe(true);
@@ -86,6 +90,15 @@ describe('AI workspace contracts', () => {
       scenes: [{id: 'scene-one', projectId, order: 0, title: 'Opening', narration: 'Narration.', durationSec: 5, claimIds: []}],
       shots: [{id: 'shot-one', projectId, sceneId: 'scene-one', order: 0, durationSec: 5, visualType: 'TEXT', visualPurpose: 'Opening text'}],
     }).success).toBe(true);
+  });
+
+  it('generates strict App Server schemas while normalizing nullable optional fields', () => {
+    const schema = getAiStageJsonSchema('DISCOVER') as {
+      properties: {topicCandidates: {items: {required: string[]; properties: {selected: unknown}}}};
+    };
+    expect(schema.properties.topicCandidates.items.required).toContain('selected');
+    expect(schema.properties.topicCandidates.items.properties.selected).toMatchObject({anyOf: expect.any(Array)});
+    expect(normalizeAiStageOutput({...topic, selected: null})).not.toHaveProperty('selected');
   });
 
   it('rejects storyboard output with a broken scene reference', () => {

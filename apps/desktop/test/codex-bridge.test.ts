@@ -68,6 +68,7 @@ const createFakeAppServer = (overrides: Record<string, (request: Request) => unk
     }]}),
     'thread/start': () => ({thread: {id: 'thread-1'}}),
     'thread/resume': (request) => ({thread: {id: request.params?.threadId}}),
+    'skills/list': () => ({data: [{cwd: 'D:/Narra/project', skills: [{name: 'narra', path: 'D:/Narra/.agents/skills/narra/SKILL.md', description: 'Narra workflow'}]}]}),
     'turn/start': () => {
       process.stdout.write(`${JSON.stringify({
         method: 'item/agentMessage/delta',
@@ -97,13 +98,22 @@ describe('CodexBridge', () => {
     await expect(bridge.assertModelAvailable()).resolves.toBeUndefined();
     await expect(bridge.startThread({cwd: 'D:/Narra/project'})).resolves.toEqual({threadId: 'thread-1'});
     await expect(bridge.resumeThread('thread-1')).resolves.toEqual({threadId: 'thread-1'});
-    await expect(bridge.startTurn({threadId: 'thread-1', text: 'Say hello', cwd: 'D:/Narra/project'}))
+    const skill = (await bridge.listSkills('D:/Narra/project'))[0];
+    expect(skill).toMatchObject({name: 'narra'});
+    await expect(bridge.startTurn({
+      threadId: 'thread-1', text: '$narra stage=discover', cwd: 'D:/Narra/project', skill,
+      outputSchema: {type: 'object', properties: {topicCandidates: {type: 'array'}}},
+    }))
       .resolves.toEqual({turnId: 'turn-1'});
     await expect(bridge.readRateLimits()).resolves.toMatchObject({rateLimits: {primary: {usedPercent: 12}}});
     await expect(bridge.interruptTurn('thread-1', 'turn-1')).resolves.toBeUndefined();
     expect(notifications).toContainEqual({
       method: 'item/agentMessage/delta',
       params: {threadId: 'thread-1', turnId: 'turn-1', delta: 'Hello'},
+    });
+    expect(fake.requests.find(({method}) => method === 'turn/start')?.params).toMatchObject({
+      input: expect.arrayContaining([{type: 'skill', name: 'narra', path: 'D:/Narra/.agents/skills/narra/SKILL.md'}]),
+      outputSchema: {type: 'object'},
     });
 
     bridge.close();

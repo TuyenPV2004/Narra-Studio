@@ -61,6 +61,7 @@ export type CodexLoginStart = {
 
 export type CodexThreadSummary = {threadId: string};
 export type CodexTurnSummary = {turnId: string};
+export type CodexSkillSummary = {name: string; path: string; description: string};
 
 export class CodexBridgeError extends Error {
   readonly code: string;
@@ -340,22 +341,46 @@ export class CodexBridge extends EventEmitter {
     return {threadId: resumedId};
   }
 
+  async listSkills(cwd: string, forceReload = false): Promise<CodexSkillSummary[]> {
+    const result = asRecord(await this.readyRequest('skills/list', {cwds: [cwd], forceReload}));
+    const entries = Array.isArray(result.data) ? result.data : [];
+    const skills = entries.flatMap((entry) => {
+      const record = asRecord(entry);
+      const values = Array.isArray(record.skills) ? record.skills : [record];
+      return values.map((value) => {
+        const skill = asRecord(value);
+        return {
+          name: asString(skill.name) ?? '',
+          path: asString(skill.path) ?? '',
+          description: asString(skill.description) ?? '',
+        };
+      });
+    });
+    return skills.filter(({name, path}) => name.length > 0 && path.length > 0);
+  }
+
   async startTurn(input: {
     threadId: string;
     text: string;
     cwd: string;
     model?: string;
     effort?: string;
+    outputSchema?: Record<string, unknown>;
+    skill?: CodexSkillSummary;
   }): Promise<CodexTurnSummary> {
     if (!input.text.trim()) throw new CodexBridgeError('APP_SERVER_ERROR', 'Prompt không được để trống.');
     const result = asRecord(await this.readyRequest('turn/start', {
       threadId: input.threadId,
-      input: [{type: 'text', text: input.text.trim()}],
+      input: [
+        {type: 'text', text: input.text.trim()},
+        ...(input.skill ? [{type: 'skill', name: input.skill.name, path: input.skill.path}] : []),
+      ],
       cwd: input.cwd,
       approvalPolicy: 'never',
       sandboxPolicy: {type: 'readOnly'},
       model: input.model ?? DEFAULT_CODEX_MODEL,
       effort: input.effort ?? DEFAULT_CODEX_EFFORT,
+      ...(input.outputSchema ? {outputSchema: input.outputSchema} : {}),
     }));
     const turnId = asString(asRecord(result.turn).id);
     if (!turnId) throw new CodexBridgeError('APP_SERVER_ERROR', 'Codex không trả về turnId hợp lệ.');

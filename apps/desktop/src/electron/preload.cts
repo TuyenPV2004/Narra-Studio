@@ -1,4 +1,4 @@
-import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProjectInput, EditorialDocument, RenderTarget} from '@narra/project-store';
+import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProjectInput, EditorialDocument, RenderTarget, SelectTopicInput, SaveOutlineInput} from '@narra/project-store';
 import {contextBridge, ipcRenderer, webUtils} from 'electron';
 import type {CodexBridgeNotification} from './codex-bridge.js';
 import type {AiReasoningEffort, AiStage} from '@narra/contracts';
@@ -25,6 +25,9 @@ const channels = {
   fitTimelineToNarration: 'voice:fit-timeline',
   getEditorialWorkspace: 'editorial:get',
   saveEditorialDocument: 'editorial:save-document',
+  selectTopicCandidate: 'editorial:select-topic',
+  selectThesisCandidate: 'editorial:select-thesis',
+  saveOutline: 'editorial:save-outline',
   getReviewWorkspace: 'review:get',
   approveGate: 'review:approve-gate',
   revokeGate: 'review:revoke-gate',
@@ -39,6 +42,7 @@ const channels = {
   codexReadRateLimits: 'codex:rate-limits-read',
   codexStartOrResumeThread: 'codex:thread-start-or-resume',
   codexStartTurn: 'codex:turn-start',
+  codexRunEditorialStage: 'codex:editorial-stage-run',
   codexInterruptTurn: 'codex:turn-interrupt',
   codexGetWorkspace: 'codex:workspace-get',
   codexUpdateSettings: 'codex:settings-update',
@@ -49,7 +53,7 @@ const channels = {
 
 const api = {
   runtime: 'electron',
-  version: 8,
+  version: 9,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -77,6 +81,11 @@ const api = {
   getEditorialWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getEditorialWorkspace, projectId),
   saveEditorialDocument: (projectId: string, document: EditorialDocument, content: string) =>
     ipcRenderer.invoke(channels.saveEditorialDocument, projectId, document, content),
+  selectTopicCandidate: (projectId: string, candidateId: string, input: SelectTopicInput) =>
+    ipcRenderer.invoke(channels.selectTopicCandidate, projectId, candidateId, input),
+  selectThesisCandidate: (projectId: string, candidateId: string, statement: string) =>
+    ipcRenderer.invoke(channels.selectThesisCandidate, projectId, candidateId, statement),
+  saveOutline: (projectId: string, input: SaveOutlineInput) => ipcRenderer.invoke(channels.saveOutline, projectId, input),
   getReviewWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getReviewWorkspace, projectId),
   approveGate: (projectId: string, gate: ApprovalGate, note: string) =>
     ipcRenderer.invoke(channels.approveGate, projectId, gate, note),
@@ -98,6 +107,8 @@ const api = {
     ipcRenderer.invoke(channels.codexUpdateSettings, projectId, input),
   codexStartTurn: (projectId: string, input: {text: string; stage: AiStage}) =>
     ipcRenderer.invoke(channels.codexStartTurn, projectId, input),
+  codexRunEditorialStage: (projectId: string, input: {stage: AiStage; instruction: string}) =>
+    ipcRenderer.invoke(channels.codexRunEditorialStage, projectId, input),
   codexInterruptTurn: (projectId: string) => ipcRenderer.invoke(channels.codexInterruptTurn, projectId),
   codexRespondServerRequest: (id: number | string, result: unknown) =>
     ipcRenderer.invoke(channels.codexRespondServerRequest, id, result),
