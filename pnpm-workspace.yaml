@@ -3,4 +3,5 @@ packages:
   - packages/*
   - remotion
 allowBuilds:
+  electron-winstaller: false
   esbuild: true

@@ -58,6 +58,7 @@ export class LocalJobRunner {
         cwd: this.repositoryRoot,
         windowsHide: true,
         shell: false,
+        env: {...process.env, ELECTRON_RUN_AS_NODE: '1'},
       });
       const active: ActiveJob = {
         execution,

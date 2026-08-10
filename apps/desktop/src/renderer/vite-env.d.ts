@@ -23,12 +23,14 @@ import type {
   TimelineWorkspace,
   UpdateCaptionCueInput,
   UpdateShotAudioInput,
+  SystemDiagnostics,
+  ProjectBackupResult,
 } from '@narra/project-store';
 import type {AiReasoningEffort, AiStage, AiProjectSettings} from '@narra/contracts';
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 12;
+  readonly version: 13;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -74,6 +76,8 @@ interface NarraDesktopApi {
   cancelJob: (projectId: string, jobId: string) => Promise<ReviewWorkspace>;
   retryJob: (projectId: string, jobId: string) => Promise<ReviewWorkspace>;
   chooseAndAttachRenderOutput: (projectId: string, jobId: string) => Promise<ReviewWorkspace | null>;
+  getSystemDiagnostics: () => Promise<SystemDiagnostics>;
+  chooseProjectBackupDirectory: (projectId: string) => Promise<ProjectBackupResult | null>;
   codexReadAccount: () => Promise<{
     signedIn: boolean;
     accountType: string | null;

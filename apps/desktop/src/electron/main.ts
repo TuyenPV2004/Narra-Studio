@@ -14,11 +14,13 @@ import {
   type GenerateNarrationBatchInput,
   type UpdateCaptionCueInput,
   type UpdateShotAudioInput,
+  type SystemDiagnostics,
   KokoroOnnxProvider,
 } from '@narra/project-store';
 import {getAiStageJsonSchema, type AiReasoningEffort, type AiStage} from '@narra/contracts';
 import {app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, shell} from 'electron';
-import {writeFileSync} from 'node:fs';
+import {accessSync, constants, existsSync, writeFileSync} from 'node:fs';
+import {spawn} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {IPC_CHANNELS} from './ipc-channels.js';
@@ -39,6 +41,24 @@ const activeAiRuns = new Map<string, {projectId: string; runId: string; structur
 const pendingCodexRequests = new Map<JsonRpcId, string>();
 const pendingTurnCompletions = new Map<string, CodexBridgeNotification>();
 const completedAgentMessages = new Map<string, string>();
+
+const getRepositoryRoot = (): string => app.isPackaged
+  ? path.join(process.resourcesPath, 'narra-runtime')
+  : path.resolve(currentDirectory, '../../..');
+
+const runVersionCheck = (file: string, args: string[], cwd: string): Promise<{ok: boolean; detail: string}> =>
+  new Promise((resolve) => {
+    const child = spawn(file, args, {cwd, windowsHide: true, shell: false, env: {...process.env, ELECTRON_RUN_AS_NODE: '1'}});
+    let output = '';
+    const timer = setTimeout(() => { child.kill(); resolve({ok: false, detail: 'Timed out after 10 seconds.'}); }, 10_000);
+    child.stdout.on('data', (data: Buffer) => { output += data.toString('utf8'); });
+    child.stderr.on('data', (data: Buffer) => { output += data.toString('utf8'); });
+    child.once('error', (error) => { clearTimeout(timer); resolve({ok: false, detail: error.message}); });
+    child.once('close', (code) => {
+      clearTimeout(timer);
+      resolve({ok: code === 0, detail: output.trim().split(/\r?\n/)[0] ?? `Exited with code ${code}`});
+    });
+  });
 
 protocol.registerSchemesAsPrivileged([
   {scheme: 'narra-media', privileges: {standard: true, secure: true, supportFetchAPI: true, stream: true}},
@@ -527,6 +547,50 @@ const registerProjectHandlers = (): void => {
     if (selection.canceled || !selection.filePaths[0]) return null;
     return getProjectStore().attachRenderOutput(projectId, jobId, selection.filePaths[0]);
   });
+  ipcMain.handle(IPC_CHANNELS.chooseProjectBackupDirectory, async (_event, projectId: string) => {
+    const selection = await dialog.showOpenDialog({title: 'Choose project backup destination', properties: ['openDirectory', 'createDirectory']});
+    if (selection.canceled || !selection.filePaths[0]) return null;
+    return getProjectStore().createProjectBackup(projectId, selection.filePaths[0]);
+  });
+  ipcMain.handle(IPC_CHANNELS.getSystemDiagnostics, async (): Promise<SystemDiagnostics> => {
+    const checks: SystemDiagnostics['checks'] = [];
+    const repositoryRoot = getRepositoryRoot();
+    try {
+      accessSync(getProjectStore().workspaceRoot, constants.R_OK | constants.W_OK);
+      checks.push({id: 'workspace', label: 'Local workspace', status: 'PASS', detail: `${getProjectStore().listProjects().length} indexed projects; folder is readable and writable.`});
+    } catch (error) {
+      checks.push({id: 'workspace', label: 'Local workspace', status: 'FAIL', detail: error instanceof Error ? error.message : String(error), remediation: 'Choose a writable Narra workspace folder.'});
+    }
+    try {
+      const account = await getCodexBridge().readAccount();
+      const models = await getCodexBridge().listModels();
+      const hasModel = models.some(({id}) => id === 'gpt-5.6-sol');
+      checks.push({
+        id: 'codex', label: 'Codex App Server', status: account.signedIn && hasModel ? 'PASS' : 'WARNING',
+        detail: account.signedIn ? `Signed in; GPT-5.6 Sol ${hasModel ? 'is available' : 'was not returned by model/list'}.` : 'Codex is available but not signed in.',
+        ...(account.signedIn && hasModel ? {} : {remediation: 'Open AI workspace and complete ChatGPT sign-in, then refresh diagnostics.'}),
+      });
+    } catch (error) {
+      checks.push({id: 'codex', label: 'Codex App Server', status: 'FAIL', detail: error instanceof Error ? error.message : String(error), remediation: 'Verify the Codex CLI installation and restart Narra Studio.'});
+    }
+    const voice = getProjectStore().getVoiceRuntimeStatus();
+    checks.push({
+      id: 'voice', label: 'Kokoro voice runtime', status: voice.available ? 'PASS' : 'WARNING',
+      detail: voice.available ? `Kokoro ${voice.modelVersion} is ready.` : `Missing: ${voice.missing.join(', ') || 'runtime files'}.`,
+      ...(voice.available ? {} : {remediation: voice.setupCommand}),
+    });
+    const remotionRoot = path.join(repositoryRoot, 'remotion');
+    const remotionCli = path.join(remotionRoot, 'node_modules/@remotion/cli/remotion-cli.js');
+    if (!existsSync(remotionCli)) {
+      checks.push({id: 'remotion', label: 'Remotion runtime', status: 'FAIL', detail: `CLI not found in ${app.isPackaged ? 'packaged resources' : 'the repository'}.`, remediation: 'Rebuild the desktop package with Narra runtime resources.'});
+    } else {
+      const remotion = await runVersionCheck(process.execPath, [remotionCli, 'versions'], remotionRoot);
+      checks.push({id: 'remotion', label: 'Remotion runtime', status: remotion.ok ? 'PASS' : 'FAIL', detail: remotion.detail, ...(remotion.ok ? {} : {remediation: 'Run pnpm install and rebuild the package.'})});
+      const ffmpeg = await runVersionCheck(process.execPath, [remotionCli, 'ffmpeg', '-version'], remotionRoot);
+      checks.push({id: 'ffmpeg', label: 'FFmpeg runtime', status: ffmpeg.ok ? 'PASS' : 'FAIL', detail: ffmpeg.detail, ...(ffmpeg.ok ? {} : {remediation: 'Repair the bundled Remotion FFmpeg runtime.'})});
+    }
+    return {checkedAt: new Date().toISOString(), appVersion: app.getVersion(), packaged: app.isPackaged, platform: `${process.platform} ${process.arch}`, checks};
+  });
 };
 
 const createWindow = async (): Promise<BrowserWindow> => {
@@ -557,7 +621,7 @@ const createWindow = async (): Promise<BrowserWindow> => {
 void app.whenReady().then(async () => {
   const workspaceRoot =
     process.env.NARRA_WORKSPACE_ROOT ?? path.join(app.getPath('documents'), 'Narra Studio', 'projects');
-  const repositoryRoot = path.resolve(currentDirectory, '../../..');
+  const repositoryRoot = getRepositoryRoot();
   projectStore = new ProjectStore(workspaceRoot, {
     voiceProvider: new KokoroOnnxProvider({
       repositoryRoot,
@@ -614,12 +678,12 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Narra Studio' || result.apiVersion !== 12 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Narra Studio' || result.apiVersion !== 13 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Narra Studio\napiVersion=12\nprojectCount=${result.projectCount}\n`,
+      `renderer=Narra Studio\napiVersion=13\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     if (process.env.NARRA_SMOKE_EDITORIAL_UI === '1') {
@@ -796,6 +860,40 @@ void app.whenReady().then(async () => {
       if (!timelineResult.hasWorkspace || timelineResult.cueCount < 1 || timelineResult.shotAudioCount < 1 ||
           !timelineResult.hasPreflight || timelineResult.hasOverflow) throw new Error(`Timeline UI smoke test received ${JSON.stringify(timelineResult)}.`);
       writeFileSync(path.join(workspaceRoot, '.timeline-smoke-ok'), `${JSON.stringify(timelineResult)}\n`, 'utf8');
+    }
+    if (process.env.NARRA_SMOKE_SYSTEM_UI === '1') {
+      await mainWindow.webContents.executeJavaScript(`document.querySelector('.project-row:not(.archived)')?.click()`);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await mainWindow.webContents.executeJavaScript(`
+        [...document.querySelectorAll('.workspace-tabs button')]
+          .find((button) => button.textContent?.trim() === 'System')
+          ?.click()
+      `);
+      const systemResult = (await mainWindow.webContents.executeJavaScript(`
+        new Promise((resolve) => {
+          const startedAt = Date.now();
+          const check = () => {
+            const workspace = document.querySelector('.system-workspace');
+            const cards = document.querySelectorAll('.diagnostic-list article');
+            const isBusy = workspace?.getAttribute('aria-busy') === 'true';
+            if ((workspace && cards.length >= 5 && !isBusy) || Date.now() - startedAt > 30000) {
+              resolve({
+                hasWorkspace: Boolean(workspace),
+                diagnosticCount: cards.length,
+                hasBackupAction: Boolean(document.querySelector('.backup-card button')),
+                isBusy,
+                hasOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+              });
+              return;
+            }
+            setTimeout(check, 100);
+          };
+          check();
+        })
+      `)) as {hasWorkspace: boolean; diagnosticCount: number; hasBackupAction: boolean; isBusy: boolean; hasOverflow: boolean};
+      if (!systemResult.hasWorkspace || systemResult.diagnosticCount < 5 || !systemResult.hasBackupAction ||
+          systemResult.isBusy || systemResult.hasOverflow) throw new Error(`System UI smoke test received ${JSON.stringify(systemResult)}.`);
+      writeFileSync(path.join(workspaceRoot, '.system-smoke-ok'), `${JSON.stringify(systemResult)}\n`, 'utf8');
     }
     if (process.env.NARRA_SMOKE_SCREENSHOT) {
       if (process.env.NARRA_SMOKE_OPEN_FIRST_PROJECT === '1') {

@@ -67,6 +67,21 @@ describe('ProjectStore', () => {
     expect(reopened.getProject(created.project.id).project.title).toBe('Grid at Midnight');
   });
 
+  it('creates a verified portable backup without unfinished render files', () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Backup Pilot', question: 'Can this project move safely?'});
+    const unfinished = path.join(created.project.rootPath, 'renders/rough/.render-v1.working.mp4');
+    writeFileSync(unfinished, 'partial', 'utf8');
+    const destination = mkdtempSync(path.join(tmpdir(), 'narra-backup-destination-'));
+    temporaryDirectories.push(destination);
+
+    const result = store.createProjectBackup(created.project.id, destination);
+    expect(result.fileCount).toBeGreaterThan(10);
+    expect(JSON.parse(readFileSync(path.join(result.backupPath, 'project.json'), 'utf8'))).toMatchObject({id: created.project.id});
+    expect(existsSync(path.join(result.backupPath, 'renders/rough/.render-v1.working.mp4'))).toBe(false);
+    expect(() => store.createProjectBackup(created.project.id, created.project.rootPath)).toThrow('outside the project folder');
+  });
+
   it('persists resumable Codex thread state in project AI settings', () => {
     const store = createStore();
     const created = store.createProject({title: 'Codex Session', question: 'Can the project resume its AI thread?'});

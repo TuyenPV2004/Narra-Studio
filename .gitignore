@@ -6,6 +6,8 @@ dist-electron/
 coverage/
 .vite/
 .runtime/
+.package-stage/
+release/
 
 # Local credentials and machine-specific configuration
 .env

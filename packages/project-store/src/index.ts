@@ -47,4 +47,7 @@ export type {
   TimelinePreflightIssue,
   UpdateCaptionCueInput,
   UpdateShotAudioInput,
+  ProjectBackupResult,
+  DiagnosticCheck,
+  SystemDiagnostics,
 } from './types.js';

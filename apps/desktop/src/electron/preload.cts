@@ -49,6 +49,8 @@ const channels = {
   cancelJob: 'render:cancel-job',
   retryJob: 'render:retry-job',
   chooseAndAttachRenderOutput: 'render:choose-and-attach-output',
+  getSystemDiagnostics: 'system:diagnostics',
+  chooseProjectBackupDirectory: 'system:backup-project',
   codexReadAccount: 'codex:account-read',
   codexStartBrowserLogin: 'codex:login-browser',
   codexStartDeviceLogin: 'codex:login-device',
@@ -67,7 +69,7 @@ const channels = {
 
 const api = {
   runtime: 'electron',
-  version: 12,
+  version: 13,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -132,6 +134,8 @@ const api = {
   retryJob: (projectId: string, jobId: string) => ipcRenderer.invoke(channels.retryJob, projectId, jobId),
   chooseAndAttachRenderOutput: (projectId: string, jobId: string) =>
     ipcRenderer.invoke(channels.chooseAndAttachRenderOutput, projectId, jobId),
+  getSystemDiagnostics: () => ipcRenderer.invoke(channels.getSystemDiagnostics),
+  chooseProjectBackupDirectory: (projectId: string) => ipcRenderer.invoke(channels.chooseProjectBackupDirectory, projectId),
   codexReadAccount: () => ipcRenderer.invoke(channels.codexReadAccount),
   codexStartBrowserLogin: () => ipcRenderer.invoke(channels.codexStartBrowserLogin),
   codexStartDeviceLogin: () => ipcRenderer.invoke(channels.codexStartDeviceLogin),

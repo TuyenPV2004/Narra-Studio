@@ -1,0 +1,21 @@
+appId: studio.narra.desktop
+productName: Narra Studio
+electronVersion: 43.3.0
+asar: true
+compression: normal
+directories:
+  output: ../../release
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - package.json
+extraResources:
+  - from: ../narra-runtime
+    to: narra-runtime
+win:
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: Narra-Studio-${version}-portable-${arch}.${ext}
+  signAndEditExecutable: false

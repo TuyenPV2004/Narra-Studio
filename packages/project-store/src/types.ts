@@ -209,6 +209,30 @@ export type TimelineWorkspace = {
 export type UpdateCaptionCueInput = Pick<CaptionCue, 'startMs' | 'endMs' | 'text'>;
 export type UpdateShotAudioInput = Pick<Shot, 'sourceAudioMode' | 'sourceAudioVolume'>;
 
+export type ProjectBackupResult = {
+  projectId: string;
+  backupPath: string;
+  fileCount: number;
+  totalBytes: number;
+  createdAt: string;
+};
+
+export type DiagnosticCheck = {
+  id: string;
+  label: string;
+  status: 'PASS' | 'WARNING' | 'FAIL';
+  detail: string;
+  remediation?: string;
+};
+
+export type SystemDiagnostics = {
+  checkedAt: string;
+  appVersion: string;
+  packaged: boolean;
+  platform: string;
+  checks: DiagnosticCheck[];
+};
+
 export type EditorialWorkspace = {
   projectId: string;
   researchBrief: string;

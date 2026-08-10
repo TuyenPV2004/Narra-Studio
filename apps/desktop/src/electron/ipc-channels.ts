@@ -44,6 +44,8 @@ export const IPC_CHANNELS = {
   cancelJob: 'render:cancel-job',
   retryJob: 'render:retry-job',
   chooseAndAttachRenderOutput: 'render:choose-and-attach-output',
+  getSystemDiagnostics: 'system:diagnostics',
+  chooseProjectBackupDirectory: 'system:backup-project',
   codexReadAccount: 'codex:account-read',
   codexStartBrowserLogin: 'codex:login-browser',
   codexStartDeviceLogin: 'codex:login-device',

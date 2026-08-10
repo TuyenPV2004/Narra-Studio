@@ -106,6 +106,8 @@ import type {
   TimelinePreflightIssue,
   UpdateCaptionCueInput,
   UpdateShotAudioInput,
+  ProjectBackupResult,
+  VoiceRuntimeStatus,
 } from './types.js';
 
 type ProjectRow = {
@@ -477,6 +479,41 @@ export class ProjectStore {
     atomicWriteJson(projectFile, nextProject);
     this.upsertProject(nextProject, destination, false);
     return this.refreshProject(nextId);
+  }
+
+  createProjectBackup(projectId: string, destinationDirectory: string): ProjectBackupResult {
+    const project = this.getProject(projectId).project;
+    const destinationRoot = path.resolve(destinationDirectory);
+    const sourceRoot = path.resolve(project.rootPath);
+    if (destinationRoot === sourceRoot || destinationRoot.startsWith(`${sourceRoot}${path.sep}`)) {
+      throw new Error('Choose a backup destination outside the project folder.');
+    }
+    mkdirSync(destinationRoot, {recursive: true});
+    const stamp = isoNow().replace(/[:.]/g, '-');
+    const backupPath = path.join(destinationRoot, `${project.id}-backup-${stamp}`);
+    cpSync(sourceRoot, backupPath, {
+      recursive: true,
+      errorOnExist: true,
+      filter: (sourcePath) => !path.basename(sourcePath).includes('.working.'),
+    });
+    const copiedProject = ProjectSchema.parse(parseJson(path.join(backupPath, 'project.json')));
+    if (copiedProject.id !== projectId) throw new Error('Backup verification found a mismatched project ID.');
+    let fileCount = 0;
+    let totalBytes = 0;
+    const measure = (directory: string): void => {
+      for (const entry of readdirSync(directory)) {
+        const entryPath = path.join(directory, entry);
+        const stats = statSync(entryPath);
+        if (stats.isDirectory()) measure(entryPath);
+        else { fileCount += 1; totalBytes += stats.size; }
+      }
+    };
+    measure(backupPath);
+    return {projectId, backupPath, fileCount, totalBytes, createdAt: isoNow()};
+  }
+
+  getVoiceRuntimeStatus(): VoiceRuntimeStatus {
+    return this.voiceProvider.getRuntimeStatus();
   }
 
   archiveProject(projectId: string): ProjectRecord {
