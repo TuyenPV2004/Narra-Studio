@@ -2,14 +2,12 @@ import {afterEach, describe, expect, it} from 'vitest';
 import {existsSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {LocalJobRunner, ProjectStore} from '../src/index.js';
+import {KOKORO_PRESETS, LocalJobRunner, ProjectStore, normalizeEnglishNarration, type VoiceProvider} from '../src/index.js';
 
 const temporaryDirectories: string[] = [];
 const stores: ProjectStore[] = [];
 
-const silentWav = (durationSec: number): Buffer => {
-  const sampleRate = 8000;
-  const channels = 1;
+const silentWav = (durationSec: number, sampleRate = 8000, channels = 1): Buffer => {
   const bitsPerSample = 16;
   const dataSize = Math.round(durationSec * sampleRate) * channels * bitsPerSample / 8;
   const buffer = Buffer.alloc(44 + dataSize);
@@ -28,10 +26,10 @@ const silentWav = (durationSec: number): Buffer => {
   return buffer;
 };
 
-const createStore = (): ProjectStore => {
+const createStore = (voiceProvider?: VoiceProvider): ProjectStore => {
   const workspace = mkdtempSync(path.join(tmpdir(), 'narra-project-store-'));
   temporaryDirectories.push(workspace);
-  const store = new ProjectStore(workspace);
+  const store = new ProjectStore(workspace, voiceProvider ? {voiceProvider} : {});
   stores.push(store);
   return store;
 };
@@ -45,6 +43,12 @@ afterEach(() => {
 });
 
 describe('ProjectStore', () => {
+  it('normalizes English narration and applies creator pronunciation entries before synthesis', () => {
+    expect(normalizeEnglishNarration('OpenAI uses 25% less GPU power across 2 GW.', [
+      {term: 'OpenAI', spokenAs: 'Open A I'},
+    ])).toBe('Open A I uses 25 percent less G P U power across 2 gigawatts.');
+  });
+
   it('creates the portable project layout and persists the index after reopening', () => {
     const store = createStore();
     const created = store.createProject({title: 'Grid at Midnight', question: 'Why is demand changing?'});
@@ -419,6 +423,66 @@ describe('ProjectStore', () => {
     };
     expect(renderInput.bundle.narrationSegments).toHaveLength(2);
     expect(renderInput.bundle.captions).toHaveLength(2);
+  });
+
+  it('generates and regenerates individual Kokoro segments without changing unrelated audio versions', async () => {
+    const provider: VoiceProvider = {
+      id: 'KOKORO_ONNX',
+      presets: KOKORO_PRESETS,
+      getRuntimeStatus: () => ({
+        provider: 'KOKORO_ONNX', available: true, modelVersion: 'test', missing: [], setupCommand: 'none',
+        licenseSummary: 'Test provider.',
+      }),
+      synthesize: async (input) => {
+        const outputPath = path.join(input.outputDirectory, 'fake-kokoro.wav');
+        writeFileSync(outputPath, silentWav(1, 48000, 2));
+        const preset = KOKORO_PRESETS.find(({id}) => id === input.presetId) ?? KOKORO_PRESETS[0]!;
+        return {
+          outputPath, preset, normalizedText: normalizeEnglishNarration(input.text, [{term: 'API', spokenAs: 'A P I'}]),
+          pronunciationDictionary: [{term: 'API', spokenAs: 'A P I'}], modelVersion: 'test',
+          sampleRate: 48000, channels: 2, loudnessTargetLufs: -16, generationDurationMs: 25,
+        };
+      },
+    };
+    const store = createStore(provider);
+    const created = store.createProject({title: 'Local Voice', question: 'Can narration remain incremental?'});
+    const projectId = created.project.id;
+    const importDirectory = mkdtempSync(path.join(tmpdir(), 'narra-local-voice-'));
+    temporaryDirectories.push(importDirectory);
+    const scenesPath = path.join(importDirectory, 'scenes.json');
+    const shotsPath = path.join(importDirectory, 'shots.json');
+    writeFileSync(scenesPath, JSON.stringify([
+      {id: 'scene-api', projectId, order: 0, title: 'API', narration: 'The API uses 25% less power.', durationSec: 4, claimIds: []},
+      {id: 'scene-grid', projectId, order: 1, title: 'Grid', narration: 'The grid supplies two regions.', durationSec: 4, claimIds: []},
+    ]), 'utf8');
+    writeFileSync(shotsPath, JSON.stringify([
+      {id: 'shot-api', projectId, sceneId: 'scene-api', order: 0, durationSec: 4, visualType: 'TEXT', visualPurpose: 'Explain the API'},
+      {id: 'shot-grid', projectId, sceneId: 'scene-grid', order: 0, durationSec: 4, visualType: 'TEXT', visualPurpose: 'Explain the grid'},
+    ]), 'utf8');
+    store.importStoryboard(projectId, scenesPath, shotsPath);
+    store.saveEditorialDocument(projectId, 'THESIS', 'Local generation keeps narration traceable.');
+    store.saveEditorialDocument(projectId, 'SCRIPT', '# Voice\n\nThe API uses less power.');
+    for (const gate of ['TOPIC', 'THESIS', 'SCRIPT', 'STORYBOARD'] as const) store.approveGate(projectId, gate, 'Voice test approval.');
+    store.syncNarrationSegments(projectId);
+
+    let voice = await store.generateNarrationSegment(projectId, {
+      segmentId: 'vo-scene-api', presetId: 'documentary-neutral-us', speed: 1, pronunciationNotes: 'API=A P I',
+    });
+    expect(voice.runtime.available).toBe(true);
+    expect(voice.segments[0]).toMatchObject({
+      version: 1, status: 'IMPORTED', audioMetadata: {sampleRate: 48000, channels: 2},
+      generation: {provider: 'KOKORO_ONNX', model: 'Kokoro-82M', voice: 'af_heart', normalizedText: 'The A P I uses 25 percent less power.'},
+    });
+    expect(voice.segments[1]?.audioPath).toBeUndefined();
+
+    voice = await store.generateNarrationSegment(projectId, {
+      segmentId: 'vo-scene-api', presetId: 'documentary-warm-us', speed: 0.96,
+    });
+    expect(voice.segments[0]?.version).toBe(2);
+    expect(voice.segments[1]?.version).toBe(1);
+    voice = await store.generateMissingNarration(projectId, {presetId: 'documentary-neutral-uk', speed: 0.98});
+    expect(voice.segments.map(({version}) => version)).toEqual([2, 1]);
+    expect(voice.segments.every(({audioPath}) => Boolean(audioPath))).toBe(true);
   });
 
   it('enforces approval order and keeps versioned render snapshots, outputs, and logs', () => {

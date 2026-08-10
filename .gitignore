@@ -5,6 +5,7 @@ dist/
 dist-electron/
 coverage/
 .vite/
+.runtime/
 
 # Local credentials and machine-specific configuration
 .env

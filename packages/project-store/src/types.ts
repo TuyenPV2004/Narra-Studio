@@ -143,8 +143,37 @@ export type TimelineWarning = {
   message: string;
 };
 
+export type VoicePreset = {
+  id: string;
+  label: string;
+  description: string;
+  voice: string;
+  language: 'en-us' | 'en-gb';
+  defaultSpeed: number;
+};
+
+export type VoiceRuntimeStatus = {
+  provider: 'KOKORO_ONNX';
+  available: boolean;
+  modelVersion: string;
+  missing: string[];
+  setupCommand: string;
+  licenseSummary: string;
+};
+
+export type GenerateNarrationInput = {
+  segmentId: string;
+  presetId: string;
+  speed: number;
+  pronunciationNotes?: string;
+};
+
+export type GenerateNarrationBatchInput = Omit<GenerateNarrationInput, 'segmentId' | 'pronunciationNotes'>;
+
 export type VoiceWorkspace = {
   projectId: string;
+  runtime: VoiceRuntimeStatus;
+  presets: VoicePreset[];
   segments: NarrationSegment[];
   captions: CaptionCue[];
   qaIssues: Array<{

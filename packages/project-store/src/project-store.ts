@@ -47,12 +47,15 @@ import {
   mkdirSync,
   readFileSync,
   createReadStream,
+  mkdtempSync,
   readdirSync,
   renameSync,
+  rmSync,
   statSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
+import {tmpdir} from 'node:os';
 import path from 'node:path';
 import type {DatabaseSync} from 'node:sqlite';
 import {
@@ -67,6 +70,7 @@ import {openWorkspaceDatabase} from './database.js';
 import {compareNarrationTranscript, parseTimedText, parseWordTimestamps} from './caption-parser.js';
 import {FlowAssistedProvider} from './flow-assisted-provider.js';
 import {probeMedia} from './media-probe.js';
+import {UnavailableVoiceProvider, type VoiceProvider} from './voice-provider.js';
 import type {
   ApprovalGate,
   ApprovalRecord,
@@ -96,6 +100,8 @@ import type {
   FlowCandidate,
   FlowCandidateStatus,
   FlowWorkspace,
+  GenerateNarrationInput,
+  GenerateNarrationBatchInput,
 } from './types.js';
 
 type ProjectRow = {
@@ -263,9 +269,11 @@ const mapRow = (row: ProjectRow): ProjectRecord => ({
 export class ProjectStore {
   readonly workspaceRoot: string;
   readonly database: DatabaseSync;
+  private readonly voiceProvider: VoiceProvider;
 
-  constructor(workspaceRoot: string) {
+  constructor(workspaceRoot: string, options: {voiceProvider?: VoiceProvider} = {}) {
     this.workspaceRoot = path.resolve(workspaceRoot);
+    this.voiceProvider = options.voiceProvider ?? new UnavailableVoiceProvider();
     mkdirSync(this.workspaceRoot, {recursive: true});
     this.database = openWorkspaceDatabase(this.workspaceRoot);
   }
@@ -900,6 +908,8 @@ export class ProjectStore {
       .all(projectId) as Array<{scope: StaleScope['scope']; stale: number; reason: string | null; updated_at: string}>;
     return {
       projectId,
+      runtime: this.voiceProvider.getRuntimeStatus(),
+      presets: this.voiceProvider.presets,
       segments: [...segments].sort((left, right) => left.order - right.order),
       captions,
       qaIssues: compareNarrationTranscript(segments, captions),
@@ -911,6 +921,71 @@ export class ProjectStore {
         updatedAt: row.updated_at,
       })),
     };
+  }
+
+  async generateNarrationSegment(projectId: string, input: GenerateNarrationInput): Promise<VoiceWorkspace> {
+    const project = this.getProject(projectId).project;
+    this.ensureApprovalRows(projectId);
+    const storyboardApproval = this.database.prepare("SELECT status FROM approvals WHERE project_id = ? AND gate = 'STORYBOARD'")
+      .get(projectId) as {status: ApprovalRecord['status']} | undefined;
+    if (storyboardApproval?.status !== 'APPROVED') throw new Error('STORYBOARD must be approved before generating narration.');
+    const segmentsPath = path.join(project.rootPath, 'audio/narration/segments.json');
+    const before = NarrationSegmentCollectionSchema.parse(parseJson(segmentsPath));
+    const segment = before.items.find(({id}) => id === input.segmentId);
+    if (!segment) throw new Error(`Narration segment ${input.segmentId} was not found.`);
+    const temporaryDirectory = mkdtempSync(path.join(tmpdir(), 'narra-voice-'));
+    try {
+      const result = await this.voiceProvider.synthesize({
+        text: segment.text,
+        presetId: input.presetId,
+        speed: input.speed,
+        ...(input.pronunciationNotes ? {pronunciationNotes: input.pronunciationNotes} : {}),
+        outputDirectory: temporaryDirectory,
+      });
+      await this.importNarrationAudio(projectId, segment.id, result.outputPath);
+      const imported = NarrationSegmentCollectionSchema.parse(parseJson(segmentsPath));
+      atomicWriteJson(segmentsPath, {
+        ...imported,
+        updatedAt: isoNow(),
+        items: imported.items.map((item) => item.id === segment.id ? NarrationSegmentSchema.parse({
+          ...item,
+          pronunciationNotes: input.pronunciationNotes?.trim() || undefined,
+          generation: {
+            provider: 'KOKORO_ONNX',
+            model: 'Kokoro-82M',
+            modelVersion: result.modelVersion,
+            voice: result.preset.voice,
+            language: result.preset.language,
+            speed: input.speed,
+            preset: result.preset.id,
+            normalizedText: result.normalizedText,
+            pronunciationDictionary: result.pronunciationDictionary,
+            sampleRate: result.sampleRate,
+            channels: result.channels,
+            loudnessTargetLufs: result.loudnessTargetLufs,
+            generationDurationMs: result.generationDurationMs,
+            generatedAt: isoNow(),
+          },
+        }) : item),
+      });
+      this.refreshProject(projectId);
+      return this.getVoiceWorkspace(projectId);
+    } finally {
+      rmSync(temporaryDirectory, {recursive: true, force: true});
+    }
+  }
+
+  async generateMissingNarration(projectId: string, input: GenerateNarrationBatchInput): Promise<VoiceWorkspace> {
+    let workspace = this.getVoiceWorkspace(projectId);
+    for (const segment of workspace.segments.filter(({audioPath}) => !audioPath)) {
+      workspace = await this.generateNarrationSegment(projectId, {
+        segmentId: segment.id,
+        presetId: input.presetId,
+        speed: input.speed,
+        ...(segment.pronunciationNotes ? {pronunciationNotes: segment.pronunciationNotes} : {}),
+      });
+    }
+    return workspace;
   }
 
   syncNarrationSegments(projectId: string): VoiceWorkspace {
@@ -938,6 +1013,7 @@ export class ProjectStore {
           status: existing?.audioPath && existing.text !== scene.narration ? 'NEEDS_REVIEW' : existing?.status ?? 'PLANNED',
           version: existing?.version ?? 1,
           pronunciationNotes: existing?.pronunciationNotes,
+          generation: existing?.generation,
         });
       });
     atomicWriteJson(segmentsPath, {...collection, updatedAt: now, items: segments});

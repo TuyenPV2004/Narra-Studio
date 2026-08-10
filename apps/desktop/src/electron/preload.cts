@@ -1,4 +1,4 @@
-import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProjectInput, EditorialDocument, RenderTarget, SelectTopicInput, SaveOutlineInput, PrepareFlowTaskInput} from '@narra/project-store';
+import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProjectInput, EditorialDocument, RenderTarget, SelectTopicInput, SaveOutlineInput, PrepareFlowTaskInput, GenerateNarrationInput, GenerateNarrationBatchInput} from '@narra/project-store';
 import {contextBridge, ipcRenderer, webUtils} from 'electron';
 import type {CodexBridgeNotification} from './codex-bridge.js';
 import type {AiReasoningEffort, AiStage} from '@narra/contracts';
@@ -28,6 +28,8 @@ const channels = {
   getVoiceWorkspace: 'voice:get',
   syncNarrationSegments: 'voice:sync-segments',
   chooseAndImportNarrationAudio: 'voice:choose-and-import-audio',
+  generateNarrationSegment: 'voice:generate-segment',
+  generateMissingNarration: 'voice:generate-missing',
   chooseAndImportCaptions: 'voice:choose-and-import-captions',
   fitTimelineToNarration: 'voice:fit-timeline',
   getEditorialWorkspace: 'editorial:get',
@@ -60,7 +62,7 @@ const channels = {
 
 const api = {
   runtime: 'electron',
-  version: 10,
+  version: 11,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -93,6 +95,10 @@ const api = {
   syncNarrationSegments: (projectId: string) => ipcRenderer.invoke(channels.syncNarrationSegments, projectId),
   chooseAndImportNarrationAudio: (projectId: string, segmentId: string) =>
     ipcRenderer.invoke(channels.chooseAndImportNarrationAudio, projectId, segmentId),
+  generateNarrationSegment: (projectId: string, input: GenerateNarrationInput) =>
+    ipcRenderer.invoke(channels.generateNarrationSegment, projectId, input),
+  generateMissingNarration: (projectId: string, input: GenerateNarrationBatchInput) =>
+    ipcRenderer.invoke(channels.generateMissingNarration, projectId, input),
   chooseAndImportCaptions: (projectId: string) => ipcRenderer.invoke(channels.chooseAndImportCaptions, projectId),
   fitTimelineToNarration: (projectId: string) => ipcRenderer.invoke(channels.fitTimelineToNarration, projectId),
   getEditorialWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getEditorialWorkspace, projectId),

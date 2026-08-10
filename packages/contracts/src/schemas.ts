@@ -162,6 +162,23 @@ export const AssetSchema = z.object({
   generation: AssetGenerationSchema.optional(),
 });
 
+export const VoiceGenerationSchema = z.object({
+  provider: z.literal('KOKORO_ONNX'),
+  model: z.literal('Kokoro-82M'),
+  modelVersion: z.string().min(1),
+  voice: IdSchema,
+  language: z.enum(['en-us', 'en-gb']),
+  speed: z.number().min(0.8).max(1.2),
+  preset: IdSchema,
+  normalizedText: z.string().min(1),
+  pronunciationDictionary: z.array(z.object({term: z.string().min(1), spokenAs: z.string().min(1)})),
+  sampleRate: z.number().int().positive(),
+  channels: z.number().int().positive(),
+  loudnessTargetLufs: z.number(),
+  generationDurationMs: z.number().int().nonnegative(),
+  generatedAt: IsoDateTimeSchema,
+});
+
 export const NarrationSegmentSchema = z.object({
   id: IdSchema,
   projectId: IdSchema,
@@ -175,6 +192,7 @@ export const NarrationSegmentSchema = z.object({
   status: z.enum(['PLANNED', 'IMPORTED', 'READY', 'NEEDS_REVIEW']),
   version: z.number().int().positive(),
   pronunciationNotes: z.string().optional(),
+  generation: VoiceGenerationSchema.optional(),
 });
 
 export const WordTimestampSchema = z.object({

@@ -10,6 +10,9 @@ import {
   type SaveOutlineInput,
   type PrepareFlowTaskInput,
   type RenderTarget,
+  type GenerateNarrationInput,
+  type GenerateNarrationBatchInput,
+  KokoroOnnxProvider,
 } from '@narra/project-store';
 import {getAiStageJsonSchema, type AiReasoningEffort, type AiStage} from '@narra/contracts';
 import {app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, shell} from 'electron';
@@ -443,6 +446,10 @@ const registerProjectHandlers = (): void => {
     if (selection.canceled || !selection.filePaths[0]) return null;
     return getProjectStore().importNarrationAudio(projectId, segmentId, selection.filePaths[0]);
   });
+  ipcMain.handle(IPC_CHANNELS.generateNarrationSegment, (_event, projectId: string, input: GenerateNarrationInput) =>
+    getProjectStore().generateNarrationSegment(projectId, input));
+  ipcMain.handle(IPC_CHANNELS.generateMissingNarration, (_event, projectId: string, input: GenerateNarrationBatchInput) =>
+    getProjectStore().generateMissingNarration(projectId, input));
   ipcMain.handle(IPC_CHANNELS.chooseAndImportCaptions, async (_event, projectId: string) => {
     const selection = await dialog.showOpenDialog({
       title: 'Import captions or word timestamps',
@@ -531,8 +538,16 @@ const createWindow = async (): Promise<BrowserWindow> => {
 void app.whenReady().then(async () => {
   const workspaceRoot =
     process.env.NARRA_WORKSPACE_ROOT ?? path.join(app.getPath('documents'), 'Narra Studio', 'projects');
-  projectStore = new ProjectStore(workspaceRoot);
-  jobRunner = new LocalJobRunner(projectStore, path.resolve(currentDirectory, '../../..'));
+  const repositoryRoot = path.resolve(currentDirectory, '../../..');
+  projectStore = new ProjectStore(workspaceRoot, {
+    voiceProvider: new KokoroOnnxProvider({
+      repositoryRoot,
+      ...(process.env.NARRA_VOICE_RUNTIME_ROOT ? {runtimeRoot: process.env.NARRA_VOICE_RUNTIME_ROOT} : {}),
+      ...(process.env.NARRA_VOICE_PYTHON ? {pythonExecutable: process.env.NARRA_VOICE_PYTHON} : {}),
+      nodeExecutable: process.execPath,
+    }),
+  });
+  jobRunner = new LocalJobRunner(projectStore, repositoryRoot);
   jobRunner.start();
   registerProjectHandlers();
   registerCodexHandlers();
@@ -580,12 +595,12 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Narra Studio' || result.apiVersion !== 10 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Narra Studio' || result.apiVersion !== 11 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Narra Studio\napiVersion=10\nprojectCount=${result.projectCount}\n`,
+      `renderer=Narra Studio\napiVersion=11\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     if (process.env.NARRA_SMOKE_EDITORIAL_UI === '1') {
@@ -648,6 +663,67 @@ void app.whenReady().then(async () => {
         throw new Error(`Flow UI smoke test received ${JSON.stringify(flowResult)}.`);
       }
       writeFileSync(path.join(workspaceRoot, '.flow-smoke-ok'), `${JSON.stringify(flowResult)}\n`, 'utf8');
+    }
+    if (process.env.NARRA_SMOKE_VOICE_UI === '1') {
+      await mainWindow.webContents.executeJavaScript(`document.querySelector('.project-row:not(.archived)')?.click()`);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await mainWindow.webContents.executeJavaScript(`
+        [...document.querySelectorAll('.workspace-tabs button')]
+          .find((button) => button.textContent?.trim() === 'Voice & captions')
+          ?.click()
+      `);
+      const voiceResult = (await mainWindow.webContents.executeJavaScript(`
+        new Promise((resolve) => {
+          const startedAt = Date.now();
+          const check = () => {
+            const workspace = document.querySelector('.voice-workspace');
+            const waveform = document.querySelector('.audio-waveform');
+            if ((workspace && waveform) || Date.now() - startedAt > 5000) {
+              resolve({
+                hasWorkspace: Boolean(workspace),
+                hasRuntimeReady: document.querySelector('.voice-runtime-card.ready') !== null,
+                hasGenerationControls: document.querySelector('.voice-generation-card') !== null,
+                hasWaveform: Boolean(waveform),
+                hasProvenance: document.querySelector('.voice-provenance') !== null,
+                hasOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+              });
+              return;
+            }
+            setTimeout(check, 50);
+          };
+          check();
+        })
+      `)) as {hasWorkspace: boolean; hasRuntimeReady: boolean; hasGenerationControls: boolean; hasWaveform: boolean; hasProvenance: boolean; hasOverflow: boolean};
+      if (!voiceResult.hasWorkspace || !voiceResult.hasRuntimeReady || !voiceResult.hasGenerationControls ||
+          !voiceResult.hasWaveform || !voiceResult.hasProvenance || voiceResult.hasOverflow) {
+        throw new Error(`Voice UI smoke test received ${JSON.stringify(voiceResult)}.`);
+      }
+      writeFileSync(path.join(workspaceRoot, '.voice-smoke-ok'), `${JSON.stringify(voiceResult)}\n`, 'utf8');
+      if (process.env.NARRA_SMOKE_VOICE_GENERATE === '1') {
+        const generationResult = (await mainWindow.webContents.executeJavaScript(`
+          new Promise((resolve) => {
+            const versionBefore = document.querySelector('.audio-import-row strong')?.textContent?.trim() ?? '';
+            const button = document.querySelector('.voice-generation-actions .primary');
+            if (!button || button.disabled) return resolve({state: 'not-ready', versionBefore});
+            button.click();
+            const startedAt = Date.now();
+            const check = () => {
+              const message = document.querySelector('.success-notice')?.textContent?.trim() ?? '';
+              const error = document.querySelector('.error-notice')?.textContent?.trim() ?? '';
+              const versionAfter = document.querySelector('.audio-import-row strong')?.textContent?.trim() ?? '';
+              if (error || (message.includes('Generated') && versionAfter !== versionBefore)) {
+                resolve({state: error ? 'failed' : 'completed', versionBefore, versionAfter, message, error});
+                return;
+              }
+              if (Date.now() - startedAt > 180000) return resolve({state: 'timeout', versionBefore, versionAfter, message, error});
+              setTimeout(check, 100);
+            };
+            check();
+          })
+        `)) as {state: string; versionBefore: string; versionAfter?: string; message?: string; error?: string};
+        if (generationResult.state !== 'completed') throw new Error(`Voice generation smoke received ${JSON.stringify(generationResult)}.`);
+        writeFileSync(path.join(workspaceRoot, '.voice-generation-smoke-ok'), `${JSON.stringify(generationResult)}\n`, 'utf8');
+      }
     }
     if (process.env.NARRA_SMOKE_SCREENSHOT) {
       if (process.env.NARRA_SMOKE_OPEN_FIRST_PROJECT === '1') {

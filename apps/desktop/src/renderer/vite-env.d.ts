@@ -18,12 +18,14 @@ import type {
   SaveOutlineInput,
   PrepareFlowTaskInput,
   FlowWorkspace,
+  GenerateNarrationInput,
+  GenerateNarrationBatchInput,
 } from '@narra/project-store';
 import type {AiReasoningEffort, AiStage, AiProjectSettings} from '@narra/contracts';
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 10;
+  readonly version: 11;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -48,6 +50,8 @@ interface NarraDesktopApi {
   getVoiceWorkspace: (projectId: string) => Promise<VoiceWorkspace>;
   syncNarrationSegments: (projectId: string) => Promise<VoiceWorkspace>;
   chooseAndImportNarrationAudio: (projectId: string, segmentId: string) => Promise<VoiceWorkspace | null>;
+  generateNarrationSegment: (projectId: string, input: GenerateNarrationInput) => Promise<VoiceWorkspace>;
+  generateMissingNarration: (projectId: string, input: GenerateNarrationBatchInput) => Promise<VoiceWorkspace>;
   chooseAndImportCaptions: (projectId: string) => Promise<VoiceWorkspace | null>;
   fitTimelineToNarration: (projectId: string) => Promise<VoiceWorkspace>;
   getEditorialWorkspace: (projectId: string) => Promise<EditorialWorkspace>;

@@ -4,6 +4,8 @@ export {LocalJobRunner} from './local-job-runner.js';
 export {probeMedia} from './media-probe.js';
 export {FlowAssistedProvider} from './flow-assisted-provider.js';
 export type {FlowPromptInput, MediaPromptProvider} from './flow-assisted-provider.js';
+export {KOKORO_PRESETS, KokoroOnnxProvider, UnavailableVoiceProvider, normalizeEnglishNarration, parsePronunciationNotes} from './voice-provider.js';
+export type {KokoroOnnxProviderOptions, PronunciationEntry, VoiceProvider, VoiceSynthesisInput, VoiceSynthesisResult} from './voice-provider.js';
 export {compareNarrationTranscript, parseTimedText, parseWordTimestamps} from './caption-parser.js';
 export type {
   AssetStatusInput,
@@ -37,4 +39,8 @@ export type {
   FlowCandidate,
   FlowCandidateStatus,
   FlowWorkspace,
+  GenerateNarrationInput,
+  GenerateNarrationBatchInput,
+  VoicePreset,
+  VoiceRuntimeStatus,
 } from './types.js';

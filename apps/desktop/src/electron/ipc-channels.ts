@@ -23,6 +23,8 @@ export const IPC_CHANNELS = {
   getVoiceWorkspace: 'voice:get',
   syncNarrationSegments: 'voice:sync-segments',
   chooseAndImportNarrationAudio: 'voice:choose-and-import-audio',
+  generateNarrationSegment: 'voice:generate-segment',
+  generateMissingNarration: 'voice:generate-missing',
   chooseAndImportCaptions: 'voice:choose-and-import-captions',
   fitTimelineToNarration: 'voice:fit-timeline',
   getEditorialWorkspace: 'editorial:get',
