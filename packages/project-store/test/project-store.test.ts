@@ -63,6 +63,26 @@ describe('ProjectStore', () => {
     expect(reopened.getProject(created.project.id).project.title).toBe('Grid at Midnight');
   });
 
+  it('persists resumable Codex thread state in project AI settings', () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Codex Session', question: 'Can the project resume its AI thread?'});
+
+    expect(store.getAiProjectSettings(created.project.id)).toMatchObject({
+      desiredModel: 'gpt-5.6-sol',
+      desiredEffort: 'medium',
+      threadId: null,
+    });
+
+    const updated = store.updateAiProjectSettings(created.project.id, {
+      threadId: 'thread-1',
+      lastTurnId: 'turn-1',
+      lastConnectionStatus: 'READY',
+    });
+
+    expect(updated).toMatchObject({threadId: 'thread-1', lastTurnId: 'turn-1', lastConnectionStatus: 'READY'});
+    expect(store.getAiProjectSettings(created.project.id)).toEqual(updated);
+  });
+
   it('duplicates project artifacts with a new project id and archives without deleting files', () => {
     const store = createStore();
     const original = store.createProject({title: 'Original Story', question: 'What happened?'});

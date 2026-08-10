@@ -22,6 +22,7 @@ import {
   ThesisCandidateCollectionSchema,
   TopicCandidateCollectionSchema,
   type Asset,
+  type AiProjectSettings,
   type CaptionCue,
   type NarrationSegment,
   type Project,
@@ -263,6 +264,24 @@ export class ProjectStore {
         stale: version.stale === 1,
       })),
     };
+  }
+
+  getAiProjectSettings(projectId: string): AiProjectSettings {
+    const project = this.getProject(projectId).project;
+    return AiProjectSettingsSchema.parse(parseJson(path.join(project.rootPath, 'ai/settings.json')));
+  }
+
+  updateAiProjectSettings(
+    projectId: string,
+    input: Partial<Pick<AiProjectSettings,
+      'desiredModel' | 'desiredEffort' | 'threadId' | 'lastStage' | 'lastTurnId' | 'lastConnectionStatus'>>,
+  ): AiProjectSettings {
+    const project = this.getProject(projectId).project;
+    const current = this.getAiProjectSettings(projectId);
+    const next = AiProjectSettingsSchema.parse({...current, ...input, updatedAt: isoNow()});
+    atomicWriteJson(path.join(project.rootPath, 'ai/settings.json'), next);
+    this.refreshProject(projectId);
+    return next;
   }
 
   createProject(input: CreateProjectInput): ProjectDetail {

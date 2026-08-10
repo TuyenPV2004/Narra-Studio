@@ -27,4 +27,13 @@ export const IPC_CHANNELS = {
   cancelJob: 'render:cancel-job',
   retryJob: 'render:retry-job',
   chooseAndAttachRenderOutput: 'render:choose-and-attach-output',
+  codexReadAccount: 'codex:account-read',
+  codexStartBrowserLogin: 'codex:login-browser',
+  codexStartDeviceLogin: 'codex:login-device',
+  codexListModels: 'codex:model-list',
+  codexReadRateLimits: 'codex:rate-limits-read',
+  codexStartOrResumeThread: 'codex:thread-start-or-resume',
+  codexStartTurn: 'codex:turn-start',
+  codexInterruptTurn: 'codex:turn-interrupt',
+  codexEvent: 'codex:event',
 } as const;

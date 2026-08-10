@@ -8,15 +8,22 @@ import {
   type EditorialDocument,
   type RenderTarget,
 } from '@narra/project-store';
-import {app, BrowserWindow, dialog, ipcMain, net, protocol} from 'electron';
+import {app, BrowserWindow, dialog, ipcMain, net, protocol, shell} from 'electron';
 import {writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {IPC_CHANNELS} from './ipc-channels.js';
+import {
+  CodexBridge,
+  DEFAULT_CODEX_EFFORT,
+  DEFAULT_CODEX_MODEL,
+  type CodexBridgeNotification,
+} from './codex-bridge.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 let projectStore: ProjectStore | null = null;
 let jobRunner: LocalJobRunner | null = null;
+let codexBridge: CodexBridge | null = null;
 
 protocol.registerSchemesAsPrivileged([
   {scheme: 'narra-media', privileges: {standard: true, secure: true, supportFetchAPI: true, stream: true}},
@@ -25,6 +32,101 @@ protocol.registerSchemesAsPrivileged([
 const getProjectStore = (): ProjectStore => {
   if (!projectStore) throw new Error('Project workspace is not ready.');
   return projectStore;
+};
+
+const getCodexBridge = (): CodexBridge => {
+  if (!codexBridge) {
+    codexBridge = new CodexBridge({executable: process.env.NARRA_CODEX_EXECUTABLE || 'codex'});
+    codexBridge.on('notification', (notification: CodexBridgeNotification) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send(IPC_CHANNELS.codexEvent, {type: 'notification', ...notification});
+      }
+    });
+    codexBridge.on('status', (status: unknown) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send(IPC_CHANNELS.codexEvent, {type: 'status', ...status as object});
+      }
+    });
+    codexBridge.on('protocolError', (error: Error) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send(IPC_CHANNELS.codexEvent, {
+          type: 'error',
+          code: 'APP_SERVER_ERROR',
+          message: error.message,
+        });
+      }
+    });
+  }
+  return codexBridge;
+};
+
+const openCodexLoginUrl = async (urlValue: string | undefined): Promise<void> => {
+  if (!urlValue) return;
+  const url = new URL(urlValue);
+  if (url.protocol !== 'https:') throw new Error('Codex returned an unsupported login URL.');
+  await shell.openExternal(url.toString());
+};
+
+const registerCodexHandlers = (): void => {
+  ipcMain.handle(IPC_CHANNELS.codexReadAccount, async () => getCodexBridge().readAccount());
+  ipcMain.handle(IPC_CHANNELS.codexStartBrowserLogin, async () => {
+    const result = await getCodexBridge().startBrowserLogin();
+    await openCodexLoginUrl(result.authUrl);
+    return result;
+  });
+  ipcMain.handle(IPC_CHANNELS.codexStartDeviceLogin, async () => {
+    const result = await getCodexBridge().startDeviceLogin();
+    await openCodexLoginUrl(result.verificationUrl);
+    return result;
+  });
+  ipcMain.handle(IPC_CHANNELS.codexListModels, async () => getCodexBridge().listModels());
+  ipcMain.handle(IPC_CHANNELS.codexReadRateLimits, async () => getCodexBridge().readRateLimits());
+  ipcMain.handle(IPC_CHANNELS.codexStartOrResumeThread, async (_event, projectId: string) => {
+    const store = getProjectStore();
+    const project = store.getProject(projectId).project;
+    const settings = store.getAiProjectSettings(projectId);
+    const bridge = getCodexBridge();
+    await bridge.assertModelAvailable(settings.desiredModel, settings.desiredEffort);
+    const result = settings.threadId
+      ? await bridge.resumeThread(settings.threadId)
+      : await bridge.startThread({cwd: project.rootPath, model: settings.desiredModel});
+    store.updateAiProjectSettings(projectId, {
+      threadId: result.threadId,
+      lastConnectionStatus: 'READY',
+    });
+    return result;
+  });
+  ipcMain.handle(IPC_CHANNELS.codexStartTurn, async (_event, projectId: string, text: string) => {
+    const store = getProjectStore();
+    const project = store.getProject(projectId).project;
+    let settings = store.getAiProjectSettings(projectId);
+    const bridge = getCodexBridge();
+    await bridge.assertModelAvailable(settings.desiredModel, settings.desiredEffort);
+    if (!settings.threadId) {
+      const thread = await bridge.startThread({cwd: project.rootPath, model: settings.desiredModel});
+      settings = store.updateAiProjectSettings(projectId, {threadId: thread.threadId});
+    } else {
+      await bridge.resumeThread(settings.threadId);
+    }
+    const result = await bridge.startTurn({
+      threadId: settings.threadId!,
+      text,
+      cwd: project.rootPath,
+      model: settings.desiredModel || DEFAULT_CODEX_MODEL,
+      effort: settings.desiredEffort || DEFAULT_CODEX_EFFORT,
+    });
+    store.updateAiProjectSettings(projectId, {
+      lastTurnId: result.turnId,
+      lastConnectionStatus: 'READY',
+    });
+    return {...result, threadId: settings.threadId};
+  });
+  ipcMain.handle(IPC_CHANNELS.codexInterruptTurn, async (_event, projectId: string) => {
+    const settings = getProjectStore().getAiProjectSettings(projectId);
+    if (!settings.threadId || !settings.lastTurnId) throw new Error('Project does not have an active Codex turn.');
+    await getCodexBridge().interruptTurn(settings.threadId, settings.lastTurnId);
+    return {interrupted: true};
+  });
 };
 
 const registerProjectHandlers = (): void => {
@@ -194,6 +296,7 @@ void app.whenReady().then(async () => {
   jobRunner = new LocalJobRunner(projectStore, path.resolve(currentDirectory, '../../..'));
   jobRunner.start();
   registerProjectHandlers();
+  registerCodexHandlers();
   protocol.handle('narra-media', (request) => {
     try {
       const url = new URL(request.url);
@@ -236,12 +339,12 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Narra Studio' || result.apiVersion !== 6 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Narra Studio' || result.apiVersion !== 7 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Narra Studio\napiVersion=6\nprojectCount=${result.projectCount}\n`,
+      `renderer=Narra Studio\napiVersion=7\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     if (process.env.NARRA_SMOKE_SCREENSHOT) {
@@ -267,6 +370,8 @@ void app.whenReady().then(async () => {
     jobRunner = null;
     projectStore.close();
     projectStore = null;
+    codexBridge?.close();
+    codexBridge = null;
     app.exit(0);
     return;
   }
@@ -286,6 +391,8 @@ void app.whenReady().then(async () => {
   jobRunner = null;
   projectStore?.close();
   projectStore = null;
+  codexBridge?.close();
+  codexBridge = null;
   app.exit(1);
 });
 
@@ -294,6 +401,8 @@ app.on('before-quit', () => {
   jobRunner = null;
   projectStore?.close();
   projectStore = null;
+  codexBridge?.close();
+  codexBridge = null;
 });
 
 app.on('window-all-closed', () => {

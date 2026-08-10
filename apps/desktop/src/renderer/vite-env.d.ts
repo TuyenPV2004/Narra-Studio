@@ -17,7 +17,7 @@ import type {
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 6;
+  readonly version: 7;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -46,6 +46,32 @@ interface NarraDesktopApi {
   cancelJob: (projectId: string, jobId: string) => Promise<ReviewWorkspace>;
   retryJob: (projectId: string, jobId: string) => Promise<ReviewWorkspace>;
   chooseAndAttachRenderOutput: (projectId: string, jobId: string) => Promise<ReviewWorkspace | null>;
+  codexReadAccount: () => Promise<{
+    signedIn: boolean;
+    accountType: string | null;
+    planType: string | null;
+  }>;
+  codexStartBrowserLogin: () => Promise<{
+    loginId: string;
+    authUrl?: string;
+  }>;
+  codexStartDeviceLogin: () => Promise<{
+    loginId: string;
+    verificationUrl?: string;
+    userCode?: string;
+  }>;
+  codexListModels: () => Promise<Array<{
+    id: string;
+    displayName: string;
+    description: string;
+    supportedReasoningEfforts: Array<{reasoningEffort: string; description?: string}>;
+    defaultReasoningEffort: string | null;
+  }>>;
+  codexReadRateLimits: () => Promise<unknown>;
+  codexStartOrResumeThread: (projectId: string) => Promise<{threadId: string}>;
+  codexStartTurn: (projectId: string, text: string) => Promise<{threadId: string; turnId: string}>;
+  codexInterruptTurn: (projectId: string) => Promise<{interrupted: true}>;
+  onCodexEvent: (listener: (event: Record<string, unknown>) => void) => () => void;
 }
 
 declare global {
