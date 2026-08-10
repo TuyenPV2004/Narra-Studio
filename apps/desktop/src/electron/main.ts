@@ -8,6 +8,7 @@ import {
   type EditorialDocument,
   type RenderTarget,
 } from '@narra/project-store';
+import type {AiReasoningEffort, AiStage} from '@narra/contracts';
 import {app, BrowserWindow, dialog, ipcMain, net, protocol, shell} from 'electron';
 import {writeFileSync} from 'node:fs';
 import path from 'node:path';
@@ -15,15 +16,20 @@ import {fileURLToPath, pathToFileURL} from 'node:url';
 import {IPC_CHANNELS} from './ipc-channels.js';
 import {
   CodexBridge,
+  CodexBridgeError,
   DEFAULT_CODEX_EFFORT,
   DEFAULT_CODEX_MODEL,
   type CodexBridgeNotification,
+  type JsonRpcId,
 } from './codex-bridge.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 let projectStore: ProjectStore | null = null;
 let jobRunner: LocalJobRunner | null = null;
 let codexBridge: CodexBridge | null = null;
+const activeAiRuns = new Map<string, {projectId: string; runId: string}>();
+const pendingCodexRequests = new Map<JsonRpcId, string>();
+const pendingTurnCompletions = new Map<string, CodexBridgeNotification>();
 
 protocol.registerSchemesAsPrivileged([
   {scheme: 'narra-media', privileges: {standard: true, secure: true, supportFetchAPI: true, stream: true}},
@@ -34,12 +40,66 @@ const getProjectStore = (): ProjectStore => {
   return projectStore;
 };
 
+const asRecord = (value: unknown): Record<string, unknown> =>
+  value && typeof value === 'object' ? value as Record<string, unknown> : {};
+
+const codexRunError = (error: unknown) => ({
+  code: error instanceof CodexBridgeError && [
+    'CODEX_NOT_FOUND', 'SIGNED_OUT', 'MODEL_UNAVAILABLE', 'RATE_LIMITED', 'APP_SERVER_ERROR',
+  ].includes(error.code) ? error.code as 'CODEX_NOT_FOUND' | 'SIGNED_OUT' | 'MODEL_UNAVAILABLE' | 'RATE_LIMITED' | 'APP_SERVER_ERROR' : 'UNKNOWN' as const,
+  message: error instanceof Error ? error.message : 'Codex run failed.',
+  retryable: !(error instanceof CodexBridgeError && error.code === 'MODEL_UNAVAILABLE'),
+});
+
+const shouldForwardCodexNotification = ({method, params}: CodexBridgeNotification): boolean => {
+  if (method.startsWith('item/reasoning/')) return false;
+  if (method === 'item/started' || method === 'item/completed') {
+    return asRecord(asRecord(params).item).type !== 'reasoning';
+  }
+  return true;
+};
+
+const completeTrackedAiRun = (notification: CodexBridgeNotification): void => {
+  if (notification.method !== 'turn/completed') return;
+  const turn = asRecord(asRecord(notification.params).turn);
+  const turnId = typeof turn.id === 'string' ? turn.id : null;
+  if (!turnId) return;
+  const tracked = activeAiRuns.get(turnId);
+  if (!tracked) {
+    pendingTurnCompletions.set(turnId, notification);
+    return;
+  }
+  activeAiRuns.delete(turnId);
+  const status = turn.status;
+  const completedAt = new Date().toISOString();
+  if (status === 'completed') {
+    getProjectStore().updateAiRun(tracked.projectId, tracked.runId, {status: 'COMPLETED', completedAt});
+  } else if (status === 'interrupted') {
+    getProjectStore().updateAiRun(tracked.projectId, tracked.runId, {status: 'CANCELLED', completedAt});
+  } else {
+    const error = asRecord(turn.error);
+    getProjectStore().updateAiRun(tracked.projectId, tracked.runId, {
+      status: 'FAILED',
+      completedAt,
+      error: {code: 'APP_SERVER_ERROR', message: typeof error.message === 'string' ? error.message : 'Codex turn failed.', retryable: true},
+    });
+  }
+};
+
 const getCodexBridge = (): CodexBridge => {
   if (!codexBridge) {
     codexBridge = new CodexBridge({executable: process.env.NARRA_CODEX_EXECUTABLE || 'codex'});
     codexBridge.on('notification', (notification: CodexBridgeNotification) => {
+      completeTrackedAiRun(notification);
+      if (!shouldForwardCodexNotification(notification)) return;
       for (const window of BrowserWindow.getAllWindows()) {
         window.webContents.send(IPC_CHANNELS.codexEvent, {type: 'notification', ...notification});
+      }
+    });
+    codexBridge.on('serverRequest', (request: CodexBridgeNotification & {id: JsonRpcId}) => {
+      pendingCodexRequests.set(request.id, request.method);
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send(IPC_CHANNELS.codexEvent, {type: 'serverRequest', ...request});
       }
     });
     codexBridge.on('status', (status: unknown) => {
@@ -68,6 +128,13 @@ const openCodexLoginUrl = async (urlValue: string | undefined): Promise<void> =>
 };
 
 const registerCodexHandlers = (): void => {
+  ipcMain.handle(IPC_CHANNELS.codexGetWorkspace, (_event, projectId: string) =>
+    getProjectStore().getAiWorkspace(projectId));
+  ipcMain.handle(
+    IPC_CHANNELS.codexUpdateSettings,
+    (_event, projectId: string, input: {desiredModel: string; desiredEffort: AiReasoningEffort}) =>
+      getProjectStore().updateAiProjectSettings(projectId, input),
+  );
   ipcMain.handle(IPC_CHANNELS.codexReadAccount, async () => getCodexBridge().readAccount());
   ipcMain.handle(IPC_CHANNELS.codexStartBrowserLogin, async () => {
     const result = await getCodexBridge().startBrowserLogin();
@@ -96,36 +163,80 @@ const registerCodexHandlers = (): void => {
     });
     return result;
   });
-  ipcMain.handle(IPC_CHANNELS.codexStartTurn, async (_event, projectId: string, text: string) => {
+  ipcMain.handle(IPC_CHANNELS.codexStartTurn, async (
+    _event,
+    projectId: string,
+    input: {text: string; stage: AiStage},
+  ) => {
     const store = getProjectStore();
     const project = store.getProject(projectId).project;
     let settings = store.getAiProjectSettings(projectId);
     const bridge = getCodexBridge();
-    await bridge.assertModelAvailable(settings.desiredModel, settings.desiredEffort);
-    if (!settings.threadId) {
-      const thread = await bridge.startThread({cwd: project.rootPath, model: settings.desiredModel});
-      settings = store.updateAiProjectSettings(projectId, {threadId: thread.threadId});
-    } else {
-      await bridge.resumeThread(settings.threadId);
+    const run = store.createAiRun(projectId, {stage: input.stage, prompt: input.text});
+    try {
+      await bridge.assertModelAvailable(settings.desiredModel, settings.desiredEffort);
+      if (!settings.threadId) {
+        const thread = await bridge.startThread({cwd: project.rootPath, model: settings.desiredModel});
+        settings = store.updateAiProjectSettings(projectId, {threadId: thread.threadId});
+      } else {
+        await bridge.resumeThread(settings.threadId);
+      }
+      const result = await bridge.startTurn({
+        threadId: settings.threadId!,
+        text: input.text,
+        cwd: project.rootPath,
+        model: settings.desiredModel || DEFAULT_CODEX_MODEL,
+        effort: settings.desiredEffort || DEFAULT_CODEX_EFFORT,
+      });
+      activeAiRuns.set(result.turnId, {projectId, runId: run.id});
+      store.updateAiRun(projectId, run.id, {
+        status: 'RUNNING',
+        actualModel: settings.desiredModel,
+        actualEffort: settings.desiredEffort,
+        threadId: settings.threadId,
+        turnId: result.turnId,
+        startedAt: new Date().toISOString(),
+      });
+      store.updateAiProjectSettings(projectId, {
+        lastStage: input.stage,
+        lastTurnId: result.turnId,
+        lastConnectionStatus: 'READY',
+      });
+      const earlyCompletion = pendingTurnCompletions.get(result.turnId);
+      if (earlyCompletion) {
+        pendingTurnCompletions.delete(result.turnId);
+        completeTrackedAiRun(earlyCompletion);
+      }
+      return {...result, threadId: settings.threadId, runId: run.id};
+    } catch (error) {
+      store.updateAiRun(projectId, run.id, {
+        status: 'FAILED',
+        completedAt: new Date().toISOString(),
+        error: codexRunError(error),
+      });
+      throw error;
     }
-    const result = await bridge.startTurn({
-      threadId: settings.threadId!,
-      text,
-      cwd: project.rootPath,
-      model: settings.desiredModel || DEFAULT_CODEX_MODEL,
-      effort: settings.desiredEffort || DEFAULT_CODEX_EFFORT,
-    });
-    store.updateAiProjectSettings(projectId, {
-      lastTurnId: result.turnId,
-      lastConnectionStatus: 'READY',
-    });
-    return {...result, threadId: settings.threadId};
   });
   ipcMain.handle(IPC_CHANNELS.codexInterruptTurn, async (_event, projectId: string) => {
     const settings = getProjectStore().getAiProjectSettings(projectId);
     if (!settings.threadId || !settings.lastTurnId) throw new Error('Project does not have an active Codex turn.');
     await getCodexBridge().interruptTurn(settings.threadId, settings.lastTurnId);
     return {interrupted: true};
+  });
+  ipcMain.handle(
+    IPC_CHANNELS.codexRespondServerRequest,
+    async (_event, id: JsonRpcId, result: unknown) => {
+      if (!pendingCodexRequests.has(id)) throw new Error('Codex request is no longer pending.');
+      pendingCodexRequests.delete(id);
+      await getCodexBridge().respondToServerRequest(id, result);
+      return {accepted: true};
+    },
+  );
+  ipcMain.handle(IPC_CHANNELS.openExternalUrl, async (_event, urlValue: string) => {
+    const url = new URL(urlValue);
+    if (url.protocol !== 'https:' && url.protocol !== 'http:') throw new Error('Only web links can be opened.');
+    await shell.openExternal(url.toString());
+    return {opened: true};
   });
 };
 
@@ -339,12 +450,12 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Narra Studio' || result.apiVersion !== 7 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Narra Studio' || result.apiVersion !== 8 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Narra Studio\napiVersion=7\nprojectCount=${result.projectCount}\n`,
+      `renderer=Narra Studio\napiVersion=8\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     if (process.env.NARRA_SMOKE_SCREENSHOT) {
@@ -360,7 +471,57 @@ void app.whenReady().then(async () => {
             ?.click()
         `);
       }
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      if (process.env.NARRA_SMOKE_AI_RUN === '1') {
+        const aiResult = await mainWindow.webContents.executeJavaScript(`
+          new Promise((resolve) => {
+            const startedAt = Date.now();
+            const startWhenReady = () => {
+              const button = document.querySelector('.run-button');
+              if (button && !button.disabled) {
+                button.click();
+                waitForCompletion();
+                return;
+              }
+              if (Date.now() - startedAt > 30000) {
+                resolve({state: 'not-ready'});
+                return;
+              }
+              setTimeout(startWhenReady, 100);
+            };
+            const waitForCompletion = () => {
+              const state = document.querySelector('.run-state')?.textContent?.trim();
+              if (state === 'Completed' || state === 'Failed' || state === 'Stopped') {
+                resolve({state, responseLength: document.querySelector('.agent-response p')?.textContent?.length ?? 0});
+                return;
+              }
+              if (Date.now() - startedAt > 150000) {
+                resolve({state: state ?? 'timeout'});
+                return;
+              }
+              setTimeout(waitForCompletion, 150);
+            };
+            startWhenReady();
+          })
+        `) as {state: string; responseLength?: number};
+        if (aiResult.state !== 'Completed' || !aiResult.responseLength) {
+          throw new Error(`AI workspace smoke received ${JSON.stringify(aiResult)}.`);
+        }
+      } else if (process.env.NARRA_SMOKE_WORKSPACE_TAB === 'AI workspace') {
+        const aiReady = await mainWindow.webContents.executeJavaScript(`
+          new Promise((resolve) => {
+            const startedAt = Date.now();
+            const check = () => {
+              if (document.querySelector('.ai-layout')) return resolve(true);
+              if (Date.now() - startedAt > 30000) return resolve(false);
+              setTimeout(check, 100);
+            };
+            check();
+          })
+        `) as boolean;
+        if (!aiReady) throw new Error('AI workspace did not finish loading for smoke capture.');
+      }
+      await new Promise((resolve) => setTimeout(resolve, process.env.NARRA_SMOKE_WORKSPACE_TAB === 'AI workspace' ? 1500 : 600));
+      await mainWindow.webContents.executeJavaScript('window.scrollTo({top: 0, behavior: "instant"})');
       const screenshot = await mainWindow.webContents.capturePage();
       writeFileSync(process.env.NARRA_SMOKE_SCREENSHOT, screenshot.toPNG());
     }

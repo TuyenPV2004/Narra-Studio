@@ -83,6 +83,29 @@ describe('ProjectStore', () => {
     expect(store.getAiProjectSettings(created.project.id)).toEqual(updated);
   });
 
+  it('persists AI run metadata without storing account credentials', () => {
+    const store = createStore();
+    const created = store.createProject({title: 'AI Run History', question: 'What should we investigate?'});
+    const run = store.createAiRun(created.project.id, {stage: 'DISCOVER', prompt: 'Find three defensible angles.'});
+
+    expect(run).toMatchObject({status: 'QUEUED', requestedModel: 'gpt-5.6-sol', requestedEffort: 'medium'});
+    const completed = store.updateAiRun(created.project.id, run.id, {
+      status: 'COMPLETED',
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      actualModel: 'gpt-5.6-sol',
+      actualEffort: 'medium',
+      startedAt: '2026-08-10T00:00:00.000Z',
+      completedAt: '2026-08-10T00:01:00.000Z',
+    });
+
+    expect(store.getAiWorkspace(created.project.id).runs[0]).toEqual(completed);
+    const persisted = readFileSync(path.join(created.project.rootPath, 'ai/runs.json'), 'utf8');
+    expect(persisted).toContain('Find three defensible angles.');
+    expect(persisted).not.toContain('email');
+    expect(persisted).not.toContain('token');
+  });
+
   it('duplicates project artifacts with a new project id and archives without deleting files', () => {
     const store = createStore();
     const original = store.createProject({title: 'Original Story', question: 'What happened?'});

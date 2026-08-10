@@ -5,7 +5,7 @@ import {createInterface} from 'node:readline';
 export const DEFAULT_CODEX_MODEL = 'gpt-5.6-sol';
 export const DEFAULT_CODEX_EFFORT = 'medium';
 
-type JsonRpcId = number | string;
+export type JsonRpcId = number | string;
 
 type JsonRpcError = {
   code: number;
@@ -86,6 +86,7 @@ const asRecord = (value: unknown): Record<string, unknown> =>
 const asString = (value: unknown): string | null => typeof value === 'string' && value.length > 0 ? value : null;
 
 const appServerErrorCode = (method: string): string => {
+  if (method === 'account/rateLimits/read') return 'RATE_LIMITED';
   if (method.startsWith('account/')) return 'SIGNED_OUT';
   if (method === 'model/list') return 'MODEL_UNAVAILABLE';
   return 'APP_SERVER_ERROR';
@@ -142,6 +143,7 @@ export class CodexBridge extends EventEmitter {
     try {
       await this.request('initialize', {
         clientInfo: {name: 'narra_studio', title: 'Narra Studio', version: '0.1.0'},
+        capabilities: {experimentalApi: true},
       });
       this.notify('initialized');
       this.emit('status', {status: 'READY'});
@@ -180,9 +182,10 @@ export class CodexBridge extends EventEmitter {
 
     if (message.method) {
       const notification = {method: message.method, params: message.params ?? null};
-      this.emit('notification', notification satisfies CodexBridgeNotification);
       if (message.id !== undefined) {
         this.emit('serverRequest', {...notification, id: message.id});
+      } else {
+        this.emit('notification', notification satisfies CodexBridgeNotification);
       }
     }
   }
@@ -365,6 +368,12 @@ export class CodexBridge extends EventEmitter {
 
   async readRateLimits(): Promise<unknown> {
     return this.readyRequest('account/rateLimits/read', {});
+  }
+
+  async respondToServerRequest(id: JsonRpcId, result: unknown): Promise<void> {
+    await this.start();
+    if (!this.process) throw new CodexBridgeError('APP_SERVER_ERROR', 'Codex App Server chưa sẵn sàng.');
+    this.process.stdin.write(`${JSON.stringify({id, result})}\n`);
   }
 
   close(): void {

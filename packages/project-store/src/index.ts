@@ -25,4 +25,7 @@ export type {
   ReviewWorkspace,
   ValidationIssue,
   ValidationReport,
+  AiWorkspace,
+  CreateAiRunInput,
+  UpdateAiRunInput,
 } from './types.js';

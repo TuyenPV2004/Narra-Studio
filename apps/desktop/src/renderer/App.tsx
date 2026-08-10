@@ -17,12 +17,14 @@ import {
   RefreshCw,
   Search,
   Sparkles,
+  WandSparkles,
   TriangleAlert,
 } from 'lucide-react';
 import {StoryboardWorkspaceView} from './StoryboardWorkspace';
 import {VoiceWorkspaceView} from './VoiceWorkspace';
 import {EditorialWorkspaceView} from './EditorialWorkspace';
 import {ReviewWorkspaceView} from './ReviewWorkspace';
+import {AiWorkspaceView} from './AiWorkspace';
 
 const formatDate = (value: string | null): string =>
   value ? new Intl.DateTimeFormat('en', {dateStyle: 'medium', timeStyle: 'short'}).format(new Date(value)) : 'Never';
@@ -34,6 +36,7 @@ const formatLabel = (value: string): string => {
 
 const workspaceItems = [
   {id: 'overview', label: 'Overview', icon: LayoutDashboard},
+  {id: 'ai', label: 'AI workspace', icon: WandSparkles},
   {id: 'editorial', label: 'Editorial', icon: BookOpenText},
   {id: 'storyboard', label: 'Storyboard & assets', icon: Clapperboard},
   {id: 'voice', label: 'Voice & captions', icon: Captions},
@@ -47,7 +50,7 @@ export const App = () => {
   const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState('');
   const [question, setQuestion] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'editorial' | 'storyboard' | 'voice' | 'review'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'ai' | 'editorial' | 'storyboard' | 'voice' | 'review'>('overview');
 
   const activeProjects = useMemo(() => projects.filter(({archived}) => !archived), [projects]);
   const archivedProjects = useMemo(() => projects.filter(({archived}) => archived), [projects]);
@@ -258,6 +261,13 @@ export const App = () => {
                     </div>
                   </section>
                 </section>
+              ) : activeTab === 'ai' ? (
+                <AiWorkspaceView
+                  projectId={selected.project.id}
+                  projectQuestion={selected.project.question}
+                  targetDurationSec={selected.project.targetDurationSec}
+                  language={selected.project.language}
+                />
               ) : activeTab === 'editorial' ? (
                 <EditorialWorkspaceView projectId={selected.project.id} onProjectRefresh={setSelected} />
               ) : activeTab === 'storyboard' ? (

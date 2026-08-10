@@ -1,4 +1,16 @@
-import type {Asset, CaptionCue, ClaimCollection, FactCollection, NarrationSegment, Project, Scene, Shot, SourceCollection} from '@narra/contracts';
+import type {
+  AiProjectSettings,
+  AiRun,
+  Asset,
+  CaptionCue,
+  ClaimCollection,
+  FactCollection,
+  NarrationSegment,
+  Project,
+  Scene,
+  Shot,
+  SourceCollection,
+} from '@narra/contracts';
 
 export type CreateProjectInput = {
   title: string;
@@ -39,6 +51,20 @@ export type ProjectDetail = {
     stale: boolean;
   }>;
 };
+
+export type AiWorkspace = {
+  projectId: string;
+  settings: AiProjectSettings;
+  runs: AiRun[];
+};
+
+export type CreateAiRunInput = {
+  stage: AiRun['stage'];
+  prompt: string;
+};
+
+export type UpdateAiRunInput = Partial<Pick<AiRun,
+  'status' | 'actualModel' | 'actualEffort' | 'threadId' | 'turnId' | 'startedAt' | 'completedAt' | 'error' | 'usage'>>;
 
 export type StaleScope = {
   scope: 'ASSETS' | 'AUDIO' | 'CAPTIONS' | 'RENDER';

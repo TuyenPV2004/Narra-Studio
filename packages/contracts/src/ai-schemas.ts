@@ -315,6 +315,8 @@ export const StoryboardOutputSchema = z
   });
 
 export type AiProjectSettings = z.infer<typeof AiProjectSettingsSchema>;
+export type AiStage = z.infer<typeof AiStageSchema>;
+export type AiReasoningEffort = z.infer<typeof AiReasoningEffortSchema>;
 export type AiRun = z.infer<typeof AiRunSchema>;
 export type AiSearchActivity = z.infer<typeof AiSearchActivitySchema>;
 export type AiSourceCard = z.infer<typeof AiSourceCardSchema>;

@@ -13,11 +13,13 @@ import type {
   EditorialWorkspace,
   RenderTarget,
   ReviewWorkspace,
+  AiWorkspace,
 } from '@narra/project-store';
+import type {AiReasoningEffort, AiStage, AiProjectSettings} from '@narra/contracts';
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 7;
+  readonly version: 8;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -69,8 +71,18 @@ interface NarraDesktopApi {
   }>>;
   codexReadRateLimits: () => Promise<unknown>;
   codexStartOrResumeThread: (projectId: string) => Promise<{threadId: string}>;
-  codexStartTurn: (projectId: string, text: string) => Promise<{threadId: string; turnId: string}>;
+  codexGetWorkspace: (projectId: string) => Promise<AiWorkspace>;
+  codexUpdateSettings: (
+    projectId: string,
+    input: {desiredModel: string; desiredEffort: AiReasoningEffort},
+  ) => Promise<AiProjectSettings>;
+  codexStartTurn: (
+    projectId: string,
+    input: {text: string; stage: AiStage},
+  ) => Promise<{threadId: string; turnId: string; runId: string}>;
   codexInterruptTurn: (projectId: string) => Promise<{interrupted: true}>;
+  codexRespondServerRequest: (id: number | string, result: unknown) => Promise<{accepted: true}>;
+  openExternalUrl: (url: string) => Promise<{opened: true}>;
   onCodexEvent: (listener: (event: Record<string, unknown>) => void) => () => void;
 }
 

@@ -5,7 +5,7 @@ import {describe, expect, it} from 'vitest';
 import {CodexBridge} from '../src/electron/codex-bridge.js';
 import type {CodexBridgeError} from '../src/electron/codex-bridge.js';
 
-type Request = {id?: number; method: string; params?: Record<string, unknown>};
+type Request = {id?: number | string; method?: string; params?: Record<string, unknown>; result?: unknown};
 
 const createFakeAppServer = (overrides: Record<string, (request: Request) => unknown> = {}) => {
   const process = new EventEmitter() as EventEmitter & {
@@ -35,7 +35,7 @@ const createFakeAppServer = (overrides: Record<string, (request: Request) => unk
       if (!line) continue;
       const request = JSON.parse(line) as Request;
       requests.push(request);
-      if (request.id === undefined) continue;
+      if (request.id === undefined || !request.method) continue;
       try {
         const handler = overrides[request.method];
         const result = handler ? handler(request) : responses[request.method]?.(request);
@@ -131,6 +131,27 @@ describe('CodexBridge', () => {
       code: 'SIGNED_OUT',
       message: 'sign in required',
     }));
+    bridge.close();
+  });
+
+  it('forwards server requests and writes the correlated response', async () => {
+    const fake = createFakeAppServer();
+    const bridge = new CodexBridge({spawnProcess: () => fake.process, requestTimeoutMs: 500});
+    const serverRequest = new Promise<{id: string; method: string}>((resolve) => bridge.once('serverRequest', resolve));
+    await bridge.start();
+    fake.process.stdout.write(`${JSON.stringify({
+      id: 'request-1',
+      method: 'item/tool/requestUserInput',
+      params: {questions: [{id: 'topic', question: 'Choose a topic'}]},
+    })}\n`);
+
+    await expect(serverRequest).resolves.toMatchObject({id: 'request-1', method: 'item/tool/requestUserInput'});
+    await bridge.respondToServerRequest('request-1', {answers: {topic: {answers: ['Grid storage']}}});
+    expect(fake.requests.at(-1)).toEqual({
+      id: 'request-1',
+      result: {answers: {topic: {answers: ['Grid storage']}}},
+    });
+    expect(fake.requests[0]?.params).toMatchObject({capabilities: {experimentalApi: true}});
     bridge.close();
   });
 });

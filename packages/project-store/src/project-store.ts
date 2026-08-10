@@ -1,6 +1,7 @@
 import {
   AiProjectSettingsSchema,
   AiRunCollectionSchema,
+  AiRunSchema,
   AiSearchActivityCollectionSchema,
   AiSourceCardCollectionSchema,
   AiWorkspaceBundleSchema,
@@ -23,6 +24,7 @@ import {
   TopicCandidateCollectionSchema,
   type Asset,
   type AiProjectSettings,
+  type AiRun,
   type CaptionCue,
   type NarrationSegment,
   type Project,
@@ -74,6 +76,9 @@ import type {
   ValidationIssue,
   ValidationReport,
   VoiceWorkspace,
+  AiWorkspace,
+  CreateAiRunInput,
+  UpdateAiRunInput,
 } from './types.js';
 
 type ProjectRow = {
@@ -280,6 +285,59 @@ export class ProjectStore {
     const current = this.getAiProjectSettings(projectId);
     const next = AiProjectSettingsSchema.parse({...current, ...input, updatedAt: isoNow()});
     atomicWriteJson(path.join(project.rootPath, 'ai/settings.json'), next);
+    this.refreshProject(projectId);
+    return next;
+  }
+
+  getAiWorkspace(projectId: string): AiWorkspace {
+    const project = this.getProject(projectId).project;
+    const runs = AiRunCollectionSchema.parse(parseJson(path.join(project.rootPath, 'ai/runs.json')));
+    return {
+      projectId,
+      settings: this.getAiProjectSettings(projectId),
+      runs: [...runs.items].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
+    };
+  }
+
+  createAiRun(projectId: string, input: CreateAiRunInput): AiRun {
+    const project = this.getProject(projectId).project;
+    const prompt = input.prompt.trim();
+    if (!prompt) throw new Error('AI run prompt cannot be empty.');
+    const filePath = path.join(project.rootPath, 'ai/runs.json');
+    const collection = AiRunCollectionSchema.parse(parseJson(filePath));
+    const settings = this.getAiProjectSettings(projectId);
+    const now = isoNow();
+    const run = AiRunSchema.parse({
+      id: `run-${randomUUID()}`,
+      projectId,
+      stage: input.stage,
+      prompt,
+      status: 'QUEUED',
+      requestedModel: settings.desiredModel,
+      requestedEffort: settings.desiredEffort,
+      threadId: settings.threadId,
+      turnId: null,
+      updatedAt: now,
+      error: null,
+      usage: null,
+    });
+    atomicWriteJson(filePath, {...collection, updatedAt: now, items: [...collection.items, run]});
+    this.refreshProject(projectId);
+    return run;
+  }
+
+  updateAiRun(projectId: string, runId: string, input: UpdateAiRunInput): AiRun {
+    const project = this.getProject(projectId).project;
+    const filePath = path.join(project.rootPath, 'ai/runs.json');
+    const collection = AiRunCollectionSchema.parse(parseJson(filePath));
+    const index = collection.items.findIndex(({id}) => id === runId);
+    if (index < 0) throw new Error(`AI run ${runId} was not found.`);
+    const now = isoNow();
+    const current = collection.items[index]!;
+    const next = AiRunSchema.parse({...current, ...input, updatedAt: now});
+    const items = [...collection.items];
+    items[index] = next;
+    atomicWriteJson(filePath, {...collection, updatedAt: now, items});
     this.refreshProject(projectId);
     return next;
   }

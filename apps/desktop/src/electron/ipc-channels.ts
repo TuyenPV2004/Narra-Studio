@@ -35,5 +35,9 @@ export const IPC_CHANNELS = {
   codexStartOrResumeThread: 'codex:thread-start-or-resume',
   codexStartTurn: 'codex:turn-start',
   codexInterruptTurn: 'codex:turn-interrupt',
+  codexGetWorkspace: 'codex:workspace-get',
+  codexUpdateSettings: 'codex:settings-update',
+  codexRespondServerRequest: 'codex:server-request-respond',
+  openExternalUrl: 'system:open-external-url',
   codexEvent: 'codex:event',
 } as const;

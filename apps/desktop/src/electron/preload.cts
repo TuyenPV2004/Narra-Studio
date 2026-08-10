@@ -1,6 +1,7 @@
 import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProjectInput, EditorialDocument, RenderTarget} from '@narra/project-store';
 import {contextBridge, ipcRenderer, webUtils} from 'electron';
 import type {CodexBridgeNotification} from './codex-bridge.js';
+import type {AiReasoningEffort, AiStage} from '@narra/contracts';
 
 const channels = {
   listProjects: 'projects:list',
@@ -39,12 +40,16 @@ const channels = {
   codexStartOrResumeThread: 'codex:thread-start-or-resume',
   codexStartTurn: 'codex:turn-start',
   codexInterruptTurn: 'codex:turn-interrupt',
+  codexGetWorkspace: 'codex:workspace-get',
+  codexUpdateSettings: 'codex:settings-update',
+  codexRespondServerRequest: 'codex:server-request-respond',
+  openExternalUrl: 'system:open-external-url',
   codexEvent: 'codex:event',
 } as const;
 
 const api = {
   runtime: 'electron',
-  version: 7,
+  version: 8,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -88,8 +93,15 @@ const api = {
   codexListModels: () => ipcRenderer.invoke(channels.codexListModels),
   codexReadRateLimits: () => ipcRenderer.invoke(channels.codexReadRateLimits),
   codexStartOrResumeThread: (projectId: string) => ipcRenderer.invoke(channels.codexStartOrResumeThread, projectId),
-  codexStartTurn: (projectId: string, text: string) => ipcRenderer.invoke(channels.codexStartTurn, projectId, text),
+  codexGetWorkspace: (projectId: string) => ipcRenderer.invoke(channels.codexGetWorkspace, projectId),
+  codexUpdateSettings: (projectId: string, input: {desiredModel: string; desiredEffort: AiReasoningEffort}) =>
+    ipcRenderer.invoke(channels.codexUpdateSettings, projectId, input),
+  codexStartTurn: (projectId: string, input: {text: string; stage: AiStage}) =>
+    ipcRenderer.invoke(channels.codexStartTurn, projectId, input),
   codexInterruptTurn: (projectId: string) => ipcRenderer.invoke(channels.codexInterruptTurn, projectId),
+  codexRespondServerRequest: (id: number | string, result: unknown) =>
+    ipcRenderer.invoke(channels.codexRespondServerRequest, id, result),
+  openExternalUrl: (url: string) => ipcRenderer.invoke(channels.openExternalUrl, url),
   onCodexEvent: (listener: (event: CodexBridgeNotification | Record<string, unknown>) => void) => {
     const handler = (_event: Electron.IpcRendererEvent, payload: CodexBridgeNotification | Record<string, unknown>) =>
       listener(payload);
