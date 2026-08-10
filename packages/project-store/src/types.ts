@@ -15,6 +15,8 @@ import type {
   ThesisCandidate,
   OutlineSection,
   AiStage,
+  FlowPromptPackage,
+  MediaMetadata,
 } from '@narra/contracts';
 
 export type CreateProjectInput = {
@@ -99,6 +101,37 @@ export type CreateAssetTaskInput = {
 export type AssetStatusInput = {
   status: Asset['status'];
   qaNote?: string;
+};
+
+export type PrepareFlowTaskInput = {
+  shotId: string;
+  kind?: 'IMAGE' | 'VIDEO';
+  imageModel?: string;
+  videoModel?: string;
+};
+
+export type FlowCandidateStatus = 'DETECTED' | 'IMPORTED' | 'SELECTED' | 'REJECTED';
+
+export type FlowCandidate = {
+  id: string;
+  projectId: string;
+  fileName: string;
+  kind: 'IMAGE' | 'VIDEO';
+  suggestedShotId: string | null;
+  status: FlowCandidateStatus;
+  fingerprint: string;
+  fileSizeBytes: number;
+  detectedAt: string;
+  updatedAt: string;
+  metadata: MediaMetadata | null;
+};
+
+export type FlowWorkspace = {
+  projectId: string;
+  watchDirectory: string | null;
+  flowUrl: string;
+  promptPackages: Array<{assetId: string; shotId: string; package: FlowPromptPackage}>;
+  candidates: FlowCandidate[];
 };
 
 export type TimelineWarning = {

@@ -1,4 +1,4 @@
-import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProjectInput, EditorialDocument, RenderTarget, SelectTopicInput, SaveOutlineInput} from '@narra/project-store';
+import type {ApprovalGate, AssetStatusInput, CreateAssetTaskInput, CreateProjectInput, EditorialDocument, RenderTarget, SelectTopicInput, SaveOutlineInput, PrepareFlowTaskInput} from '@narra/project-store';
 import {contextBridge, ipcRenderer, webUtils} from 'electron';
 import type {CodexBridgeNotification} from './codex-bridge.js';
 import type {AiReasoningEffort, AiStage} from '@narra/contracts';
@@ -17,6 +17,13 @@ const channels = {
   updateAssetStatus: 'assets:update-status',
   chooseAndImportAssetMedia: 'assets:choose-and-import-media',
   importAssetMediaPath: 'assets:import-media-path',
+  getFlowWorkspace: 'flow:get',
+  chooseFlowWatchDirectory: 'flow:choose-watch-directory',
+  scanFlowCandidates: 'flow:scan-candidates',
+  prepareFlowAssetTask: 'flow:prepare-task',
+  selectFlowCandidate: 'flow:select-candidate',
+  rejectFlowCandidate: 'flow:reject-candidate',
+  copyText: 'system:copy-text',
   exportStoryboardRenderInput: 'render:export-storyboard-input',
   getVoiceWorkspace: 'voice:get',
   syncNarrationSegments: 'voice:sync-segments',
@@ -53,7 +60,7 @@ const channels = {
 
 const api = {
   runtime: 'electron',
-  version: 9,
+  version: 10,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -71,6 +78,16 @@ const api = {
     ipcRenderer.invoke(channels.chooseAndImportAssetMedia, projectId, assetId),
   importDroppedAssetMedia: (projectId: string, assetId: string, file: File) =>
     ipcRenderer.invoke(channels.importAssetMediaPath, projectId, assetId, webUtils.getPathForFile(file)),
+  getFlowWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getFlowWorkspace, projectId),
+  chooseFlowWatchDirectory: (projectId: string) => ipcRenderer.invoke(channels.chooseFlowWatchDirectory, projectId),
+  scanFlowCandidates: (projectId: string) => ipcRenderer.invoke(channels.scanFlowCandidates, projectId),
+  prepareFlowAssetTask: (projectId: string, input: PrepareFlowTaskInput) =>
+    ipcRenderer.invoke(channels.prepareFlowAssetTask, projectId, input),
+  selectFlowCandidate: (projectId: string, candidateId: string, assetId: string) =>
+    ipcRenderer.invoke(channels.selectFlowCandidate, projectId, candidateId, assetId),
+  rejectFlowCandidate: (projectId: string, candidateId: string) =>
+    ipcRenderer.invoke(channels.rejectFlowCandidate, projectId, candidateId),
+  copyText: (value: string) => ipcRenderer.invoke(channels.copyText, value),
   exportStoryboardRenderInput: (projectId: string) => ipcRenderer.invoke(channels.exportStoryboardRenderInput, projectId),
   getVoiceWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getVoiceWorkspace, projectId),
   syncNarrationSegments: (projectId: string) => ipcRenderer.invoke(channels.syncNarrationSegments, projectId),

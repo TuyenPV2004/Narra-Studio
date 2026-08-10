@@ -8,10 +8,11 @@ import {
   type EditorialDocument,
   type SelectTopicInput,
   type SaveOutlineInput,
+  type PrepareFlowTaskInput,
   type RenderTarget,
 } from '@narra/project-store';
 import {getAiStageJsonSchema, type AiReasoningEffort, type AiStage} from '@narra/contracts';
-import {app, BrowserWindow, dialog, ipcMain, net, protocol, shell} from 'electron';
+import {app, BrowserWindow, clipboard, dialog, ipcMain, net, protocol, shell} from 'electron';
 import {writeFileSync} from 'node:fs';
 import path from 'node:path';
 import {fileURLToPath, pathToFileURL} from 'node:url';
@@ -401,6 +402,29 @@ const registerProjectHandlers = (): void => {
     (_event, projectId: string, assetId: string, sourcePath: string) =>
       getProjectStore().importAssetMedia(projectId, assetId, sourcePath),
   );
+  ipcMain.handle(IPC_CHANNELS.getFlowWorkspace, (_event, projectId: string) =>
+    getProjectStore().getFlowWorkspace(projectId));
+  ipcMain.handle(IPC_CHANNELS.chooseFlowWatchDirectory, async (_event, projectId: string) => {
+    const selection = await dialog.showOpenDialog({
+      title: 'Choose Google Flow download folder',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (selection.canceled || !selection.filePaths[0]) return null;
+    return getProjectStore().setFlowWatchDirectory(projectId, selection.filePaths[0]);
+  });
+  ipcMain.handle(IPC_CHANNELS.scanFlowCandidates, (_event, projectId: string) =>
+    getProjectStore().scanFlowCandidates(projectId));
+  ipcMain.handle(IPC_CHANNELS.prepareFlowAssetTask, (_event, projectId: string, input: PrepareFlowTaskInput) =>
+    getProjectStore().prepareFlowAssetTask(projectId, input));
+  ipcMain.handle(IPC_CHANNELS.selectFlowCandidate, (_event, projectId: string, candidateId: string, assetId: string) =>
+    getProjectStore().selectFlowCandidate(projectId, candidateId, assetId));
+  ipcMain.handle(IPC_CHANNELS.rejectFlowCandidate, (_event, projectId: string, candidateId: string) =>
+    getProjectStore().rejectFlowCandidate(projectId, candidateId));
+  ipcMain.handle(IPC_CHANNELS.copyText, (_event, value: string) => {
+    if (!value.trim()) throw new Error('Cannot copy empty text.');
+    clipboard.writeText(value);
+    return {copied: true};
+  });
   ipcMain.handle(IPC_CHANNELS.exportStoryboardRenderInput, (_event, projectId: string) =>
     getProjectStore().exportStoryboardRenderInput(projectId),
   );
@@ -516,12 +540,14 @@ void app.whenReady().then(async () => {
     try {
       const url = new URL(request.url);
       const [projectId, assetId] = url.pathname.split('/').filter(Boolean).map(decodeURIComponent);
-      if (!['asset', 'narration'].includes(url.hostname) || !projectId || !assetId) {
+      if (!['asset', 'narration', 'flow-candidate'].includes(url.hostname) || !projectId || !assetId) {
         return new Response('Invalid media URL', {status: 400});
       }
       const filePath = url.hostname === 'narration'
         ? getProjectStore().getNarrationFilePath(projectId, assetId)
-        : getProjectStore().getAssetFilePath(projectId, assetId);
+        : url.hostname === 'flow-candidate'
+          ? getProjectStore().getFlowCandidateFilePath(projectId, assetId)
+          : getProjectStore().getAssetFilePath(projectId, assetId);
       return net.fetch(pathToFileURL(filePath).toString());
     } catch (error) {
       return new Response(error instanceof Error ? error.message : 'Media not found', {status: 404});
@@ -554,12 +580,12 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Narra Studio' || result.apiVersion !== 9 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Narra Studio' || result.apiVersion !== 10 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Narra Studio\napiVersion=9\nprojectCount=${result.projectCount}\n`,
+      `renderer=Narra Studio\napiVersion=10\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     if (process.env.NARRA_SMOKE_EDITORIAL_UI === '1') {
@@ -588,6 +614,40 @@ void app.whenReady().then(async () => {
         throw new Error(`Editorial smoke test received ${JSON.stringify(editorialResult)}.`);
       }
       writeFileSync(path.join(workspaceRoot, '.editorial-smoke-ok'), `${JSON.stringify(editorialResult)}\n`, 'utf8');
+    }
+    if (process.env.NARRA_SMOKE_FLOW_UI === '1') {
+      await mainWindow.webContents.executeJavaScript(`document.querySelector('.project-row:not(.archived)')?.click()`);
+      await new Promise((resolve) => setTimeout(resolve, 350));
+      await mainWindow.webContents.executeJavaScript(`
+        [...document.querySelectorAll('.workspace-tabs button')]
+          .find((button) => button.textContent?.trim() === 'Storyboard & assets')
+          ?.click()
+      `);
+      const flowResult = (await mainWindow.webContents.executeJavaScript(`
+        new Promise((resolve) => {
+          const startedAt = Date.now();
+          const check = () => {
+            const panel = document.querySelector('.flow-assistant-panel');
+            if (panel || Date.now() - startedAt > 5000) {
+              resolve({
+                hasPanel: Boolean(panel),
+                promptCardCount: document.querySelectorAll('.flow-prompt-grid article').length,
+                candidateCount: document.querySelectorAll('.flow-candidate').length,
+                hasWatchFolder: Boolean(document.querySelector('.flow-inbox small')?.textContent?.trim()),
+                hasOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+              });
+              return;
+            }
+            setTimeout(check, 50);
+          };
+          check();
+        })
+      `)) as {hasPanel: boolean; promptCardCount: number; candidateCount: number; hasWatchFolder: boolean; hasOverflow: boolean};
+      if (!flowResult.hasPanel || flowResult.promptCardCount !== 2 || flowResult.candidateCount < 1 ||
+          !flowResult.hasWatchFolder || flowResult.hasOverflow) {
+        throw new Error(`Flow UI smoke test received ${JSON.stringify(flowResult)}.`);
+      }
+      writeFileSync(path.join(workspaceRoot, '.flow-smoke-ok'), `${JSON.stringify(flowResult)}\n`, 'utf8');
     }
     if (process.env.NARRA_SMOKE_SCREENSHOT) {
       if (process.env.NARRA_SMOKE_OPEN_FIRST_PROJECT === '1') {

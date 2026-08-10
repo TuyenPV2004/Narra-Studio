@@ -4,6 +4,7 @@ import {
   AiRunSchema,
   AiSearchActivitySchema,
   AiWorkspaceBundleSchema,
+  AssetSchema,
   DiscoverOutputSchema,
   OutlineOutputSchema,
   ResearchOutputSchema,
@@ -120,5 +121,29 @@ describe('AI workspace contracts', () => {
     });
     expect(result.success).toBe(false);
     if (!result.success) expect(result.error.issues.some(({message}) => message.includes('unknown run'))).toBe(true);
+  });
+
+  it('preserves Google Flow prompt and generation provenance on an asset', () => {
+    const result = AssetSchema.safeParse({
+      id: 'asset-one', projectId, shotId: 'shot-one', kind: 'VIDEO', status: 'SELECTED',
+      path: 'assets/video/asset-one.mp4', rightsNote: 'Creator-generated in Google Flow.',
+      task: {
+        provider: 'GOOGLE_FLOW', brief: 'A restrained documentary establishing shot.',
+        prompt: 'Create a six-second documentary shot.', createdAt: now,
+        flow: {
+          version: 2, shotToken: 'flow-shot-one-v2', imageModel: 'Nano Banana 2', videoModel: 'Veo 3.1 Lite',
+          imagePrompt: 'Create a documentary still.', videoPrompt: 'Create a six-second documentary shot.',
+          negativeGuidance: 'No watermark or fabricated evidence.', aspectRatio: '16:9',
+          generationDurationSec: 6, ingredients: ['scene:scene-one'], createdAt: now,
+        },
+      },
+      generation: {
+        provider: 'GOOGLE_FLOW', candidateId: 'candidate-one', promptVersion: 2,
+        model: 'Veo 3.1 Lite', prompt: 'Create a six-second documentary shot.',
+        sourceFileName: 'flow-shot-one-v2.mp4', importedAt: now,
+      },
+    });
+
+    expect(result.success).toBe(true);
   });
 });

@@ -2,6 +2,8 @@ export {CURRENT_ARTIFACT_SCHEMA_VERSION, PROJECT_DIRECTORIES} from './artifact-l
 export {ProjectStore} from './project-store.js';
 export {LocalJobRunner} from './local-job-runner.js';
 export {probeMedia} from './media-probe.js';
+export {FlowAssistedProvider} from './flow-assisted-provider.js';
+export type {FlowPromptInput, MediaPromptProvider} from './flow-assisted-provider.js';
 export {compareNarrationTranscript, parseTimedText, parseWordTimestamps} from './caption-parser.js';
 export type {
   AssetStatusInput,
@@ -31,4 +33,8 @@ export type {
   EditorialStage,
   SelectTopicInput,
   SaveOutlineInput,
+  PrepareFlowTaskInput,
+  FlowCandidate,
+  FlowCandidateStatus,
+  FlowWorkspace,
 } from './types.js';

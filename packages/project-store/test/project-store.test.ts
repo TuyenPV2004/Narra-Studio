@@ -281,6 +281,62 @@ describe('ProjectStore', () => {
     expect(renderInput.bundle.assets.find(({id}) => id === asset?.id)?.status).toBe('QA_PASS');
   });
 
+  it('prepares Google Flow prompts, deduplicates downloads, and requires creator confirmation before import', async () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Assisted Flow', question: 'Can creator-operated generation remain traceable?'});
+    const projectId = created.project.id;
+    const importDirectory = mkdtempSync(path.join(tmpdir(), 'narra-flow-import-'));
+    temporaryDirectories.push(importDirectory);
+    const scenesPath = path.join(importDirectory, 'scenes.json');
+    const shotsPath = path.join(importDirectory, 'shots.json');
+    writeFileSync(scenesPath, JSON.stringify([{
+      id: 'scene-flow', projectId, order: 0, title: 'Physical infrastructure',
+      narration: 'A physical system sits behind the interface.', durationSec: 6, claimIds: [],
+    }]), 'utf8');
+    writeFileSync(shotsPath, JSON.stringify([{
+      id: 'shot-flow', projectId, sceneId: 'scene-flow', order: 0, durationSec: 6,
+      visualType: 'AI_IMAGE', visualPurpose: 'Show restrained physical infrastructure at dusk',
+      assetRoute: 'GOOGLE_FLOW', evidenceRequired: true, claimIds: [],
+    }]), 'utf8');
+    store.importStoryboard(projectId, scenesPath, shotsPath);
+    store.saveEditorialDocument(projectId, 'THESIS', 'The interface depends on physical infrastructure.');
+    store.saveEditorialDocument(projectId, 'SCRIPT', '# Opening\n\nA physical system sits behind the interface.');
+    for (const gate of ['TOPIC', 'THESIS', 'SCRIPT', 'STORYBOARD'] as const) store.approveGate(projectId, gate, 'Flow test approval.');
+
+    let storyboard = store.prepareFlowAssetTask(projectId, {shotId: 'shot-flow', kind: 'IMAGE'});
+    const asset = storyboard.assets[0];
+    expect(asset?.task?.flow).toMatchObject({
+      version: 1, shotToken: 'flow-shot-flow-v1', imageModel: 'Nano Banana 2',
+      videoModel: 'Veo 3.1 Lite', generationDurationSec: 6,
+    });
+    expect(asset?.task?.flow?.negativeGuidance).toContain('fabricated evidence');
+    expect(asset?.status).toBe('PLANNED');
+
+    store.setFlowWatchDirectory(projectId, importDirectory);
+    const downloadedImage = path.join(importDirectory, 'flow-shot-flow-v1-result.png');
+    writeFileSync(downloadedImage, Buffer.from(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+      'base64',
+    ));
+    let flowWorkspace = await store.scanFlowCandidates(projectId);
+    expect(flowWorkspace.candidates).toHaveLength(1);
+    expect(flowWorkspace.candidates[0]).toMatchObject({status: 'DETECTED', suggestedShotId: 'shot-flow', kind: 'IMAGE'});
+    flowWorkspace = await store.scanFlowCandidates(projectId);
+    expect(flowWorkspace.candidates).toHaveLength(1);
+    expect(existsSync(downloadedImage)).toBe(true);
+
+    storyboard = store.updateAssetStatus(projectId, asset?.id ?? '', {status: 'AWAITING_HUMAN'});
+    expect(storyboard.assets[0]?.status).toBe('AWAITING_HUMAN');
+    storyboard = await store.selectFlowCandidate(projectId, flowWorkspace.candidates[0]?.id ?? '', asset?.id ?? '');
+    expect(storyboard.assets[0]).toMatchObject({
+      status: 'SELECTED',
+      generation: {provider: 'GOOGLE_FLOW', promptVersion: 1, model: 'Nano Banana 2', sourceFileName: 'flow-shot-flow-v1-result.png'},
+    });
+    expect(storyboard.assets[0]?.status).not.toBe('QA_PASS');
+    expect(store.getFlowWorkspace(projectId).candidates[0]?.status).toBe('SELECTED');
+    expect(existsSync(downloadedImage)).toBe(true);
+  });
+
   it('rejects storyboard imports with broken scene references without changing the project', () => {
     const store = createStore();
     const created = store.createProject({title: 'Broken Storyboard', question: 'Will invalid links be rejected?'});

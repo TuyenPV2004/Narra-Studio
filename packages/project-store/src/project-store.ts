@@ -46,6 +46,7 @@ import {
   existsSync,
   mkdirSync,
   readFileSync,
+  createReadStream,
   readdirSync,
   renameSync,
   statSync,
@@ -64,6 +65,8 @@ import {
 } from './artifact-layout.js';
 import {openWorkspaceDatabase} from './database.js';
 import {compareNarrationTranscript, parseTimedText, parseWordTimestamps} from './caption-parser.js';
+import {FlowAssistedProvider} from './flow-assisted-provider.js';
+import {probeMedia} from './media-probe.js';
 import type {
   ApprovalGate,
   ApprovalRecord,
@@ -89,6 +92,10 @@ import type {
   UpdateAiRunInput,
   SelectTopicInput,
   SaveOutlineInput,
+  PrepareFlowTaskInput,
+  FlowCandidate,
+  FlowCandidateStatus,
+  FlowWorkspace,
 } from './types.js';
 
 type ProjectRow = {
@@ -147,6 +154,22 @@ type JobRow = {
   updated_at: string;
 };
 
+type FlowCandidateRow = {
+  id: string;
+  project_id: string;
+  source_path: string;
+  file_name: string;
+  fingerprint: string;
+  kind: FlowCandidate['kind'];
+  suggested_shot_id: string | null;
+  status: FlowCandidateStatus;
+  asset_id: string | null;
+  file_size_bytes: number;
+  metadata_json: string | null;
+  detected_at: string;
+  updated_at: string;
+};
+
 const atomicWriteJson = (filePath: string, value: unknown): void => {
   const temporaryPath = `${filePath}.tmp`;
   writeFileSync(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
@@ -161,6 +184,14 @@ const atomicWriteText = (filePath: string, value: string): void => {
 
 const contentHash = (content: string): string =>
   createHash('sha256').update(content).digest('hex');
+
+const fileFingerprint = (filePath: string): Promise<string> => new Promise((resolve, reject) => {
+  const hash = createHash('sha256');
+  const stream = createReadStream(filePath);
+  stream.on('data', (chunk) => hash.update(chunk));
+  stream.once('error', reject);
+  stream.once('end', () => resolve(hash.digest('hex')));
+});
 
 const parseJson = (filePath: string): unknown => JSON.parse(readFileSync(filePath, 'utf8')) as unknown;
 
@@ -612,7 +643,6 @@ export class ProjectStore {
       throw new Error(`Asset ${assetId} must be AWAITING_HUMAN before media can be imported.`);
     }
 
-    const {probeMedia} = await import('./media-probe.js');
     const metadata = await probeMedia(sourcePath, asset.kind);
     const extension = path.extname(sourcePath).toLowerCase();
     const destinationDirectory = asset.kind === 'IMAGE' ? 'assets/images' : 'assets/videos';
@@ -641,6 +671,217 @@ export class ProjectStore {
     const projectPrefix = `${path.resolve(project.rootPath)}${path.sep}`;
     if (!resolved.startsWith(projectPrefix)) throw new Error(`Asset ${assetId} points outside its project.`);
     if (!existsSync(resolved)) throw new Error(`Asset media is missing: ${asset.path}`);
+    return resolved;
+  }
+
+  getFlowWorkspace(projectId: string): FlowWorkspace {
+    const project = this.getProject(projectId).project;
+    const setting = this.database.prepare('SELECT watch_directory FROM flow_watch_settings WHERE project_id = ?')
+      .get(projectId) as {watch_directory: string} | undefined;
+    const rows = this.database.prepare(
+      `SELECT id, project_id, source_path, file_name, fingerprint, kind, suggested_shot_id,
+              status, asset_id, file_size_bytes, metadata_json, detected_at, updated_at
+       FROM flow_candidates WHERE project_id = ? ORDER BY detected_at DESC`,
+    ).all(projectId) as FlowCandidateRow[];
+    const assets = AssetCollectionSchema.parse(parseJson(path.join(project.rootPath, 'assets/manifest.json'))).items;
+    return {
+      projectId,
+      watchDirectory: setting?.watch_directory ?? null,
+      flowUrl: 'https://labs.google/fx/tools/flow',
+      promptPackages: assets.flatMap((asset) => asset.task?.provider === 'GOOGLE_FLOW' && asset.task.flow
+        ? [{assetId: asset.id, shotId: asset.shotId, package: asset.task.flow}]
+        : []),
+      candidates: rows.map((row) => ({
+        id: row.id,
+        projectId: row.project_id,
+        fileName: row.file_name,
+        kind: row.kind,
+        suggestedShotId: row.suggested_shot_id,
+        status: row.status,
+        fingerprint: row.fingerprint,
+        fileSizeBytes: row.file_size_bytes,
+        detectedAt: row.detected_at,
+        updatedAt: row.updated_at,
+        metadata: row.metadata_json ? JSON.parse(row.metadata_json) as FlowCandidate['metadata'] : null,
+      })),
+    };
+  }
+
+  setFlowWatchDirectory(projectId: string, directory: string): FlowWorkspace {
+    this.getProject(projectId);
+    const resolved = path.resolve(directory);
+    if (!existsSync(resolved) || !statSync(resolved).isDirectory()) throw new Error(`Flow watch directory was not found: ${resolved}`);
+    this.database.prepare(
+      `INSERT INTO flow_watch_settings (project_id, watch_directory, updated_at) VALUES (?, ?, ?)
+       ON CONFLICT(project_id) DO UPDATE SET watch_directory = excluded.watch_directory, updated_at = excluded.updated_at`,
+    ).run(projectId, resolved, isoNow());
+    return this.getFlowWorkspace(projectId);
+  }
+
+  prepareFlowAssetTask(projectId: string, input: PrepareFlowTaskInput): StoryboardWorkspace {
+    const project = this.getProject(projectId).project;
+    this.ensureApprovalRows(projectId);
+    const storyboardApproval = this.database.prepare("SELECT status FROM approvals WHERE project_id = ? AND gate = 'STORYBOARD'")
+      .get(projectId) as {status: ApprovalRecord['status']} | undefined;
+    if (storyboardApproval?.status !== 'APPROVED') throw new Error('STORYBOARD must be approved before preparing Google Flow assets.');
+    this.assertGateWritable(projectId, 'ASSETS');
+    const shotsPath = path.join(project.rootPath, 'storyboard/shots.json');
+    const assetsPath = path.join(project.rootPath, 'assets/manifest.json');
+    const scenes = SceneCollectionSchema.parse(parseJson(path.join(project.rootPath, 'storyboard/scenes.json')));
+    const shots = ShotCollectionSchema.parse(parseJson(shotsPath));
+    const assets = AssetCollectionSchema.parse(parseJson(assetsPath));
+    const shot = shots.items.find(({id}) => id === input.shotId);
+    if (!shot) throw new Error(`Shot ${input.shotId} was not found.`);
+    const scene = scenes.items.find(({id}) => id === shot.sceneId);
+    if (!scene) throw new Error(`Scene ${shot.sceneId} was not found.`);
+    const existing = shot.assetId ? assets.items.find(({id}) => id === shot.assetId) : undefined;
+    if (existing?.path && input.kind && input.kind !== existing.kind) {
+      throw new Error('Import a replacement task before changing the kind of an asset with media.');
+    }
+    const kind = input.kind ?? (shot.visualType === 'AI_VIDEO' ? 'VIDEO' : 'IMAGE');
+    const version = (existing?.task?.flow?.version ?? 0) + 1;
+    const provider = new FlowAssistedProvider();
+    const flow = provider.createPromptPackage({
+      project,
+      scene,
+      shot,
+      version,
+      ...(input.imageModel ? {imageModel: input.imageModel} : {}),
+      ...(input.videoModel ? {videoModel: input.videoModel} : {}),
+    });
+    const now = isoNow();
+    const assetId = existing?.id ?? `asset-${shot.id}-${randomUUID().slice(0, 6)}`;
+    const nextAsset = AssetSchema.parse({
+      ...(existing ?? {}),
+      id: assetId,
+      projectId,
+      shotId: shot.id,
+      kind,
+      status: existing ? 'AWAITING_HUMAN' : 'PLANNED',
+      rightsNote: existing?.rightsNote ?? 'Creator-generated in Google Flow; creator must confirm usage and documentary context.',
+      task: {
+        provider: 'GOOGLE_FLOW',
+        brief: shot.visualPurpose,
+        prompt: kind === 'VIDEO' ? flow.videoPrompt : flow.imagePrompt,
+        negativePrompt: flow.negativeGuidance,
+        createdAt: now,
+        flow,
+      },
+    });
+    atomicWriteJson(assetsPath, {
+      ...assets,
+      updatedAt: now,
+      items: existing ? assets.items.map((asset) => asset.id === existing.id ? nextAsset : asset) : [...assets.items, nextAsset],
+    });
+    if (!existing) {
+      atomicWriteJson(shotsPath, {
+        ...shots, updatedAt: now,
+        items: shots.items.map((item) => item.id === shot.id ? {...item, assetId} : item),
+      });
+    }
+    this.revokeApprovalChain(projectId, 'ASSETS', 'Google Flow prompt package changed');
+    this.markScopes(projectId, ['ASSETS', 'RENDER'], 'Google Flow prompt package changed');
+    this.refreshProject(projectId);
+    return this.getStoryboardWorkspace(projectId);
+  }
+
+  async scanFlowCandidates(projectId: string): Promise<FlowWorkspace> {
+    const workspace = this.getFlowWorkspace(projectId);
+    if (!workspace.watchDirectory) throw new Error('Choose a Google Flow download directory before scanning.');
+    const directory = path.resolve(workspace.watchDirectory);
+    if (!existsSync(directory) || !statSync(directory).isDirectory()) throw new Error(`Flow watch directory is unavailable: ${directory}`);
+    const extensions = new Map<string, FlowCandidate['kind']>([
+      ['.png', 'IMAGE'], ['.jpg', 'IMAGE'], ['.jpeg', 'IMAGE'], ['.webp', 'IMAGE'],
+      ['.mp4', 'VIDEO'], ['.mov', 'VIDEO'], ['.webm', 'VIDEO'], ['.mkv', 'VIDEO'],
+    ]);
+    const promptPackages = workspace.promptPackages;
+    for (const entry of readdirSync(directory, {withFileTypes: true})) {
+      if (!entry.isFile()) continue;
+      const kind = extensions.get(path.extname(entry.name).toLowerCase());
+      if (!kind) continue;
+      const sourcePath = path.join(directory, entry.name);
+      const fileSize = statSync(sourcePath).size;
+      const unchanged = this.database.prepare(
+        'SELECT 1 AS found FROM flow_candidates WHERE project_id = ? AND source_path = ? AND file_size_bytes = ?',
+      ).get(projectId, sourcePath, fileSize) as {found: number} | undefined;
+      if (unchanged) continue;
+      const fingerprint = await fileFingerprint(sourcePath);
+      const known = this.database.prepare('SELECT 1 AS found FROM flow_candidates WHERE project_id = ? AND fingerprint = ?')
+        .get(projectId, fingerprint) as {found: number} | undefined;
+      if (known) continue;
+      const lowerName = entry.name.toLowerCase();
+      const suggestedShotId = promptPackages.find(({package: promptPackage, shotId}) =>
+        lowerName.includes(promptPackage.shotToken.toLowerCase()) || lowerName.includes(shotId.toLowerCase()),
+      )?.shotId ?? null;
+      const metadata = await probeMedia(sourcePath, kind);
+      const now = isoNow();
+      this.database.prepare(
+        `INSERT INTO flow_candidates
+         (id, project_id, source_path, file_name, fingerprint, kind, suggested_shot_id, status,
+          asset_id, file_size_bytes, metadata_json, detected_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'DETECTED', NULL, ?, ?, ?, ?)`,
+      ).run(
+        `flow-candidate-${randomUUID()}`, projectId, sourcePath, entry.name, fingerprint, kind,
+        suggestedShotId, fileSize, JSON.stringify(metadata), now, now,
+      );
+    }
+    return this.getFlowWorkspace(projectId);
+  }
+
+  async selectFlowCandidate(projectId: string, candidateId: string, assetId: string): Promise<StoryboardWorkspace> {
+    const row = this.getFlowCandidateRow(projectId, candidateId);
+    if (row.status === 'REJECTED') throw new Error('A rejected Flow candidate cannot be selected.');
+    const project = this.getProject(projectId).project;
+    const assetsPath = path.join(project.rootPath, 'assets/manifest.json');
+    const before = AssetCollectionSchema.parse(parseJson(assetsPath));
+    const asset = before.items.find(({id}) => id === assetId);
+    if (!asset?.task?.flow || asset.task.provider !== 'GOOGLE_FLOW') throw new Error(`Asset ${assetId} is not a Google Flow task.`);
+    if (asset.kind !== row.kind) throw new Error(`Flow candidate kind ${row.kind} does not match asset kind ${asset.kind}.`);
+    if (asset.status !== 'AWAITING_HUMAN' && asset.status !== 'QA_FAIL' && asset.status !== 'IMPORTED' && asset.status !== 'SELECTED') {
+      throw new Error(`Mark asset ${assetId} as awaiting creator output before selecting a Flow candidate.`);
+    }
+    await this.importAssetMedia(projectId, assetId, row.source_path);
+    const imported = AssetCollectionSchema.parse(parseJson(assetsPath));
+    const nextAssets = imported.items.map((item): Asset => item.id === assetId ? AssetSchema.parse({
+      ...item,
+      status: 'SELECTED',
+      generation: {
+        provider: 'GOOGLE_FLOW',
+        candidateId,
+        promptVersion: asset.task!.flow!.version,
+        model: asset.kind === 'VIDEO' ? asset.task!.flow!.videoModel : asset.task!.flow!.imageModel,
+        prompt: asset.kind === 'VIDEO' ? asset.task!.flow!.videoPrompt : asset.task!.flow!.imagePrompt,
+        sourceFileName: row.file_name,
+        importedAt: isoNow(),
+      },
+    }) : item);
+    atomicWriteJson(assetsPath, {...imported, updatedAt: isoNow(), items: nextAssets});
+    const now = isoNow();
+    this.database.prepare("UPDATE flow_candidates SET status = 'REJECTED', updated_at = ? WHERE project_id = ? AND asset_id = ? AND id <> ?")
+      .run(now, projectId, assetId, candidateId);
+    this.database.prepare("UPDATE flow_candidates SET status = 'SELECTED', asset_id = ?, suggested_shot_id = ?, updated_at = ? WHERE project_id = ? AND id = ?")
+      .run(assetId, asset.shotId, now, projectId, candidateId);
+    this.refreshProject(projectId);
+    this.markScopes(projectId, ['ASSETS', 'RENDER'], `Google Flow candidate selected for ${assetId}`);
+    this.syncAssetScope(projectId);
+    return this.getStoryboardWorkspace(projectId);
+  }
+
+  rejectFlowCandidate(projectId: string, candidateId: string): FlowWorkspace {
+    const row = this.getFlowCandidateRow(projectId, candidateId);
+    if (row.status === 'SELECTED') throw new Error('Selected Flow candidate must be replaced before it can be rejected.');
+    this.database.prepare("UPDATE flow_candidates SET status = 'REJECTED', updated_at = ? WHERE project_id = ? AND id = ?")
+      .run(isoNow(), projectId, candidateId);
+    return this.getFlowWorkspace(projectId);
+  }
+
+  getFlowCandidateFilePath(projectId: string, candidateId: string): string {
+    const row = this.getFlowCandidateRow(projectId, candidateId);
+    const workspace = this.getFlowWorkspace(projectId);
+    if (!workspace.watchDirectory) throw new Error('Flow watch directory is not configured.');
+    const resolved = path.resolve(row.source_path);
+    const directory = path.resolve(workspace.watchDirectory);
+    if (!resolved.startsWith(`${directory}${path.sep}`) || !existsSync(resolved)) throw new Error('Flow candidate is outside the configured directory or no longer exists.');
     return resolved;
   }
 
@@ -1503,6 +1744,17 @@ export class ProjectStore {
     if (stage === 'THESIS') return 'THESIS';
     if (stage === 'OUTLINE' || stage === 'SCRIPT') return 'SCRIPT';
     return 'STORYBOARD';
+  }
+
+  private getFlowCandidateRow(projectId: string, candidateId: string): FlowCandidateRow {
+    this.getProject(projectId);
+    const row = this.database.prepare(
+      `SELECT id, project_id, source_path, file_name, fingerprint, kind, suggested_shot_id,
+              status, asset_id, file_size_bytes, metadata_json, detected_at, updated_at
+       FROM flow_candidates WHERE project_id = ? AND id = ?`,
+    ).get(projectId, candidateId) as FlowCandidateRow | undefined;
+    if (!row) throw new Error(`Flow candidate ${candidateId} was not found.`);
+    return row;
   }
 
   private assertGateWritable(projectId: string, gate: ApprovalGate): void {

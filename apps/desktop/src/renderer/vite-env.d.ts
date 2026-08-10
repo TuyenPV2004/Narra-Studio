@@ -16,12 +16,14 @@ import type {
   AiWorkspace,
   SelectTopicInput,
   SaveOutlineInput,
+  PrepareFlowTaskInput,
+  FlowWorkspace,
 } from '@narra/project-store';
 import type {AiReasoningEffort, AiStage, AiProjectSettings} from '@narra/contracts';
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 9;
+  readonly version: 10;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -35,6 +37,13 @@ interface NarraDesktopApi {
   updateAssetStatus: (projectId: string, assetId: string, input: AssetStatusInput) => Promise<StoryboardWorkspace>;
   chooseAndImportAssetMedia: (projectId: string, assetId: string) => Promise<StoryboardWorkspace | null>;
   importDroppedAssetMedia: (projectId: string, assetId: string, file: File) => Promise<StoryboardWorkspace>;
+  getFlowWorkspace: (projectId: string) => Promise<FlowWorkspace>;
+  chooseFlowWatchDirectory: (projectId: string) => Promise<FlowWorkspace | null>;
+  scanFlowCandidates: (projectId: string) => Promise<FlowWorkspace>;
+  prepareFlowAssetTask: (projectId: string, input: PrepareFlowTaskInput) => Promise<StoryboardWorkspace>;
+  selectFlowCandidate: (projectId: string, candidateId: string, assetId: string) => Promise<StoryboardWorkspace>;
+  rejectFlowCandidate: (projectId: string, candidateId: string) => Promise<FlowWorkspace>;
+  copyText: (value: string) => Promise<{copied: true}>;
   exportStoryboardRenderInput: (projectId: string) => Promise<string>;
   getVoiceWorkspace: (projectId: string) => Promise<VoiceWorkspace>;
   syncNarrationSegments: (projectId: string) => Promise<VoiceWorkspace>;

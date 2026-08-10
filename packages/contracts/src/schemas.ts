@@ -122,6 +122,29 @@ export const AssetTaskSchema = z.object({
   prompt: z.string().min(1),
   negativePrompt: z.string().optional(),
   createdAt: IsoDateTimeSchema,
+  flow: z.object({
+    version: z.number().int().positive(),
+    shotToken: IdSchema,
+    imageModel: z.string().min(1),
+    videoModel: z.string().min(1),
+    imagePrompt: z.string().min(1),
+    videoPrompt: z.string().min(1),
+    negativeGuidance: z.string().min(1),
+    aspectRatio: z.enum(['16:9', '9:16', '1:1']),
+    generationDurationSec: z.union([z.literal(4), z.literal(6), z.literal(8)]),
+    ingredients: z.array(z.string().min(1)),
+    createdAt: IsoDateTimeSchema,
+  }).optional(),
+});
+
+export const AssetGenerationSchema = z.object({
+  provider: z.literal('GOOGLE_FLOW'),
+  candidateId: IdSchema,
+  promptVersion: z.number().int().positive(),
+  model: z.string().min(1),
+  prompt: z.string().min(1),
+  sourceFileName: z.string().min(1),
+  importedAt: IsoDateTimeSchema,
 });
 
 export const AssetSchema = z.object({
@@ -136,6 +159,7 @@ export const AssetSchema = z.object({
   task: AssetTaskSchema.optional(),
   metadata: MediaMetadataSchema.optional(),
   qaNote: z.string().optional(),
+  generation: AssetGenerationSchema.optional(),
 });
 
 export const NarrationSegmentSchema = z.object({
@@ -298,6 +322,7 @@ export type ProjectBundle = z.infer<typeof ProjectBundleSchema>;
 export type Scene = z.infer<typeof SceneSchema>;
 export type Shot = z.infer<typeof ShotSchema>;
 export type Asset = z.infer<typeof AssetSchema>;
+export type FlowPromptPackage = NonNullable<z.infer<typeof AssetTaskSchema>['flow']>;
 export type MediaMetadata = z.infer<typeof MediaMetadataSchema>;
 export type NarrationSegment = z.infer<typeof NarrationSegmentSchema>;
 export type CaptionCue = z.infer<typeof CaptionCueSchema>;

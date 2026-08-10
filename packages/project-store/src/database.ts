@@ -2,7 +2,7 @@ import {mkdirSync} from 'node:fs';
 import path from 'node:path';
 import {DatabaseSync} from 'node:sqlite';
 
-const DATABASE_VERSION = 4;
+const DATABASE_VERSION = 5;
 
 export const openWorkspaceDatabase = (workspaceRoot: string): DatabaseSync => {
   const stateDirectory = path.join(workspaceRoot, '.narra');
@@ -119,6 +119,36 @@ export const openWorkspaceDatabase = (workspaceRoot: string): DatabaseSync => {
         ON jobs(project_id, idempotency_key)
         WHERE idempotency_key IS NOT NULL AND status IN ('QUEUED', 'RUNNING');
       PRAGMA user_version = 4;
+      COMMIT;
+    `);
+  }
+
+  if (version.user_version < 5) {
+    database.exec(`
+      BEGIN IMMEDIATE;
+      CREATE TABLE flow_watch_settings (
+        project_id TEXT PRIMARY KEY REFERENCES projects(id) ON DELETE CASCADE,
+        watch_directory TEXT NOT NULL,
+        updated_at TEXT NOT NULL
+      ) STRICT;
+      CREATE TABLE flow_candidates (
+        id TEXT PRIMARY KEY,
+        project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+        source_path TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        fingerprint TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        suggested_shot_id TEXT,
+        status TEXT NOT NULL,
+        asset_id TEXT,
+        file_size_bytes INTEGER NOT NULL,
+        metadata_json TEXT,
+        detected_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        UNIQUE(project_id, fingerprint)
+      ) STRICT;
+      CREATE INDEX flow_candidates_project_status ON flow_candidates(project_id, status, detected_at);
+      PRAGMA user_version = 5;
       COMMIT;
     `);
   }
