@@ -26,6 +26,18 @@ pnpm dev
 
 `pnpm validate` chạy lint, typecheck, test và production build. Không chạy Narra bằng cách mở trực tiếp file HTML trong `dist`; ứng dụng cần Electron Main/Preload để truy cập project store, Codex, filesystem và local jobs.
 
+### Lưu trữ local
+
+Khi chạy từ repository hoặc bản `release/win-unpacked` nằm trong repository, Narra lưu dữ liệu tại:
+
+```text
+<repository>/
+├── database/workspace.sqlite
+└── projects/<project-id>/...
+```
+
+Hai thư mục này là dữ liệu local và được Git ignore. Có thể đổi gốc chung bằng `NARRA_STORAGE_ROOT`, hoặc đổi riêng bằng `NARRA_WORKSPACE_ROOT` và `NARRA_DATABASE_ROOT`. Bản cài đặt nằm ngoài repository dùng Electron `userData` làm fallback, không dùng thư mục Documents/OneDrive.
+
 ## 3. Voice runtime
 
 Thiết lập Kokoro local:
@@ -73,7 +85,7 @@ Trong tab **System**, chọn **Choose destination** ở thẻ Project backup. Na
 - Đọc lại `project.json` của bản copy và xác nhận đúng project ID.
 - Báo số file, tổng dung lượng và đường dẫn backup.
 
-Backup project không gồm `.env`, credential, cookie hoặc database index `.narra` của workspace. Để restore, dùng **Open project folder** và chọn thư mục backup chứa `project.json`; Narra sẽ index lại project. Nên mở và chạy **Refresh** trước khi tiếp tục render.
+Backup project không gồm `.env`, credential, cookie hoặc database index trong thư mục `database`. Để restore, dùng **Open project folder** và chọn thư mục backup chứa `project.json`; Narra sẽ index lại project. Nên mở và chạy **Refresh** trước khi tiếp tục render.
 
 Không chọn thư mục đích nằm bên trong project nguồn. ProjectStore chặn trường hợp này để tránh backup đệ quy.
 

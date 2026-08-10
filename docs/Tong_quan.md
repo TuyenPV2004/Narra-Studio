@@ -19,6 +19,8 @@ V1 được triển khai như một desktop application:
 - Remotion và FFmpeg chạy local để preview, probe, transcode và render.
 - Không đưa Supabase, backend server, cloud storage, auth, HTTPS, multi-user hoặc hạ tầng production vào V1 khi chưa có nhu cầu thực tế.
 
+Khi chạy từ repository, workspace local được tách thành `projects/` cho artifact/media và `database/workspace.sqlite` cho index/state; cả hai đều được Git ignore. Có thể cấu hình lại bằng `NARRA_STORAGE_ROOT`, `NARRA_WORKSPACE_ROOT` và `NARRA_DATABASE_ROOT`. Bản cài đặt nằm ngoài repository dùng Electron `userData` làm fallback để không phụ thuộc Documents hoặc OneDrive.
+
 ### 2.2 Codex App Server là lớp AI operator tích hợp
 
 Các bước cần OpenAI model được thực hiện từ chính giao diện Narra thông qua `codex app-server`, đăng nhập bằng tài khoản ChatGPT hiện có:

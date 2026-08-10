@@ -67,6 +67,20 @@ describe('ProjectStore', () => {
     expect(reopened.getProject(created.project.id).project.title).toBe('Grid at Midnight');
   });
 
+  it('can store the SQLite index outside the project workspace', () => {
+    const workspace = mkdtempSync(path.join(tmpdir(), 'narra-project-files-'));
+    const databaseRoot = mkdtempSync(path.join(tmpdir(), 'narra-project-database-'));
+    temporaryDirectories.push(workspace, databaseRoot);
+    const store = new ProjectStore(workspace, {databaseRoot});
+    stores.push(store);
+
+    const created = store.createProject({title: 'Separate State', question: 'Where should local state live?'});
+
+    expect(existsSync(path.join(databaseRoot, 'workspace.sqlite'))).toBe(true);
+    expect(existsSync(path.join(workspace, '.narra', 'workspace.sqlite'))).toBe(false);
+    expect(created.project.rootPath.startsWith(workspace)).toBe(true);
+  });
+
   it('creates a verified portable backup without unfinished render files', () => {
     const store = createStore();
     const created = store.createProject({title: 'Backup Pilot', question: 'Can this project move safely?'});

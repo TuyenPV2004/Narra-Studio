@@ -274,14 +274,16 @@ const mapRow = (row: ProjectRow): ProjectRecord => ({
 
 export class ProjectStore {
   readonly workspaceRoot: string;
+  readonly databaseRoot: string;
   readonly database: DatabaseSync;
   private readonly voiceProvider: VoiceProvider;
 
-  constructor(workspaceRoot: string, options: {voiceProvider?: VoiceProvider} = {}) {
+  constructor(workspaceRoot: string, options: {voiceProvider?: VoiceProvider; databaseRoot?: string} = {}) {
     this.workspaceRoot = path.resolve(workspaceRoot);
+    this.databaseRoot = path.resolve(options.databaseRoot ?? path.join(this.workspaceRoot, '.narra'));
     this.voiceProvider = options.voiceProvider ?? new UnavailableVoiceProvider();
     mkdirSync(this.workspaceRoot, {recursive: true});
-    this.database = openWorkspaceDatabase(this.workspaceRoot);
+    this.database = openWorkspaceDatabase(this.databaseRoot);
   }
 
   close(): void {

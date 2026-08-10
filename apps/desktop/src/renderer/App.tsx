@@ -506,7 +506,23 @@ export const App = () => {
 
               <div className="question-label-row">
                 <label htmlFor="project-guiding-question">Câu hỏi dẫn dắt</label>
-                <span><Sparkles aria-hidden="true" size={13} /> Hỗ trợ bằng AI</span>
+                <button
+                  className={`question-language-button ${questionIsTranslating ? 'translating' : ''}`}
+                  type="button"
+                  aria-label={questionIsTranslating
+                    ? 'Đang dịch câu hỏi sang Tiếng Việt'
+                    : questionDisplayLanguage === 'en'
+                      ? 'Dịch câu hỏi tiếng Anh sang Tiếng Việt'
+                      : 'Hiển thị lại câu hỏi tiếng Anh gốc'}
+                  aria-pressed={questionDisplayLanguage === 'vi'}
+                  aria-busy={questionIsTranslating}
+                  title={questionDisplayLanguage === 'en' ? 'Dịch sang Tiếng Việt' : 'Trở về bản English'}
+                  disabled={busy || questionIsGenerating || questionIsTranslating || !question.trim()}
+                  onClick={() => void translateProjectQuestion()}
+                >
+                  <Languages aria-hidden="true" size={17} />
+                  <span>{questionIsTranslating ? '…' : questionDisplayLanguage === 'en' ? 'Eng' : 'Vie'}</span>
+                </button>
               </div>
               <div className={`question-field-shell ${questionIsWorking ? 'generating' : ''}`}>
                 <textarea
@@ -531,23 +547,6 @@ export const App = () => {
                   rows={5}
                 />
                 <button
-                  className={`question-language-button ${questionIsTranslating ? 'translating' : ''}`}
-                  type="button"
-                  aria-label={questionIsTranslating
-                    ? 'Đang dịch câu hỏi sang Tiếng Việt'
-                    : questionDisplayLanguage === 'en'
-                      ? 'Dịch câu hỏi tiếng Anh sang Tiếng Việt'
-                      : 'Hiển thị lại câu hỏi tiếng Anh gốc'}
-                  aria-pressed={questionDisplayLanguage === 'vi'}
-                  aria-busy={questionIsTranslating}
-                  title={questionDisplayLanguage === 'en' ? 'Dịch sang Tiếng Việt' : 'Trở về bản English'}
-                  disabled={busy || questionIsGenerating || questionIsTranslating || !question.trim()}
-                  onClick={() => void translateProjectQuestion()}
-                >
-                  <Languages aria-hidden="true" size={17} />
-                  <span>{questionIsTranslating ? '…' : questionDisplayLanguage === 'en' ? 'ENG' : 'VIE'}</span>
-                </button>
-                <button
                   className={`question-generate-button ${questionIsGenerating ? 'stop' : ''}`}
                   type="button"
                   aria-label={questionIsGenerating ? 'Dừng tạo câu hỏi dẫn dắt' : 'Tạo câu hỏi dẫn dắt bằng AI'}
@@ -559,48 +558,44 @@ export const App = () => {
                 </button>
               </div>
               <div className="question-help-row" id="project-question-help">
-                <span>Nên 12–32 từ · tối đa 240 ký tự · Sparkles tạo ENG, Languages dịch VIE</span>
                 <strong className={question.length >= 230 ? 'near-limit' : ''}>{questionWordCount} từ · {question.length}/240</strong>
               </div>
               {questionTranslationError && <p className="field-error" role="alert">{questionTranslationError}</p>}
 
-              <section className={`question-generation-panel ${questionGenerationPhase.toLowerCase()} ${questionEvidenceStatus?.toLowerCase() ?? ''}`} id="project-question-status" aria-live="polite">
-                <header>
-                  <div><Sparkles aria-hidden="true" size={16} /><strong>AI tạo câu hỏi dẫn dắt</strong></div>
-                  <span>GPT-5.6 Sol · Medium · ENG{questionEvidenceStatus ? ` · ${formatUiLabel(questionEvidenceStatus)}` : ''}</span>
-                </header>
-                <p>{questionGenerationPhase === 'IDLE' && 'AI chỉ chạy khi anh bấm Sparkles. Kết quả không tự động tạo dự án.'}
-                  {questionGenerationPhase === 'CONNECTING' && 'Đang kiểm tra đăng nhập và model…'}
-                  {questionGenerationPhase === 'RESEARCHING' && 'Đang tìm và mở từng trang nguồn để xác minh phạm vi…'}
-                  {questionGenerationPhase === 'DRAFTING' && 'Đã có bằng chứng; đang soạn một câu hỏi có thể điều tra…'}
-                  {questionGenerationPhase === 'STOPPING' && 'Đang dừng lượt chạy…'}
-                  {questionGenerationPhase === 'COMPLETED' && questionEvidenceStatus === 'SUFFICIENT' && 'Đủ bằng chứng sơ bộ. Anh có thể sửa câu hỏi trước khi tạo dự án.'}
-                  {questionGenerationPhase === 'COMPLETED' && questionEvidenceStatus === 'LIMITED' && 'Bằng chứng còn hạn chế; AI đã giữ câu hỏi rộng và thận trọng để anh duyệt.'}
-                  {questionGenerationPhase === 'COMPLETED' && questionEvidenceStatus === 'INSUFFICIENT' && 'Chưa đủ bằng chứng để tạo câu hỏi an toàn; AI không tự điền nội dung vào khung.'}
-                  {questionGenerationPhase === 'COMPLETED' && !questionEvidenceStatus && 'Hoàn tất. Anh có thể sửa kết quả trước khi tạo dự án.'}
-                  {questionGenerationPhase === 'CANCELLED' && 'Đã dừng. Nội dung cũ trong khung không bị thay đổi.'}
-                  {questionGenerationPhase === 'FAILED' && 'Chưa tạo được câu hỏi. Kiểm tra lỗi bên dưới rồi thử lại.'}</p>
-                {questionGenerationError && <p className="field-error" role="alert">{questionGenerationError}</p>}
-                {questionSources.length > 0 && (
-                  <div className="question-source-list">
-                    <div><Globe2 aria-hidden="true" size={14} /><strong>Nguồn Codex đã mở ({questionSources.length})</strong></div>
-                    {questionSources.map((source) => (
-                      <button key={source.id ?? source.url} type="button" onClick={() => void window.narra.openExternalUrl(source.url)}>
-                        <span>
-                          <strong>{source.publisher}</strong>
-                          <small>{source.publisherType && source.sourceUse ? `${formatUiLabel(source.publisherType)} · ${formatUiLabel(source.sourceUse)} · ${source.title}` : source.title}</small>
-                          {source.supports?.[0] && <small>{formatUiLabel(source.supports[0].evidenceRole)} · {source.supports[0].premise}</small>}
-                          {source.discoveryNote && <small>{source.discoveryNote}</small>}
-                          {source.relevantInterests && <small>Lợi ích liên quan: {source.relevantInterests}</small>}
-                        </span>
-                        <ExternalLink aria-hidden="true" size={14} />
-                      </button>
-                    ))}
-                  </div>
-                )}
-                {questionEditorialNote && <div className="question-rationale"><strong>Ghi chú biên tập</strong><p>{questionEditorialNote}</p></div>}
-                {questionWarnings.length > 0 && <div className="question-warnings"><strong>Phần cần lưu ý</strong>{questionWarnings.map((warning) => <p key={warning}>{warning}</p>)}</div>}
-              </section>
+              {(questionGenerationPhase !== 'IDLE' || questionGenerationError || questionSources.length > 0 || questionEditorialNote || questionWarnings.length > 0) && (
+                <section className={`question-generation-panel ${questionGenerationPhase.toLowerCase()} ${questionEvidenceStatus?.toLowerCase() ?? ''}`} id="project-question-status" aria-live="polite">
+                  {questionGenerationPhase !== 'IDLE' && <p>{questionGenerationPhase === 'CONNECTING' && 'Đang kiểm tra đăng nhập và model…'}
+                    {questionGenerationPhase === 'RESEARCHING' && 'Đang tìm và mở từng trang nguồn để xác minh phạm vi…'}
+                    {questionGenerationPhase === 'DRAFTING' && 'Đã có bằng chứng; đang soạn một câu hỏi có thể điều tra…'}
+                    {questionGenerationPhase === 'STOPPING' && 'Đang dừng lượt chạy…'}
+                    {questionGenerationPhase === 'COMPLETED' && questionEvidenceStatus === 'SUFFICIENT' && 'Đủ bằng chứng sơ bộ. Anh có thể sửa câu hỏi trước khi tạo dự án.'}
+                    {questionGenerationPhase === 'COMPLETED' && questionEvidenceStatus === 'LIMITED' && 'Bằng chứng còn hạn chế; AI đã giữ câu hỏi rộng và thận trọng để anh duyệt.'}
+                    {questionGenerationPhase === 'COMPLETED' && questionEvidenceStatus === 'INSUFFICIENT' && 'Chưa đủ bằng chứng để tạo câu hỏi an toàn; AI không tự điền nội dung vào khung.'}
+                    {questionGenerationPhase === 'COMPLETED' && !questionEvidenceStatus && 'Hoàn tất. Anh có thể sửa kết quả trước khi tạo dự án.'}
+                    {questionGenerationPhase === 'CANCELLED' && 'Đã dừng. Nội dung cũ trong khung không bị thay đổi.'}
+                    {questionGenerationPhase === 'FAILED' && 'Chưa tạo được câu hỏi. Kiểm tra lỗi bên dưới rồi thử lại.'}</p>}
+                  {questionGenerationError && <p className="field-error" role="alert">{questionGenerationError}</p>}
+                  {questionSources.length > 0 && (
+                    <div className="question-source-list">
+                      <div><Globe2 aria-hidden="true" size={14} /><strong>Nguồn Codex đã mở ({questionSources.length})</strong></div>
+                      {questionSources.map((source) => (
+                        <button key={source.id ?? source.url} type="button" onClick={() => void window.narra.openExternalUrl(source.url)}>
+                          <span>
+                            <strong>{source.publisher}</strong>
+                            <small>{source.publisherType && source.sourceUse ? `${formatUiLabel(source.publisherType)} · ${formatUiLabel(source.sourceUse)} · ${source.title}` : source.title}</small>
+                            {source.supports?.[0] && <small>{formatUiLabel(source.supports[0].evidenceRole)} · {source.supports[0].premise}</small>}
+                            {source.discoveryNote && <small>{source.discoveryNote}</small>}
+                            {source.relevantInterests && <small>Lợi ích liên quan: {source.relevantInterests}</small>}
+                          </span>
+                          <ExternalLink aria-hidden="true" size={14} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {questionEditorialNote && <div className="question-rationale"><strong>Ghi chú biên tập</strong><p>{questionEditorialNote}</p></div>}
+                  {questionWarnings.length > 0 && <div className="question-warnings"><strong>Phần cần lưu ý</strong>{questionWarnings.map((warning) => <p key={warning}>{warning}</p>)}</div>}
+                </section>
+              )}
 
               <div className="dialog-actions"><button className="secondary" disabled={busy || questionIsWorking} type="button" onClick={() => setCreateDialogOpen(false)}>Hủy</button><button className="primary" disabled={busy || questionIsWorking || !title.trim() || !question.trim()} type="submit"><Plus aria-hidden="true" size={17} /> Tạo dự án</button></div>
             </form>

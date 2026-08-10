@@ -85,6 +85,30 @@ const getRepositoryRoot = (): string => app.isPackaged
   ? path.join(process.resourcesPath, 'narra-runtime')
   : path.resolve(currentDirectory, '../../..');
 
+const findLocalRepositoryRoot = (startPath: string): string | null => {
+  let candidate = path.resolve(startPath);
+  for (let depth = 0; depth < 8; depth += 1) {
+    if (
+      existsSync(path.join(candidate, 'package.json'))
+      && existsSync(path.join(candidate, 'apps', 'desktop'))
+      && existsSync(path.join(candidate, 'packages', 'project-store'))
+    ) return candidate;
+    const parent = path.dirname(candidate);
+    if (parent === candidate) break;
+    candidate = parent;
+  }
+  return null;
+};
+
+const getLocalStorageRoot = (): string => {
+  if (process.env.NARRA_STORAGE_ROOT) return path.resolve(process.env.NARRA_STORAGE_ROOT);
+  for (const startPath of [process.cwd(), path.dirname(process.execPath), currentDirectory]) {
+    const repositoryRoot = findLocalRepositoryRoot(startPath);
+    if (repositoryRoot) return repositoryRoot;
+  }
+  return app.getPath('userData');
+};
+
 const runVersionCheck = (file: string, args: string[], cwd: string): Promise<{ok: boolean; detail: string}> =>
   new Promise((resolve) => {
     const child = spawn(file, args, {cwd, windowsHide: true, shell: false, env: {...process.env, ELECTRON_RUN_AS_NODE: '1'}});
@@ -988,10 +1012,14 @@ const installApplicationMenu = (): void => {
 
 void app.whenReady().then(async () => {
   installApplicationMenu();
+  const storageRoot = getLocalStorageRoot();
   const workspaceRoot =
-    process.env.NARRA_WORKSPACE_ROOT ?? path.join(app.getPath('documents'), 'Narra Studio', 'projects');
+    process.env.NARRA_WORKSPACE_ROOT ?? path.join(storageRoot, 'projects');
+  const databaseRoot =
+    process.env.NARRA_DATABASE_ROOT ?? path.join(storageRoot, 'database');
   const repositoryRoot = getRepositoryRoot();
   projectStore = new ProjectStore(workspaceRoot, {
+    databaseRoot,
     voiceProvider: new KokoroOnnxProvider({
       repositoryRoot,
       ...(process.env.NARRA_VOICE_RUNTIME_ROOT ? {runtimeRoot: process.env.NARRA_VOICE_RUNTIME_ROOT} : {}),
@@ -1047,12 +1075,12 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Narra Studio' || result.apiVersion !== 14 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Narra Studio' || result.apiVersion !== 16 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Narra Studio\napiVersion=14\nprojectCount=${result.projectCount}\n`,
+      `renderer=Narra Studio\napiVersion=16\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
     if (process.env.NARRA_SMOKE_EDITORIAL_UI === '1') {

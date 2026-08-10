@@ -4,11 +4,10 @@ import {DatabaseSync} from 'node:sqlite';
 
 const DATABASE_VERSION = 5;
 
-export const openWorkspaceDatabase = (workspaceRoot: string): DatabaseSync => {
-  const stateDirectory = path.join(workspaceRoot, '.narra');
-  mkdirSync(stateDirectory, {recursive: true});
+export const openWorkspaceDatabase = (databaseRoot: string): DatabaseSync => {
+  mkdirSync(databaseRoot, {recursive: true});
 
-  const database = new DatabaseSync(path.join(stateDirectory, 'workspace.sqlite'), {
+  const database = new DatabaseSync(path.join(databaseRoot, 'workspace.sqlite'), {
     timeout: 5000,
   });
   database.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
