@@ -2,6 +2,7 @@ import type {Asset} from '@narra/contracts';
 import type {CreateAssetTaskInput, ProjectDetail, StoryboardWorkspace} from '@narra/project-store';
 import type {DragEvent, FormEvent} from 'react';
 import {useEffect, useMemo, useState} from 'react';
+import {Download, FileUp, Upload, WandSparkles} from 'lucide-react';
 
 type Props = {
   projectId: string;
@@ -14,6 +15,11 @@ const previewUrl = (projectId: string, assetId: string): string =>
 
 const formatDuration = (seconds?: number): string =>
   seconds === undefined ? '—' : `${seconds.toFixed(seconds < 10 ? 2 : 1)}s`;
+
+const formatLabel = (value: string): string => {
+  const normalized = value.replaceAll('_', ' ').toLowerCase();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
 
 const statusActions = (status: Asset['status']): Array<{label: string; next: Asset['status']; tone?: 'danger'}> => {
   if (status === 'PLANNED') return [{label: 'Send to creator', next: 'AWAITING_HUMAN'}];
@@ -108,23 +114,23 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
     <section className="storyboard-workspace" aria-busy={busy} aria-label="Storyboard and asset manager">
       <header className="storyboard-toolbar">
         <div>
-          <p className="section-label">STORYBOARD</p>
+          <p className="section-label">Storyboard</p>
           <p>{workspace.scenes.length} scenes · {workspace.shots.length} shots · {workspace.assets.length} assets</p>
         </div>
         <div className="scope-row" aria-label="Downstream freshness">
           {workspace.staleScopes.map((scope) => (
             <span className={`scope-chip ${scope.stale ? 'stale' : 'fresh'}`} key={scope.scope} title={scope.reason ?? 'Up to date'}>
-              {scope.scope} · {scope.stale ? 'STALE' : 'FRESH'}
+              {formatLabel(scope.scope)} · {scope.stale ? 'Needs update' : 'Current'}
             </span>
           ))}
           <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.chooseAndImportStoryboard(projectId))}>
-            Import storyboard
+            <FileUp aria-hidden="true" size={16} /> Import storyboard
           </button>
           <button
             className="secondary"
             disabled={busy || workspace.shots.length === 0}
             onClick={() => void exportRenderInput()}
-          >Export render input</button>
+          ><Download aria-hidden="true" size={16} /> Export render input</button>
         </div>
       </header>
 
@@ -142,7 +148,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
           <nav className="scene-browser" aria-label="Scenes and shots">
             {workspace.scenes.map((scene) => (
               <section className="scene-block" key={scene.id}>
-                <header><span>SCENE {scene.order + 1}</span><strong>{scene.title}</strong><small>{formatDuration(scene.durationSec)}</small></header>
+                <header><span>Scene {scene.order + 1}</span><strong>{scene.title}</strong><small>{formatDuration(scene.durationSec)}</small></header>
                 {(shotsByScene.get(scene.id) ?? []).map((shot) => {
                   const asset = workspace.assets.find(({id}) => id === shot.assetId);
                   return (
@@ -153,7 +159,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                       onClick={() => setSelectedShotId(shot.id)}
                     >
                       <span className="shot-order">{shot.order + 1}</span>
-                      <span><strong>{shot.visualType.replaceAll('_', ' ')}</strong><small>{shot.visualPurpose}</small></span>
+                      <span><strong>{formatLabel(shot.visualType)}</strong><small>{shot.visualPurpose}</small></span>
                       <span className={`asset-dot ${asset?.status.toLowerCase().replaceAll('_', '-') ?? 'missing'}`} title={asset?.status ?? 'No asset'} />
                     </button>
                   );
@@ -166,12 +172,12 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
             {selectedShot && selectedScene ? (
               <>
                 <header className="inspector-heading">
-                  <div><p className="section-label">SHOT {selectedShot.order + 1}</p><h3>{selectedShot.visualPurpose}</h3></div>
+                  <div><p className="section-label">Shot {selectedShot.order + 1}</p><h3>{selectedShot.visualPurpose}</h3></div>
                   <span className="status-pill">{formatDuration(selectedShot.durationSec)}</span>
                 </header>
                 <dl className="shot-facts">
                   <div><dt>Scene</dt><dd>{selectedScene.title}</dd></div>
-                  <div><dt>Visual type</dt><dd>{selectedShot.visualType.replaceAll('_', ' ')}</dd></div>
+                  <div><dt>Visual type</dt><dd>{formatLabel(selectedShot.visualType)}</dd></div>
                   <div><dt>Route</dt><dd>{selectedShot.assetRoute ?? 'Not specified'}</dd></div>
                   <div><dt>Evidence</dt><dd>{selectedShot.evidenceRequired ? 'Required' : 'Not required'}</dd></div>
                 </dl>
@@ -180,7 +186,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                   <div className="storyboard-empty compact"><p>This shot is rendered from structured data and does not require imported media.</p></div>
                 ) : !selectedAsset ? (
                   <form className="asset-task-form" onSubmit={(event) => void createTask(event)}>
-                    <div><p className="section-label">ASSET TASK</p><h3>Create prompt package</h3></div>
+                    <div><p className="section-label">Asset task</p><h3>Create prompt package</h3></div>
                     <div className="form-pair">
                       <label>Kind<select value={task.kind} onChange={(event) => setTask({...task, kind: event.target.value as 'IMAGE' | 'VIDEO'})}><option value="IMAGE">Image</option><option value="VIDEO">Video</option></select></label>
                       <label>Provider<select value={task.provider} onChange={(event) => setTask({...task, provider: event.target.value as CreateAssetTaskInput['provider']})}><option value="GOOGLE_FLOW">Google Flow</option><option value="STOCK">Stock</option><option value="LOCAL">Local</option><option value="OTHER">Other</option></select></label>
@@ -189,13 +195,13 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                     <label>Generation/search prompt<textarea rows={4} value={task.prompt} onChange={(event) => setTask({...task, prompt: event.target.value})} required /></label>
                     <label>Negative prompt<textarea rows={2} value={task.negativePrompt ?? ''} onChange={(event) => setTask({...task, negativePrompt: event.target.value})} /></label>
                     <label>Rights note<input value={task.rightsNote} onChange={(event) => setTask({...task, rightsNote: event.target.value})} required /></label>
-                    <button className="primary" disabled={busy} type="submit">Create asset task</button>
+                    <button className="primary" disabled={busy} type="submit"><WandSparkles aria-hidden="true" size={16} /> Create asset task</button>
                   </form>
                 ) : (
                   <section className="asset-detail">
                     <div className="asset-status-bar">
-                      <div><p className="section-label">ASSET</p><h3>{selectedAsset.id}</h3></div>
-                      <span className={`health ${selectedAsset.status === 'QA_PASS' ? 'valid' : 'pending'}`}>{selectedAsset.status.replaceAll('_', ' ')}</span>
+                      <div><p className="section-label">Asset</p><h3>{selectedAsset.id}</h3></div>
+                      <span className={`health ${selectedAsset.status === 'QA_PASS' ? 'valid' : 'pending'}`}>{formatLabel(selectedAsset.status)}</span>
                     </div>
 
                     {selectedAsset.path ? (
@@ -206,7 +212,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
 
                     {selectedAsset.task && (
                       <details className="prompt-package" open>
-                        <summary>Prompt package · {selectedAsset.task.provider}</summary>
+                        <summary>Prompt package · {formatLabel(selectedAsset.task.provider)}</summary>
                         <p>{selectedAsset.task.brief}</p>
                         <pre>{selectedAsset.task.prompt}</pre>
                         {selectedAsset.task.negativePrompt && <small>Negative: {selectedAsset.task.negativePrompt}</small>}
@@ -222,7 +228,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                         onDrop={(event) => void importDroppedFile(event)}
                       >
                         <p>Drop a replacement file here, or choose one from disk.</p>
-                        <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.chooseAndImportAssetMedia(projectId, selectedAsset.id))}>Import media</button>
+                        <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.chooseAndImportAssetMedia(projectId, selectedAsset.id))}><Upload aria-hidden="true" size={16} /> Import media</button>
                       </div>
                     ) : null}
 

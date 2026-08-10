@@ -26,6 +26,20 @@ Allowed `sourceType`: `PRIMARY`, `OFFICIAL`, `ACADEMIC`, `REPUTABLE_SECONDARY`.
 
 `research/research_packet.md` summarizes the question, evidence lanes, counterpoints, uncertainty, candidate argument, and source IDs. It must not introduce facts absent from `facts.json`.
 
+## AI workspace
+
+U0 adds portable, non-sensitive AI workspace artifacts:
+
+- `ai/settings.json`: desired model/effort, Codex thread/turn IDs, last stage, and connection status. Never store credentials, cookies, access tokens, API keys, or account email here.
+- `ai/runs.json`: stage, prompt, requested/actual model, status, timing, structured error, and optional rate-limit snapshot.
+- `ai/search_activity.json`: search/open/find activity emitted by the agent.
+- `ai/source_cards.json`: UI-ready source summaries linked to an AI run and optional research source/fact IDs.
+- `research/topic_candidates.json`: scored topic proposals linked to the run that produced them.
+- `thesis/thesis_candidates.json`: supportable thesis options linked to facts and their producing run.
+- `script/outline.json`: ordered structured outline sections linked to sources/claims and target duration.
+
+Every run-owned item must reference an existing run in the same project. `packages/contracts/src/ai-schemas.ts` is authoritative for AI error codes, stage/status enums, collection schemas, and the structured output schemas for discover, research, thesis, outline, script, and storyboard.
+
 ## Thesis
 
 Use `thesis/thesis_candidates.json` for 2–3 options during deliberation. Each candidate includes an ID, statement, supporting fact IDs, counterpoint, and falsifiability note.

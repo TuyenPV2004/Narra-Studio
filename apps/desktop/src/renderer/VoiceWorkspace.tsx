@@ -1,5 +1,6 @@
 import type {ProjectDetail, VoiceWorkspace} from '@narra/project-store';
 import {useEffect, useState} from 'react';
+import {AudioLines, Captions, Clock3, RefreshCw, Upload} from 'lucide-react';
 
 type Props = {
   projectId: string;
@@ -11,6 +12,11 @@ const formatSeconds = (value: number | null | undefined): string =>
 
 const narrationUrl = (projectId: string, segmentId: string): string =>
   `narra-media://narration/${encodeURIComponent(projectId)}/${encodeURIComponent(segmentId)}`;
+
+const formatLabel = (value: string): string => {
+  const normalized = value.replaceAll('_', ' ').toLowerCase();
+  return normalized.charAt(0).toUpperCase() + normalized.slice(1);
+};
 
 export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
   const [workspace, setWorkspace] = useState<VoiceWorkspace | null>(null);
@@ -53,13 +59,13 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
     <section className="voice-workspace" aria-busy={busy} aria-label="Voice, captions and timeline sync">
       <header className="voice-toolbar">
         <div>
-          <p className="section-label">VOICE &amp; CAPTIONS</p>
+          <p className="section-label">Voice and captions</p>
           <p>{workspace.segments.length} segments · {workspace.captions.length} cues · {workspace.qaIssues.length} QA issues</p>
         </div>
         <div className="voice-actions">
-          <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.syncNarrationSegments(projectId))}>Sync from storyboard</button>
-          <button className="secondary" disabled={busy || workspace.segments.length === 0} onClick={() => void run(() => window.narra.chooseAndImportCaptions(projectId))}>Import captions</button>
-          <button className="primary" disabled={busy || !audioReady} onClick={() => void run(() => window.narra.fitTimelineToNarration(projectId))}>Fit timeline to audio</button>
+          <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.syncNarrationSegments(projectId))}><RefreshCw aria-hidden="true" size={16} /> Sync from storyboard</button>
+          <button className="secondary" disabled={busy || workspace.segments.length === 0} onClick={() => void run(() => window.narra.chooseAndImportCaptions(projectId))}><Captions aria-hidden="true" size={16} /> Import captions</button>
+          <button className="primary" disabled={busy || !audioReady} onClick={() => void run(() => window.narra.fitTimelineToNarration(projectId))}><Clock3 aria-hidden="true" size={16} /> Fit timeline to audio</button>
         </div>
       </header>
 
@@ -87,9 +93,9 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
                 >
                   <span className="segment-order">VO {String(segment.order + 1).padStart(2, '0')}</span>
                   <strong>{segment.text}</strong>
-                  <small>{segment.status.replaceAll('_', ' ')} · {formatSeconds(segment.durationSec)}</small>
+                  <small>{formatLabel(segment.status)} · {formatSeconds(segment.durationSec)}</small>
                   <span className={`timing-state ${(segmentWarning?.kind ?? 'MISSING_AUDIO').toLowerCase()}`}>
-                    {issueCount > 0 ? `${issueCount} QA` : segmentWarning?.kind.replaceAll('_', ' ') ?? 'MISSING AUDIO'}
+                    {issueCount > 0 ? `${issueCount} QA` : segmentWarning ? formatLabel(segmentWarning.kind) : 'Missing audio'}
                   </span>
                 </button>
               );
@@ -100,8 +106,8 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
             {selected ? (
               <>
                 <header className="inspector-heading">
-                  <div><p className="section-label">NARRATION SEGMENT</p><h3>{selected.id}</h3></div>
-                  <span className={`health ${selected.status === 'READY' ? 'valid' : 'pending'}`}>{selected.status.replaceAll('_', ' ')}</span>
+                  <div><p className="section-label">Narration segment</p><h3>{selected.id}</h3></div>
+                  <span className={`health ${selected.status === 'READY' ? 'valid' : 'pending'}`}>{formatLabel(selected.status)}</span>
                 </header>
 
                 <section className="narration-copy" aria-label="Narration text">
@@ -121,7 +127,7 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
                     <p>Generate or record this segment outside Narra, then import the resulting audio file.</p>
                   </div>
                   <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.chooseAndImportNarrationAudio(projectId, selected.id))}>
-                    {selected.audioPath ? 'Replace segment audio' : 'Import segment audio'}
+                    <Upload aria-hidden="true" size={16} /> {selected.audioPath ? 'Replace segment audio' : 'Import segment audio'}
                   </button>
                 </div>
 
@@ -136,17 +142,17 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
 
                 {warning && (
                   <div className={`timing-warning ${warning.kind.toLowerCase()}`}>
-                    <strong>{warning.kind.replaceAll('_', ' ')}</strong>
+                    <strong>{formatLabel(warning.kind)}</strong>
                     <p>{warning.message}</p>
                   </div>
                 )}
 
                 {issues.length > 0 && (
                   <section className="voice-qa-list" aria-label="Transcript mismatch issues">
-                    <p className="section-label">TRANSCRIPT QA</p>
+                    <p className="section-label">Transcript QA</p>
                     {issues.map((issue) => (
                       <article key={`${issue.segmentId}-${issue.message}`}>
-                        <strong>{issue.severity} · {Math.round(issue.similarity * 100)}% match</strong>
+                        <strong>{formatLabel(issue.severity)} · {Math.round(issue.similarity * 100)}% match</strong>
                         <p>{issue.message}</p>
                       </article>
                     ))}
@@ -159,7 +165,7 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
       )}
 
       <section className="caption-summary">
-        <div><p className="section-label">CAPTION INPUT</p><h3>SRT, WebVTT or word timestamps JSON</h3></div>
+        <div><p className="section-label"><AudioLines aria-hidden="true" size={15} /> Caption input</p><h3>SRT, WebVTT or word timestamps JSON</h3></div>
         <p>Word JSON may use <code>startMs/endMs</code> or seconds-based <code>start/end</code>. Set <code>timebase: "segment"</code> when each segment starts at zero.</p>
       </section>
     </section>

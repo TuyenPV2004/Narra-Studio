@@ -168,7 +168,7 @@ const createWindow = async (): Promise<BrowserWindow> => {
     height: 800,
     minWidth: 960,
     minHeight: 640,
-    backgroundColor: '#0a0d12',
+    backgroundColor: '#f3f5f8',
     webPreferences: {
       preload: path.join(currentDirectory, 'preload.cjs'),
       contextIsolation: true,
@@ -236,14 +236,31 @@ void app.whenReady().then(async () => {
         check();
       })
     `)) as {heading?: string; apiVersion?: number; projectCount?: number; apiError?: string};
-    if (result.heading !== 'Projects' || result.apiVersion !== 6 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
+    if (result.heading !== 'Narra Studio' || result.apiVersion !== 6 || typeof result.projectCount !== 'number' || result.projectCount < 0) {
       throw new Error(`Desktop smoke test received ${JSON.stringify(result)}.`);
     }
     writeFileSync(
       path.join(workspaceRoot, '.desktop-smoke-ok'),
-      `renderer=Projects\napiVersion=6\nprojectCount=${result.projectCount}\n`,
+      `renderer=Narra Studio\napiVersion=6\nprojectCount=${result.projectCount}\n`,
       'utf8',
     );
+    if (process.env.NARRA_SMOKE_SCREENSHOT) {
+      if (process.env.NARRA_SMOKE_OPEN_FIRST_PROJECT === '1') {
+        await mainWindow.webContents.executeJavaScript(`document.querySelector('.project-row:not(.archived)')?.click()`);
+        await new Promise((resolve) => setTimeout(resolve, 350));
+      }
+      if (process.env.NARRA_SMOKE_WORKSPACE_TAB) {
+        const tabLabel = JSON.stringify(process.env.NARRA_SMOKE_WORKSPACE_TAB);
+        await mainWindow.webContents.executeJavaScript(`
+          [...document.querySelectorAll('.workspace-tabs button')]
+            .find((button) => button.textContent?.trim() === ${tabLabel})
+            ?.click()
+        `);
+      }
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      const screenshot = await mainWindow.webContents.capturePage();
+      writeFileSync(process.env.NARRA_SMOKE_SCREENSHOT, screenshot.toPNG());
+    }
     console.log('NARRA_DESKTOP_SMOKE_OK');
     await new Promise((resolve) => setTimeout(resolve, 100));
     jobRunner?.stop();

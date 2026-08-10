@@ -1,4 +1,9 @@
 import {
+  AiProjectSettingsSchema,
+  AiRunCollectionSchema,
+  AiSearchActivityCollectionSchema,
+  AiSourceCardCollectionSchema,
+  AiWorkspaceBundleSchema,
   AssetCollectionSchema,
   AssetSchema,
   CaptionCollectionSchema,
@@ -9,10 +14,13 @@ import {
   ProjectSchema,
   NarrationSegmentCollectionSchema,
   NarrationSegmentSchema,
+  OutlineSectionCollectionSchema,
   SceneCollectionSchema,
   ShotCollectionSchema,
   SourceCollectionSchema,
   ThesisSchema,
+  ThesisCandidateCollectionSchema,
+  TopicCandidateCollectionSchema,
   type Asset,
   type CaptionCue,
   type NarrationSegment,
@@ -38,7 +46,10 @@ import type {DatabaseSync} from 'node:sqlite';
 import {
   COLLECTION_ARTIFACTS,
   CURRENT_ARTIFACT_SCHEMA_VERSION,
+  JSON_ARTIFACTS,
+  OBJECT_ARTIFACTS,
   PROJECT_DIRECTORIES,
+  UPDATE_V1_ARTIFACT_PATHS,
 } from './artifact-layout.js';
 import {openWorkspaceDatabase} from './database.js';
 import {compareNarrationTranscript, parseTimedText, parseWordTimestamps} from './caption-parser.js';
@@ -136,6 +147,23 @@ const contentHash = (content: string): string =>
   createHash('sha256').update(content).digest('hex');
 
 const parseJson = (filePath: string): unknown => JSON.parse(readFileSync(filePath, 'utf8')) as unknown;
+
+const defaultObjectArtifact = (artifactPath: string, projectId: string, updatedAt: string): unknown => {
+  if (artifactPath === 'ai/settings.json') {
+    return {
+      schemaVersion: 1,
+      projectId,
+      updatedAt,
+      desiredModel: 'gpt-5.6-sol',
+      desiredEffort: 'medium',
+      threadId: null,
+      lastStage: null,
+      lastTurnId: null,
+      lastConnectionStatus: 'UNKNOWN',
+    };
+  }
+  throw new Error(`No default object artifact is registered for ${artifactPath}.`);
+};
 
 const replaceProjectId = (value: unknown, previousId: string, nextId: string): unknown => {
   if (value === previousId) return nextId;
@@ -271,6 +299,9 @@ export class ProjectStore {
         items: [],
       });
     }
+    for (const artifact of OBJECT_ARTIFACTS) {
+      atomicWriteJson(path.join(projectRoot, artifact.path), defaultObjectArtifact(artifact.path, project.id, now));
+    }
     writeFileSync(path.join(projectRoot, 'research/research_packet.md'), '', 'utf8');
     atomicWriteJson(path.join(projectRoot, 'thesis/thesis.json'), {schemaVersion: 1, projectId: project.id, updatedAt: now, statement: ''});
     writeFileSync(path.join(projectRoot, 'script/script_v1.md'), '', 'utf8');
@@ -329,6 +360,7 @@ export class ProjectStore {
 
   refreshProject(projectId: string): ProjectDetail {
     const record = this.getProject(projectId).project;
+    this.ensureUpdateV1Artifacts(record.rootPath, projectId);
     this.ensurePhase4Artifacts(record.rootPath, projectId);
     this.ensurePhase5Artifacts(record.rootPath);
     const report = this.validateProjectDirectory(record.rootPath, projectId);
@@ -1181,6 +1213,24 @@ export class ProjectStore {
     }
   }
 
+  private ensureUpdateV1Artifacts(projectRoot: string, projectId: string): void {
+    const now = isoNow();
+    for (const artifact of JSON_ARTIFACTS) {
+      if (!UPDATE_V1_ARTIFACT_PATHS.has(artifact.path)) continue;
+      const filePath = path.join(projectRoot, ...artifact.path.split('/'));
+      if (existsSync(filePath)) continue;
+      const tracked = this.database
+        .prepare('SELECT 1 AS found FROM artifact_versions WHERE project_id = ? AND artifact_path = ?')
+        .get(projectId, artifact.path) as {found: number} | undefined;
+      if (tracked) continue;
+      mkdirSync(path.dirname(filePath), {recursive: true});
+      const value = artifact.path === 'ai/settings.json'
+        ? defaultObjectArtifact(artifact.path, projectId, now)
+        : {schemaVersion: 1, projectId, updatedAt: now, items: []};
+      atomicWriteJson(filePath, value);
+    }
+  }
+
   private ensurePhase5Artifacts(projectRoot: string): void {
     for (const artifactPath of ['research/research_packet.md', 'script/script_v1.md']) {
       const filePath = path.join(projectRoot, ...artifactPath.split('/'));
@@ -1471,7 +1521,7 @@ export class ProjectStore {
     const issues: ValidationIssue[] = [];
     const targets = [
       {path: 'project.json', schema: ProjectSchema},
-      ...COLLECTION_ARTIFACTS,
+      ...JSON_ARTIFACTS,
     ];
 
     for (const target of targets) {
@@ -1571,6 +1621,31 @@ export class ProjectStore {
           suggestion: 'Ensure the file contains valid UTF-8 JSON and is not locked by another process.',
         });
       }
+    }
+
+    try {
+      const aiWorkspace = AiWorkspaceBundleSchema.safeParse({
+        settings: AiProjectSettingsSchema.parse(parseJson(path.join(projectRoot, 'ai/settings.json'))),
+        runs: AiRunCollectionSchema.parse(parseJson(path.join(projectRoot, 'ai/runs.json'))).items,
+        searchActivities: AiSearchActivityCollectionSchema.parse(parseJson(path.join(projectRoot, 'ai/search_activity.json'))).items,
+        sourceCards: AiSourceCardCollectionSchema.parse(parseJson(path.join(projectRoot, 'ai/source_cards.json'))).items,
+        topicCandidates: TopicCandidateCollectionSchema.parse(parseJson(path.join(projectRoot, 'research/topic_candidates.json'))).items,
+        thesisCandidates: ThesisCandidateCollectionSchema.parse(parseJson(path.join(projectRoot, 'thesis/thesis_candidates.json'))).items,
+        outlineSections: OutlineSectionCollectionSchema.parse(parseJson(path.join(projectRoot, 'script/outline.json'))).items,
+      });
+      if (!aiWorkspace.success) {
+        for (const issue of aiWorkspace.error.issues) {
+          issues.push({
+            severity: 'ERROR',
+            file: 'ai/workspace',
+            path: issue.path.join('.'),
+            message: issue.message,
+            suggestion: 'Repair the AI run relationship or regenerate the affected structured output.',
+          });
+        }
+      }
+    } catch {
+      // Per-file schema errors above already provide the actionable details.
     }
 
     try {

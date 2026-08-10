@@ -50,7 +50,7 @@ describe('ProjectStore', () => {
     const created = store.createProject({title: 'Grid at Midnight', question: 'Why is demand changing?'});
 
     expect(created.project.validation?.status).toBe('VALID');
-    expect(created.artifactVersions).toHaveLength(9);
+    expect(created.artifactVersions).toHaveLength(16);
     expect(readFileSync(path.join(created.project.rootPath, 'project.json'), 'utf8')).toContain(created.project.id);
 
     const workspace = store.workspaceRoot;
@@ -89,6 +89,34 @@ describe('ProjectStore', () => {
     expect(opened.project.validation?.status).toBe('VALID');
   });
 
+  it('adds U0 AI artifacts when opening a legacy project without changing its identity', () => {
+    const store = createStore();
+    const created = store.createProject({title: 'Legacy Project', question: 'Can an old project migrate safely?'});
+    const updatePaths = [
+      'ai/runs.json', 'ai/search_activity.json', 'ai/source_cards.json', 'ai/settings.json',
+      'research/topic_candidates.json', 'thesis/thesis_candidates.json', 'script/outline.json',
+    ];
+    for (const artifactPath of updatePaths) {
+      rmSync(path.join(created.project.rootPath, ...artifactPath.split('/')), {force: true});
+      store.database.prepare('DELETE FROM artifact_versions WHERE project_id = ? AND artifact_path = ?')
+        .run(created.project.id, artifactPath);
+    }
+    rmSync(path.join(created.project.rootPath, 'ai'), {recursive: true, force: true});
+
+    const opened = store.openProjectDirectory(created.project.rootPath);
+    expect(opened.project.id).toBe(created.project.id);
+    expect(opened.project.validation?.status).toBe('VALID');
+    expect(opened.artifactVersions).toHaveLength(16);
+    const settings = JSON.parse(readFileSync(path.join(created.project.rootPath, 'ai', 'settings.json'), 'utf8')) as Record<string, unknown>;
+    expect(settings).toMatchObject({
+      projectId: created.project.id,
+      desiredModel: 'gpt-5.6-sol',
+      desiredEffort: 'medium',
+      threadId: null,
+      lastConnectionStatus: 'UNKNOWN',
+    });
+  });
+
   it('reports an actionable error for a newer artifact schema', () => {
     const store = createStore();
     const created = store.createProject({title: 'Future Artifact', question: 'What changed?'});
@@ -104,6 +132,29 @@ describe('ProjectStore', () => {
       path: 'schemaVersion',
     });
     expect(refreshed.project.validation?.issues[0]?.suggestion).toContain('Upgrade Narra Studio');
+  });
+
+  it('reports an invalid AI workspace relationship without modifying editorial artifacts', () => {
+    const store = createStore();
+    const created = store.createProject({title: 'AI Relationship', question: 'Can AI provenance be validated?'});
+    const sourceCardsPath = path.join(created.project.rootPath, 'ai', 'source_cards.json');
+    const sourceCards = JSON.parse(readFileSync(sourceCardsPath, 'utf8')) as {
+      projectId: string;
+      items: unknown[];
+    };
+    sourceCards.items = [{
+      id: 'source-card-one', projectId: created.project.id, runId: 'run-missing',
+      title: 'Official source', url: 'https://example.com/source', summary: 'Relevant evidence.',
+      supportsFactIds: [], accessedAt: '2026-08-10T00:00:00.000Z',
+    }];
+    writeFileSync(sourceCardsPath, `${JSON.stringify(sourceCards, null, 2)}\n`, 'utf8');
+
+    const refreshed = store.refreshProject(created.project.id);
+    expect(refreshed.project.validation?.status).toBe('INVALID');
+    expect(refreshed.project.validation?.issues.some(({file, message}) =>
+      file === 'ai/workspace' && message.includes('unknown run run-missing'),
+    )).toBe(true);
+    expect(readFileSync(path.join(created.project.rootPath, 'script', 'script_v1.md'), 'utf8')).toBe('');
   });
 
   it('moves an asset from planning through human import and QA into the renderable storyboard', async () => {
