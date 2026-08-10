@@ -1,6 +1,6 @@
 import type {ProjectDetail, TimelineWorkspace} from '@narra/project-store';
 import {useEffect, useMemo, useState} from 'react';
-import {AudioLines, Captions, CheckCircle2, Clock3, Music2, Save, SlidersHorizontal, TriangleAlert, Upload} from 'lucide-react';
+import {AudioLines, Captions, CheckCircle2, Clock3, Music2, Save, TriangleAlert, Upload} from 'lucide-react';
 
 const formatTime = (milliseconds: number): string => {
   const totalSeconds = milliseconds / 1000;
@@ -53,7 +53,7 @@ export const TimelineWorkspaceView = ({projectId, onProjectRefresh}: {
   return (
     <section className="timeline-workspace" aria-busy={busy}>
       <header className="timeline-toolbar">
-        <div><p className="section-label">Dòng thời gian bản dựng thô</p><h3>Lời đọc làm mốc chính · {workspace.durationSec.toFixed(2)} giây</h3><p>Media bám theo thời lượng lời đọc đã duyệt. Âm thanh gốc của video được tắt trừ khi bật riêng cho từng shot.</p></div>
+        <div><h3>Lời đọc làm mốc chính · {workspace.durationSec.toFixed(2)} giây</h3><p>Media bám theo thời lượng lời đọc đã duyệt. Âm thanh gốc của video được tắt trừ khi bật riêng cho từng shot.</p></div>
         <div className="actions">
           <button className="secondary" disabled={busy || workspace.segments.some(({durationSec}) => !durationSec)} onClick={() => void run(() => window.narra.generateCaptionsFromNarration(projectId))}><Captions aria-hidden="true" size={16} /> Tạo cue</button>
           <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.chooseAndImportTimelineAudio(projectId, 'MUSIC'))}><Music2 aria-hidden="true" size={16} /> Thêm nhạc</button>
@@ -79,19 +79,19 @@ export const TimelineWorkspaceView = ({projectId, onProjectRefresh}: {
 
       <div className="timeline-columns">
         <section className="timeline-card">
-          <header><div><p className="section-label"><Captions aria-hidden="true" size={15} /> Cue phụ đề</p><h3>{workspace.captions.length} cue có thể chỉnh sửa</h3></div></header>
+          <header><h3>{workspace.captions.length} cue phụ đề có thể chỉnh sửa</h3></header>
           <div className="caption-cue-list">
             {workspace.captions.map((caption) => <button className={caption.id === selectedCaptionId ? 'selected' : ''} key={caption.id} onClick={() => setSelectedCaptionId(caption.id)}><span>{formatTime(caption.startMs)} – {formatTime(caption.endMs)}</span><strong>{caption.text}</strong></button>)}
           </div>
           {selectedCaption && <form className="caption-editor" onSubmit={(event) => { event.preventDefault(); void run(() => window.narra.updateCaptionCue(projectId, selectedCaption.id, draft)); }}>
-            <div className="time-fields"><label>Bắt đầu (ms)<input type="number" min="0" step="1" value={draft.startMs} onChange={(event) => setDraft({...draft, startMs: Number(event.target.value)})} /></label><label>Kết thúc (ms)<input type="number" min="1" step="1" value={draft.endMs} onChange={(event) => setDraft({...draft, endMs: Number(event.target.value)})} /></label></div>
-            <label>Nội dung phụ đề<textarea rows={3} value={draft.text} onChange={(event) => setDraft({...draft, text: event.target.value})} /></label>
+            <div className="time-fields"><label>Bắt đầu (ms)<input type="number" min="0" step="1" value={draft.startMs} onChange={(event) => setDraft({...draft, startMs: Number(event.target.value)})} placeholder="Nhập thời điểm bắt đầu theo ms" /></label><label>Kết thúc (ms)<input type="number" min="1" step="1" value={draft.endMs} onChange={(event) => setDraft({...draft, endMs: Number(event.target.value)})} placeholder="Nhập thời điểm kết thúc theo ms" /></label></div>
+            <label>Nội dung phụ đề<textarea rows={3} value={draft.text} onChange={(event) => setDraft({...draft, text: event.target.value})} placeholder="Nhập nội dung phụ đề" /></label>
             <button className="primary" disabled={busy || !draft.text.trim() || draft.endMs <= draft.startMs}><Save aria-hidden="true" size={16} /> Lưu cue</button>
           </form>}
         </section>
 
         <section className="timeline-card">
-          <header><div><p className="section-label"><SlidersHorizontal aria-hidden="true" size={15} /> Âm thanh nguồn</p><h3>Thiết lập trộn âm theo shot</h3></div></header>
+          <header><h3>Thiết lập trộn âm nguồn theo shot</h3></header>
           <div className="shot-audio-list">
             {workspace.shots.map((shot) => {
               const asset = workspace.assets.find(({id}) => id === shot.assetId);
@@ -102,7 +102,7 @@ export const TimelineWorkspaceView = ({projectId, onProjectRefresh}: {
         </section>
       </div>
 
-      {workspace.preflightIssues.length > 0 && <section className="timeline-card preflight-list"><header><div><p className="section-label">Chi tiết kiểm tra</p><h3>Sửa các mục được đánh dấu lỗi trước khi kết xuất</h3></div></header>{workspace.preflightIssues.map((issue) => <article key={`${issue.code}-${issue.subjectId}`} className={issue.severity.toLowerCase()}><strong>{issue.severity === 'ERROR' ? 'Lỗi' : 'Cảnh báo'} · {issue.code}</strong><p>{issue.message}</p></article>)}</section>}
+      {workspace.preflightIssues.length > 0 && <section className="timeline-card preflight-list"><header><h3>Sửa các mục được đánh dấu lỗi trước khi kết xuất</h3></header>{workspace.preflightIssues.map((issue) => <article key={`${issue.code}-${issue.subjectId}`} className={issue.severity.toLowerCase()}><strong>{issue.severity === 'ERROR' ? 'Lỗi' : 'Cảnh báo'} · {issue.code}</strong><p>{issue.message}</p></article>)}</section>}
     </section>
   );
 };

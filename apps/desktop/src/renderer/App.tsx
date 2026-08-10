@@ -155,7 +155,7 @@ export const App = () => {
       <div className="workspace-grid">
         <aside className="project-rail">
           <header className="project-rail-header">
-            <div><span className="section-label">Thư viện</span><h2>Dự án</h2></div>
+            <h2>Dự án</h2>
             <button className="secondary icon-button" aria-label="Tạo dự án mới" title="Tạo dự án mới (Ctrl+N)" onClick={() => setCreateDialogOpen(true)}>
               <Plus aria-hidden="true" size={17} />
             </button>
@@ -187,7 +187,6 @@ export const App = () => {
           {!selected ? (
             <div className="welcome-panel">
               <span className="empty-illustration"><FileStack aria-hidden="true" size={28} /></span>
-              <p className="section-label">Không gian dự án</p>
               <h2>Xây dựng phim tài liệu với quy trình rõ ràng.</h2>
               <p>Tạo dự án mới hoặc mở một thư mục có sẵn. Narra lưu trạng thái có cấu trúc trong SQLite và đặt media cạnh các artifact của dự án.</p>
               <div className="welcome-actions"><button className="primary" disabled={busy} onClick={() => setCreateDialogOpen(true)}><Plus aria-hidden="true" size={17} /> Tạo dự án mới</button><button className="secondary" disabled={busy} onClick={() => void chooseProject()}><FolderOpen aria-hidden="true" size={17} /> Mở dự án có sẵn</button></div>
@@ -230,7 +229,7 @@ export const App = () => {
               {activeTab === 'overview' ? (
                 <section className="validation-panel">
                   <div className="panel-heading">
-                    <div><p className="section-label">Tình trạng artifact</p><h3>{selected.artifactVersions.length} artifact có phiên bản</h3></div>
+                    <h3>{selected.artifactVersions.length} artifact có phiên bản</h3>
                     <span>{formatUiDate(selected.project.validation?.checkedAt ?? null)}</span>
                   </div>
                   {selected.project.validation?.issues.length ? (
@@ -246,7 +245,7 @@ export const App = () => {
                   )}
 
                   <section className="artifact-table-section" aria-labelledby="artifact-table-title">
-                    <div className="table-heading"><div><p className="section-label">Tệp dự án</p><h3 id="artifact-table-title">Danh mục artifact</h3></div><Search aria-hidden="true" size={18} /></div>
+                    <div className="table-heading"><h3 id="artifact-table-title">Danh mục artifact</h3><Search aria-hidden="true" size={18} /></div>
                     <div className="table-scroll">
                       <table className="data-table">
                         <thead><tr><th>Artifact</th><th>Schema</th><th>Trạng thái</th><th>Cập nhật</th></tr></thead>
@@ -293,12 +292,12 @@ export const App = () => {
         <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget && !busy) setCreateDialogOpen(false); }}>
           <section className="create-project-dialog" role="dialog" aria-modal="true" aria-labelledby="create-project-title">
             <header>
-              <div><p className="section-label">Dự án local</p><h2 id="create-project-title">Tạo dự án mới</h2><p>Bắt đầu bằng một câu hỏi phim tài liệu rõ ràng.</p></div>
+              <div><h2 id="create-project-title">Tạo dự án mới</h2><p>Bắt đầu bằng một câu hỏi phim tài liệu rõ ràng.</p></div>
               <button className="dialog-close" aria-label="Đóng" disabled={busy} onClick={() => setCreateDialogOpen(false)}><X aria-hidden="true" size={19} /></button>
             </header>
             <form onSubmit={(event) => void createProject(event)}>
-              <label>Tên dự án<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} required /></label>
-              <label>Câu hỏi phim tài liệu<textarea value={question} onChange={(event) => setQuestion(event.target.value)} required rows={4} /></label>
+              <label>Tên dự án<input autoFocus value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Nhập tên dự án" required /></label>
+              <label>Câu hỏi phim tài liệu<textarea value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="Nhập câu hỏi trung tâm của phim tài liệu" required rows={4} /></label>
               <div className="dialog-actions"><button className="secondary" disabled={busy} type="button" onClick={() => setCreateDialogOpen(false)}>Hủy</button><button className="primary" disabled={busy || !title.trim() || !question.trim()} type="submit"><Plus aria-hidden="true" size={17} /> Tạo dự án</button></div>
             </form>
           </section>

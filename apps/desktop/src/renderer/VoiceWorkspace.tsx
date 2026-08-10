@@ -1,6 +1,6 @@
 import type {ProjectDetail, VoiceWorkspace} from '@narra/project-store';
 import {useEffect, useRef, useState} from 'react';
-import {AudioLines, Captions, Clock3, Gauge, Mic2, RefreshCw, Sparkles, Upload} from 'lucide-react';
+import {Captions, Clock3, Gauge, Mic2, RefreshCw, Sparkles, Upload} from 'lucide-react';
 import {formatUiLabel} from './ui-locale';
 
 type Props = {
@@ -135,7 +135,6 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
     <section className="voice-workspace" aria-busy={busy} aria-label="Lời đọc, phụ đề và đồng bộ dòng thời gian">
       <header className="voice-toolbar">
         <div>
-          <p className="section-label">Lời đọc và phụ đề</p>
           <p>{workspace.segments.length} đoạn · {workspace.captions.length} cue · {workspace.qaIssues.length} vấn đề QA</p>
         </div>
         <div className="voice-actions">
@@ -191,7 +190,7 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
             {selected ? (
               <>
                 <header className="inspector-heading">
-                  <div><p className="section-label">Đoạn lời đọc</p><h3>{selected.id}</h3></div>
+                  <h3>Đoạn lời đọc · {selected.id}</h3>
                   <span className={`health ${selected.status === 'READY' ? 'valid' : 'pending'}`}>{formatUiLabel(selected.status)}</span>
                 </header>
 
@@ -201,7 +200,7 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
                 </section>
 
                 <section className="voice-generation-card" aria-label="Thiết lập giọng Kokoro">
-                  <header><div><p className="section-label">Tạo trên máy</p><h3>Giọng đọc và cách thể hiện Kokoro</h3></div><Gauge aria-hidden="true" size={20} /></header>
+                  <header><h3>Giọng đọc và cách thể hiện Kokoro</h3><Gauge aria-hidden="true" size={20} /></header>
                   <div className="voice-generation-fields">
                     <label>Mẫu giọng<select value={presetId} onChange={(event) => {
                       const nextId = event.target.value;
@@ -211,7 +210,7 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
                     }}>{workspace.presets.map((preset) => <option key={preset.id} value={preset.id}>{preset.label}</option>)}</select><small>{workspace.presets.find(({id}) => id === presetId)?.description}</small></label>
                     <label>Tốc độ <output>{speed.toFixed(2)}×</output><input aria-label="Tốc độ lời đọc" type="range" min="0.8" max="1.2" step="0.01" value={speed} onChange={(event) => setSpeed(Number(event.target.value))} /></label>
                   </div>
-                  <label>Từ điển phát âm<textarea rows={3} value={pronunciationNotes} onChange={(event) => setPronunciationNotes(event.target.value)} placeholder="OpenAI=Open A I; API=A P I" /><small>Mỗi dòng dùng một mục <code>từ=cách đọc</code>, hoặc ngăn cách các mục bằng dấu chấm phẩy.</small></label>
+                  <label>Từ điển phát âm<textarea rows={3} value={pronunciationNotes} onChange={(event) => setPronunciationNotes(event.target.value)} placeholder="Nhập từ và cách đọc theo định dạng từ=cách đọc" /><small>Mỗi dòng dùng một mục <code>từ=cách đọc</code>, hoặc ngăn cách các mục bằng dấu chấm phẩy.</small></label>
                   <div className="voice-generation-actions"><button className="primary" disabled={busy || !workspace.runtime.available} onClick={() => void generateSelected()}><Sparkles aria-hidden="true" size={16} /> {selected.audioPath ? 'Tạo lại đoạn' : 'Tạo đoạn'}</button><span>Chạy hoàn toàn trên máy. Âm thanh cũ chỉ được thay bằng phiên bản mới sau khi tạo thành công.</span></div>
                 </section>
 
@@ -257,7 +256,7 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
 
                 {issues.length > 0 && (
                   <section className="voice-qa-list" aria-label="Các vấn đề sai lệch bản chép lời">
-                    <p className="section-label">QA bản chép lời</p>
+                    <h4 className="panel-title">QA bản chép lời</h4>
                     {issues.map((issue) => (
                       <article key={`${issue.segmentId}-${issue.message}`}>
                         <strong>{formatUiLabel(issue.severity)} · khớp {Math.round(issue.similarity * 100)}%</strong>
@@ -273,7 +272,7 @@ export const VoiceWorkspaceView = ({projectId, onProjectRefresh}: Props) => {
       )}
 
       <section className="caption-summary">
-        <div><p className="section-label"><AudioLines aria-hidden="true" size={15} /> Dữ liệu phụ đề</p><h3>SRT, WebVTT hoặc JSON mốc thời gian theo từ</h3></div>
+        <h3>SRT, WebVTT hoặc JSON mốc thời gian theo từ</h3>
         <p>JSON theo từ có thể dùng <code>startMs/endMs</code> hoặc <code>start/end</code> theo giây. Đặt <code>timebase: "segment"</code> khi mỗi đoạn bắt đầu từ 0.</p>
       </section>
     </section>

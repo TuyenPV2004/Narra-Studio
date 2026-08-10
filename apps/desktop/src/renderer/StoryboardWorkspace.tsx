@@ -196,7 +196,6 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
     <section className="storyboard-workspace" aria-busy={busy} aria-label="Storyboard và trình quản lý tài nguyên">
       <header className="storyboard-toolbar">
         <div>
-          <p className="section-label">Storyboard</p>
           <p>{workspace.scenes.length} cảnh · {workspace.shots.length} shot · {workspace.assets.length} tài nguyên</p>
         </div>
         <div className="scope-row" aria-label="Mức cập nhật của dữ liệu phía sau">
@@ -255,7 +254,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
             {selectedShot && selectedScene ? (
               <>
                 <header className="inspector-heading">
-                  <div><p className="section-label">Shot {selectedShot.order + 1}</p><h3>{selectedShot.visualPurpose}</h3></div>
+                  <h3>Shot {selectedShot.order + 1} · {selectedShot.visualPurpose}</h3>
                   <span className="status-pill">{formatDuration(selectedShot.durationSec)}</span>
                 </header>
                 <dl className="shot-facts">
@@ -269,7 +268,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                   <div className="storyboard-empty compact"><p>Shot này được kết xuất từ dữ liệu có cấu trúc và không cần media nhập ngoài.</p></div>
                 ) : !selectedAsset ? (
                   <form className="asset-task-form" onSubmit={(event) => void createTask(event)}>
-                    <div><p className="section-label">Tác vụ tài nguyên</p><h3>Tạo gói prompt</h3></div>
+                    <h3>Tạo gói prompt tài nguyên</h3>
                     <div className="flow-quick-start">
                       <WandSparkles aria-hidden="true" size={20} />
                       <div><strong>Google Flow có hỗ trợ</strong><p>Tạo cả prompt ảnh Nano Banana và video Veo từ shot đã duyệt này.</p></div>
@@ -279,16 +278,16 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                       <label>Loại<select value={task.kind} onChange={(event) => setTask({...task, kind: event.target.value as 'IMAGE' | 'VIDEO'})}><option value="IMAGE">Ảnh</option><option value="VIDEO">Video</option></select></label>
                       <label>Nhà cung cấp<select value={task.provider} onChange={(event) => setTask({...task, provider: event.target.value as CreateAssetTaskInput['provider']})}><option value="GOOGLE_FLOW">Google Flow</option><option value="STOCK">Kho media</option><option value="LOCAL">Trên máy</option><option value="OTHER">Khác</option></select></label>
                     </div>
-                    <label>Mô tả hình ảnh<textarea rows={2} value={task.brief} onChange={(event) => setTask({...task, brief: event.target.value})} required /></label>
-                    <label>Prompt tạo/tìm kiếm<textarea rows={4} value={task.prompt} onChange={(event) => setTask({...task, prompt: event.target.value})} required /></label>
-                    <label>Prompt loại trừ<textarea rows={2} value={task.negativePrompt ?? ''} onChange={(event) => setTask({...task, negativePrompt: event.target.value})} /></label>
-                    <label>Ghi chú bản quyền<input value={task.rightsNote} onChange={(event) => setTask({...task, rightsNote: event.target.value})} required /></label>
+                    <label>Mô tả hình ảnh<textarea rows={2} value={task.brief} onChange={(event) => setTask({...task, brief: event.target.value})} placeholder="Nhập mô tả hình ảnh cần có" required /></label>
+                    <label>Prompt tạo/tìm kiếm<textarea rows={4} value={task.prompt} onChange={(event) => setTask({...task, prompt: event.target.value})} placeholder="Nhập prompt tạo hoặc tìm kiếm tài nguyên" required /></label>
+                    <label>Prompt loại trừ<textarea rows={2} value={task.negativePrompt ?? ''} onChange={(event) => setTask({...task, negativePrompt: event.target.value})} placeholder="Nhập các yếu tố cần loại trừ" /></label>
+                    <label>Ghi chú bản quyền<input value={task.rightsNote} onChange={(event) => setTask({...task, rightsNote: event.target.value})} placeholder="Nhập nguồn và ghi chú quyền sử dụng" required /></label>
                     <button className="primary" disabled={busy} type="submit"><WandSparkles aria-hidden="true" size={16} /> Tạo tác vụ tài nguyên</button>
                   </form>
                 ) : (
                   <section className="asset-detail">
                     <div className="asset-status-bar">
-                      <div><p className="section-label">Tài nguyên</p><h3>{selectedAsset.id}</h3></div>
+                      <h3>Tài nguyên · {selectedAsset.id}</h3>
                       <span className={`health ${selectedAsset.status === 'QA_PASS' ? 'valid' : 'pending'}`}>{formatUiLabel(selectedAsset.status)}</span>
                     </div>
 
@@ -310,7 +309,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                     {selectedAsset.task?.flow && (
                       <section className="flow-assistant-panel" aria-label="Google Flow assisted workflow">
                         <header>
-                          <div><p className="section-label">Google Flow có hỗ trợ</p><h3>{selectedAsset.task.flow.shotToken}</h3></div>
+                          <h3>Google Flow · {selectedAsset.task.flow.shotToken}</h3>
                           <span className="status-pill">Prompt v{selectedAsset.task.flow.version}</span>
                         </header>
                         <dl className="flow-settings-grid">
@@ -387,7 +386,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
       {candidateToConfirm && (
         <div className="modal-scrim" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCandidateToConfirm(null); }}>
           <section className="candidate-dialog" role="dialog" aria-modal="true" aria-labelledby="candidate-dialog-title">
-            <header><div><p className="section-label">Xác nhận nhập từ Flow</p><h3 id="candidate-dialog-title">Ánh xạ ứng viên vào tác vụ tài nguyên</h3></div><button className="icon-button" aria-label="Đóng hộp thoại ứng viên" onClick={() => setCandidateToConfirm(null)}><X aria-hidden="true" size={17} /></button></header>
+            <header><h3 id="candidate-dialog-title">Ánh xạ ứng viên vào tác vụ tài nguyên</h3><button className="icon-button" aria-label="Đóng hộp thoại ứng viên" onClick={() => setCandidateToConfirm(null)}><X aria-hidden="true" size={17} /></button></header>
             <div className="dialog-preview">{candidateToConfirm.kind === 'VIDEO' ? <video controls src={candidatePreviewUrl(projectId, candidateToConfirm.id)} /> : <img alt={candidateToConfirm.fileName} src={candidatePreviewUrl(projectId, candidateToConfirm.id)} />}</div>
             <p className="candidate-file-name">{candidateToConfirm.fileName}</p>
             <label>Shot và tác vụ tài nguyên đích<select value={candidateAssetId} onChange={(event) => setCandidateAssetId(event.target.value)}><option value="">Chọn đích…</option>{workspace.assets.filter((asset) => asset.kind === candidateToConfirm.kind && asset.task?.provider === 'GOOGLE_FLOW').map((asset) => <option key={asset.id} value={asset.id}>{asset.shotId} · {asset.id}</option>)}</select></label>

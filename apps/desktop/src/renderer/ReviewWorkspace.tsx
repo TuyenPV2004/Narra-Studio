@@ -66,8 +66,8 @@ export const ReviewWorkspaceView = ({projectId, onProjectRefresh}: {
   return (
     <section className="review-workspace">
       <header className="review-toolbar">
-        <div><p className="section-label">Quy trình phê duyệt</p><h3>Bảy cổng duyệt trên một lộ trình rõ ràng</h3></div>
-        <label>Ghi chú phê duyệt<input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú quyết định, không bắt buộc" /></label>
+        <h3>Bảy cổng duyệt trên một lộ trình rõ ràng</h3>
+        <label>Ghi chú phê duyệt<input value={note} onChange={(event) => setNote(event.target.value)} placeholder="Nhập ghi chú quyết định (không bắt buộc)" /></label>
       </header>
       {error && <div className="notice error-notice">{error}</div>}
       <div className="gate-list">
@@ -88,12 +88,12 @@ export const ReviewWorkspaceView = ({projectId, onProjectRefresh}: {
       </div>
       <section className="render-panel">
         <header>
-          <div><p className="section-label">Hàng đợi local</p><h3>Snapshot có phiên bản, tiến độ và khả năng phục hồi</h3></div>
+          <h3>Snapshot có phiên bản, tiến độ và khả năng phục hồi</h3>
           <div className="actions"><button className="secondary" disabled={busy} onClick={() => void queue('ROUGH')}><Play aria-hidden="true" size={16} /> Xếp bản dựng thô</button><button className="primary" disabled={busy} onClick={() => void queue('FINAL')}><FileVideo aria-hidden="true" size={16} /> Xếp bản cuối</button></div>
         </header>
         {workspace.jobs.length === 0 ? <p className="render-empty">Chưa có yêu cầu kết xuất. Hãy duyệt tài nguyên trước khi xếp bản dựng thô.</p> : workspace.jobs.map((job) => (
           <article className="render-job" key={job.id}>
-            <p className="section-label">{formatUiLabel(job.type)}</p>
+            <strong className="job-kind">{formatUiLabel(job.type)}</strong>
             <div><strong>{formatUiLabel(job.target)} · v{job.version}</strong><span className={`job-state ${job.status.toLowerCase()}`}>{formatUiLabel(job.status)}</span><small>{formatUiDate(job.updatedAt)}</small></div>
             <code>{job.inputSnapshotPath}</code>
             <progress max={1} value={job.progress} aria-label={`Tiến độ kết xuất ${Math.round(job.progress * 100)} phần trăm`} />

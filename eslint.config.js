@@ -9,6 +9,9 @@ export default tseslint.config(
       '**/dist-electron/**',
       '**/node_modules/**',
       'coverage/**',
+      '.codex-build/**',
+      '.package-stage/**',
+      'release/**',
     ],
   },
   eslint.configs.recommended,
@@ -26,4 +29,3 @@ export default tseslint.config(
     },
   },
 );
-

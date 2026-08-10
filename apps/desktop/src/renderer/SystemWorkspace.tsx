@@ -35,7 +35,7 @@ export const SystemWorkspaceView = ({projectId}: {projectId: string}) => {
   return (
     <section className="system-workspace" aria-busy={busy}>
       <header className="system-toolbar">
-        <div><p className="section-label">Hệ thống local</p><h3>Chẩn đoán và khôi phục dự án</h3><p>Kiểm tra runtime local mà không hiển thị thông tin đăng nhập hoặc gửi dữ liệu dự án tới API bên ngoài.</p></div>
+        <div><h3>Chẩn đoán và khôi phục dự án</h3><p>Kiểm tra runtime local mà không hiển thị thông tin đăng nhập hoặc gửi dữ liệu dự án tới API bên ngoài.</p></div>
         <button className="secondary" disabled={busy} onClick={() => void runDiagnostics()}><RefreshCw aria-hidden="true" size={16} /> Chạy chẩn đoán</button>
       </header>
       {error && <div className="notice error-notice" role="alert">{error}</div>}
@@ -57,7 +57,7 @@ export const SystemWorkspaceView = ({projectId}: {projectId: string}) => {
 
       <section className="backup-card">
         <Archive aria-hidden="true" size={22} />
-        <div><p className="section-label">Sao lưu dự án</p><h3>Tạo bản sao thư mục đã xác minh</h3><p>Bản sao lưu được tạo ngoài dự án đang mở và bỏ qua tệp kết xuất dở dang có tên <code>.working</code>. Thông tin đăng nhập và database của workspace không được sao chép.</p>{backup && <div className="backup-result" aria-live="polite"><strong>Sao lưu hoàn tất · {backup.fileCount} tệp · {(backup.totalBytes / 1024 / 1024).toFixed(2)} MB</strong><code>{backup.backupPath}</code></div>}</div>
+        <div><h3>Tạo bản sao thư mục đã xác minh</h3><p>Bản sao lưu được tạo ngoài dự án đang mở và bỏ qua tệp kết xuất dở dang có tên <code>.working</code>. Thông tin đăng nhập và database của workspace không được sao chép.</p>{backup && <div className="backup-result" aria-live="polite"><strong>Sao lưu hoàn tất · {backup.fileCount} tệp · {(backup.totalBytes / 1024 / 1024).toFixed(2)} MB</strong><code>{backup.backupPath}</code></div>}</div>
         <button className="primary" disabled={busy} onClick={() => void createBackup()}>Chọn nơi lưu</button>
       </section>
     </section>
