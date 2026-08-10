@@ -29,6 +29,3 @@ fixtures/**/renders/**
 Thumbs.db
 .idea/
 .vscode/
-
-.agent/
-docs/
