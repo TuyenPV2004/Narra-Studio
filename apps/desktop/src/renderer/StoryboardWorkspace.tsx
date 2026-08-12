@@ -4,6 +4,7 @@ import type {DragEvent, FormEvent} from 'react';
 import {useEffect, useMemo, useState} from 'react';
 import {Check, Copy, Download, ExternalLink, FileUp, FolderOpen, RefreshCw, Upload, WandSparkles, X} from 'lucide-react';
 import {formatUiLabel} from './ui-locale';
+import type {FlowAccount, FlowAutomationJob} from '../electron/provider-types';
 
 type Props = {
   projectId: string;
@@ -39,20 +40,38 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
   const [message, setMessage] = useState<string | null>(null);
   const [candidateToConfirm, setCandidateToConfirm] = useState<FlowCandidate | null>(null);
   const [candidateAssetId, setCandidateAssetId] = useState('');
+  const [flowAccounts, setFlowAccounts] = useState<FlowAccount[]>([]);
+  const [flowJobs, setFlowJobs] = useState<FlowAutomationJob[]>([]);
+  const [selectedFlowSlot, setSelectedFlowSlot] = useState(0);
   const [task, setTask] = useState<CreateAssetTaskInput>({
     shotId: '', kind: 'IMAGE', provider: 'GOOGLE_FLOW', brief: '', prompt: '', rightsNote: '',
   });
 
   const load = async (): Promise<void> => {
-    const [next, flow] = await Promise.all([window.narra.getStoryboard(projectId), window.narra.getFlowWorkspace(projectId)]);
+    const [next, flow, accounts, jobs] = await Promise.all([
+      window.narra.getStoryboard(projectId), window.narra.getFlowWorkspace(projectId),
+      window.narra.flowListAccounts(), window.narra.flowListJobs(projectId),
+    ]);
     setWorkspace(next);
     setFlowWorkspace(flow);
+    setFlowAccounts(accounts);
+    setFlowJobs(jobs);
     setSelectedShotId((current) => current && next.shots.some(({id}) => id === current) ? current : next.shots[0]?.id ?? null);
   };
 
   useEffect(() => {
     void load().catch((reason: unknown) => setError(reason instanceof Error ? reason.message : 'Không thể tải storyboard.'));
   }, [projectId]);
+
+  useEffect(() => window.narra.onProviderEvent((event) => {
+    if (event.type === 'flow-accounts-updated') setFlowAccounts(event.payload as FlowAccount[]);
+    if (event.type === 'flow-job-updated') {
+      const job = event.payload as FlowAutomationJob;
+      if (job.projectId !== projectId) return;
+      setFlowJobs((current) => [job, ...current.filter(({id}) => id !== job.id)]);
+    }
+    if (event.type === 'flow-asset-attached') void load().catch(() => undefined);
+  }), [projectId]);
 
   useEffect(() => {
     if (!flowWorkspace?.watchDirectory) return;
@@ -142,8 +161,33 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
   });
 
   const openFlow = (): Promise<void> => runFlow(async () => {
-    await window.narra.openExternalUrl(flowWorkspace?.flowUrl ?? 'https://labs.google/fx/tools/flow');
-    setMessage('Đã mở Google Flow trong trình duyệt. Narra không tự nhấn Tạo hoặc sử dụng credit.');
+    await window.narra.flowOpenAccount(selectedFlowSlot);
+    setMessage('Đã mở Google Flow trong phiên Narra của tài khoản đã chọn.');
+  });
+
+  const loginFlow = (): Promise<void> => runFlow(async () => {
+    await window.narra.flowLoginAccount(selectedFlowSlot);
+    setFlowAccounts(await window.narra.flowListAccounts());
+    setMessage('Hãy đăng nhập hoặc hoàn tất xác minh trực tiếp trong cửa sổ Google Flow.');
+  });
+
+  const logoutFlow = (): Promise<void> => runFlow(async () => {
+    await window.narra.flowLogoutAccount(selectedFlowSlot);
+    setFlowAccounts(await window.narra.flowListAccounts());
+    setMessage('Đã xóa dữ liệu phiên local của tài khoản Flow đã chọn.');
+  });
+
+  const generateWithFlow = (): Promise<void> => runFlow(async () => {
+    if (!selectedAsset?.task?.flow) throw new Error('Asset chưa có gói prompt Google Flow.');
+    const job = await window.narra.flowSubmitAsset(projectId, selectedAsset.id, selectedFlowSlot);
+    setFlowJobs((current) => [job, ...current.filter(({id}) => id !== job.id)]);
+    setMessage('Narra đã xếp hàng tác vụ Google Flow. Credit chỉ được dùng sau thao tác này của anh.');
+  });
+
+  const generateWithAvis = (): Promise<void> => runFlow(async () => {
+    if (!selectedAsset) throw new Error('Hãy chọn asset trước.');
+    setWorkspace(await window.narra.avisGenerateAsset(projectId, selectedAsset.id));
+    setMessage('Avis đã sinh media và Narra đã nhập đầu ra để chờ QA.');
   });
 
   const confirmCandidate = (candidate: FlowCandidate): void => {
@@ -276,7 +320,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                     </div>
                     <div className="form-pair">
                       <label>Loại<select value={task.kind} onChange={(event) => setTask({...task, kind: event.target.value as 'IMAGE' | 'VIDEO'})}><option value="IMAGE">Ảnh</option><option value="VIDEO">Video</option></select></label>
-                      <label>Nhà cung cấp<select value={task.provider} onChange={(event) => setTask({...task, provider: event.target.value as CreateAssetTaskInput['provider']})}><option value="GOOGLE_FLOW">Google Flow</option><option value="STOCK">Kho media</option><option value="LOCAL">Trên máy</option><option value="OTHER">Khác</option></select></label>
+                      <label>Nhà cung cấp<select value={task.provider} onChange={(event) => setTask({...task, provider: event.target.value as CreateAssetTaskInput['provider']})}><option value="GOOGLE_FLOW">Google Flow tự động</option><option value="AVIS">Avis API</option><option value="STOCK">Kho media</option><option value="LOCAL">Trên máy</option><option value="OTHER">Khác</option></select></label>
                     </div>
                     <label>Mô tả hình ảnh<textarea rows={2} value={task.brief} onChange={(event) => setTask({...task, brief: event.target.value})} placeholder="Nhập mô tả hình ảnh cần có" required /></label>
                     <label>Prompt tạo/tìm kiếm<textarea rows={4} value={task.prompt} onChange={(event) => setTask({...task, prompt: event.target.value})} placeholder="Nhập prompt tạo hoặc tìm kiếm tài nguyên" required /></label>
@@ -307,7 +351,7 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                     )}
 
                     {selectedAsset.task?.flow && (
-                      <section className="flow-assistant-panel" aria-label="Google Flow assisted workflow">
+                      <section className="provider-panel" aria-label="Narra Google Flow automation">
                         <header>
                           <h3>Google Flow · {selectedAsset.task.flow.shotToken}</h3>
                           <span className="status-pill">Prompt v{selectedAsset.task.flow.version}</span>
@@ -324,10 +368,15 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                         </div>
                         <details className="flow-negative"><summary>Hướng dẫn loại trừ và thành phần</summary><p>{selectedAsset.task.flow.negativeGuidance}</p><small>{selectedAsset.task.flow.ingredients.join(' · ') || 'Không cần thành phần tham chiếu.'}</small></details>
                         <div className="flow-action-row">
+                          <label>Tài khoản Flow<select value={selectedFlowSlot} onChange={(event) => setSelectedFlowSlot(Number(event.target.value))}>{flowAccounts.map((account) => <option key={account.id} value={account.id}>Tài khoản {account.id + 1} · {formatUiLabel(account.status)}</option>)}</select></label>
+                          <button className="secondary" disabled={busy} onClick={() => void loginFlow()}>Đăng nhập / xác minh</button>
+                          <button className="secondary" disabled={busy || flowAccounts[selectedFlowSlot]?.status === 'EMPTY'} onClick={() => void logoutFlow()}>Đăng xuất phiên</button>
                           <button className="primary" disabled={busy} onClick={() => void openFlow()}><ExternalLink aria-hidden="true" size={16} /> Mở Google Flow</button>
+                          <button className="primary" disabled={busy || !flowWorkspace?.watchDirectory || flowAccounts[selectedFlowSlot]?.status !== 'CONNECTED'} onClick={() => void generateWithFlow()}><WandSparkles aria-hidden="true" size={16} /> Sinh tự động</button>
                           {selectedAsset.status === 'PLANNED' && <button className="secondary" disabled={busy} onClick={() => void run(() => window.narra.updateAssetStatus(projectId, selectedAsset.id, {status: 'AWAITING_HUMAN'}))}><Check aria-hidden="true" size={16} /> Đánh dấu đang tạo</button>}
                           <button className="secondary" disabled={busy} onClick={() => void prepareFlow()}><RefreshCw aria-hidden="true" size={16} /> Tạo lại prompt</button>
                         </div>
+                        {flowJobs.filter(({assetId}) => assetId === selectedAsset.id).slice(0, 3).map((job) => <div className="notice" key={job.id}><strong>{formatUiLabel(job.status)}</strong> · {Math.round(job.progress * 100)}% · tài khoản {(job.slotId ?? 0) + 1}{job.error ? ` · ${job.error}` : ''}{['WAITING_FOR_USER', 'RETRYABLE_FAILED'].includes(job.status) && <button className="secondary" disabled={busy} onClick={() => void runFlow(async () => { await window.narra.flowRetryJob(job.id); })}>Thử lại</button>}</div>)}
 
                         <section className="flow-inbox">
                           <header><div><strong>Hộp thư tải xuống</strong><small>{flowWorkspace?.watchDirectory ?? 'Chưa chọn thư mục'}</small></div><div><button className="secondary" disabled={busy} onClick={() => void chooseWatchDirectory()}><FolderOpen aria-hidden="true" size={16} /> Chọn thư mục</button><button className="secondary" disabled={busy || !flowWorkspace?.watchDirectory} onClick={() => void scanCandidates()}><RefreshCw aria-hidden="true" size={16} /> Quét ngay</button></div></header>
@@ -340,6 +389,14 @@ export const StoryboardWorkspaceView = ({projectId, onProjectRefresh}: Props) =>
                           </div>
                           {flowCandidates.length === 0 && <p className="flow-empty">Tải ảnh/video từ Flow, nên có mã <code>{selectedAsset.task.flow.shotToken}</code> trong tên tệp, sau đó quét.</p>}
                         </section>
+                      </section>
+                    )}
+
+                    {selectedAsset.task?.provider === 'AVIS' && (
+                      <section className="provider-panel" aria-label="Avis generation workflow">
+                        <header><h3>Avis API</h3><span className="status-pill">Cấu hình qua .env</span></header>
+                        <p>Narra gửi đúng prompt của asset tới Avis khi anh bấm nút bên dưới, tải đầu ra về dự án và vẫn giữ bước QA thủ công.</p>
+                        <button className="primary" disabled={busy} onClick={() => void generateWithAvis()}><WandSparkles aria-hidden="true" size={16} /> Sinh bằng Avis</button>
                       </section>
                     )}
 

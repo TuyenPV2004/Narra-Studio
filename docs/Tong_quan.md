@@ -2,7 +2,7 @@
 
 ## 1. Trạng thái của tài liệu
 
-Tài liệu này là bản tổng hợp quyết định hiện hành của Narra Studio sau khi rà soát và điều chỉnh từ [Narra_Studio_Blueprint_V1.md](Narra_Studio_Blueprint_V1.md). Khi hai tài liệu khác nhau, `Tong_quan.md` là định hướng được ưu tiên cho V1; Blueprint gốc được giữ lại làm tài liệu khám phá và tham chiếu lịch sử. Các bước nâng cấp từ implementation hiện tại sang luồng mới được quản lý trong [Ke_Hoach_V1_Update.md](Ke_Hoach_V1_Update.md); [Ke_Hoach_V1.md](Ke_Hoach_V1.md) tiếp tục ghi nhận lịch sử các giai đoạn nền tảng đã hoàn thành.
+Đây là nguồn kiến trúc hiện hành của Narra Studio V1. Kế hoạch nền tảng nằm tại [Ke_Hoach_V1.md](Ke_Hoach_V1.md); blueprint, kế hoạch cập nhật và báo cáo pilot cũ đã được chuyển vào [`docs/archive`](archive/) để không lẫn với tài liệu đang áp dụng.
 
 Narra Studio có tagline **From question to documentary.** Đây là công cụ desktop chạy local dành cho một creator/editor, hỗ trợ sản xuất video YouTube tiếng Anh dạng faceless cinematic explainer hoặc mini-documentary. Narra không phải website, SaaS, hệ thống multi-tenant hay dây chuyền tự động xuất bản hàng loạt.
 
@@ -70,7 +70,7 @@ Plugin không thay thế Remotion runtime trong repository, không tự cài Nod
 
 Narra V1 phải đưa một project documentary 7–9 phút, mặc định 8 phút, qua toàn bộ chuỗi:
 
-`Prompt → Research → Topic selection → Thesis → Outline → Script → Storyboard → Flow-assisted assets → English voice/captions → Rough cut → Human review → Final export`
+`Prompt → Research → Topic selection → Thesis → Outline → Script → Storyboard → Narra media providers (Google Flow/Avis/local) → English voice/captions → Rough cut → Human review → Final export`
 
 Sản phẩm phải:
 
@@ -84,8 +84,9 @@ Sản phẩm phải:
 
 - Website public, SaaS, tài khoản người dùng, billing và collaboration.
 - Tự động xuất bản public hoặc sản xuất hàng loạt không có human gate.
-- Điều khiển ngầm ChatGPT Web hoặc tự động click toàn bộ Google Flow bằng browser automation không được xem là luồng ổn định của V1.
-- Gọi Gemini/Nano Banana/Veo API có tính phí; V1 dùng Google Flow Assisted để tận dụng quyền lợi Google AI Pro.
+- Narra có thể tự điền prompt, gửi generation và tải output trong Google Flow bằng phiên trình duyệt local tách biệt. Khi Google yêu cầu CAPTCHA, 2FA hoặc xác minh bất thường, job dừng ở `WAITING_FOR_USER` để creator tự hoàn tất trong đúng cửa sổ tài khoản.
+- Avis là provider API tùy chọn. Narra chỉ gọi Avis sau thao tác rõ ràng của creator; khóa nằm trong `.env`, không nằm trong artifact dự án hay renderer.
+- Không chia sẻ cookie giữa tài khoản, không lưu Google password/2FA secret, không tự vượt xác minh, không tự QA_PASS và không tự publish.
 - Bắt buộc dùng OpenAI API, Supabase, n8n hoặc cloud render.
 - Tạo 100% footage bằng AI.
 - Tự động lấy media không rõ quyền sử dụng.
@@ -101,7 +102,7 @@ Narra Desktop
   ├─ Editorial Workspace
   │   └─ topic → thesis → outline → script → claim/source
   ├─ Storyboard & Asset Studio
-  │   └─ Flow Assisted → Google Flow → download/import → shot
+  │   └─ Narra Provider Hub → Google Flow/Avis/local → import → shot
   ├─ Voice Studio
   │   └─ Kokoro / Chatterbox / Piper → narration → captions
   ├─ ProjectStore + approval gates + local job runner
@@ -125,7 +126,7 @@ Narra Desktop
 | AI operator | Codex App Server + Narra skill | Prompt, research, topic, thesis, outline, script, storyboard và QA ngay trong UI |
 | Render | Remotion | Composition và timeline programmatic |
 | Media utilities | FFmpeg/ffprobe | Probe, transcode, normalize, proxy và post-process |
-| Image/video AI | Google Flow Assisted | Narra tạo prompt, mở Flow, theo dõi import và gán output vào shot |
+| Image/video AI | Narra Provider Hub | Tự động Google Flow, Avis API tùy chọn và import local fallback |
 | Voice | Kokoro mặc định; Chatterbox tùy chọn; Piper fallback | Tạo narration tiếng Anh local, không phụ thuộc ElevenLabs |
 | Alignment/STT | faster-whisper local | Transcript QA và word timestamps khi cần |
 
@@ -157,9 +158,11 @@ Codex tạo outline có chapter, mục tiêu, claim, nguồn và thời lượng
 
 Codex chia script thành scene và nhiều shot. Mỗi shot có mục đích hình ảnh, duration, visual type, motion, evidence requirement và asset route. Không đồng nhất một scene với một ảnh. Gate: `STORYBOARD_APPROVED`.
 
-### 5.7 Asset production bằng Google Flow Assisted
+### 5.7 Asset production bằng Narra Provider Hub
 
-Narra tạo `asset task`, prompt ảnh tiếng Anh cho Nano Banana và prompt video cho Veo 3.1 theo từng shot. Creator bấm `Copy prompt` hoặc `Mở trong Flow`; Narra mở Google Flow bằng trình duyệt hệ thống nhưng không điều khiển ngầm thao tác generation. Creator xác nhận model/generation bằng quyền lợi Google AI Pro, tải output về, rồi Narra phát hiện file mới trong thư mục import/download đã cấu hình và đề xuất gán vào đúng shot.
+Narra tạo `asset task`, prompt ảnh/video theo từng shot và định tuyến tới `GOOGLE_FLOW`, `AVIS`, `LOCAL`, `STOCK` hoặc `OTHER`. Với Google Flow, mỗi tài khoản chạy trong một Electron partition riêng; creator đăng nhập/xác minh trực tiếp, sau đó chủ động bấm `Sinh tự động`. Narra điền prompt, gửi generation, tải output vào thư mục đã chọn và tự gắn provenance vào asset. Luồng copy prompt/quét thư mục vẫn là fallback khi giao diện Flow thay đổi. Với Avis, Narra gọi API bằng `AVIS_API_KEY` từ môi trường và tải output về `imports/avis`.
+
+Mọi output provider dừng ở `SELECTED`; creator vẫn phải review và chuyển `QA_PASS`. Narra không có license/subscription/telemetry/auto-update/team/community/cloud-sync của phần mềm mẫu.
 
 Creator xác nhận việc gán; Narra copy media vào project, probe metadata kỹ thuật, lưu prompt/model/provenance, tạo thumbnail/preview và hỗ trợ select, reject, regenerate cùng visual QA. File không được tự động coi là đạt chỉ vì vừa tải xuống. Gate: `ASSETS_APPROVED`.
 
@@ -253,7 +256,7 @@ Desktop UI quản lý trực tiếp các artifact biên tập và bảy creative
 | OpenAI research/script | Không cần API key | Narra gọi Codex App Server, đăng nhập bằng ChatGPT subscription |
 | Remotion render | Không | Chạy local |
 | FFmpeg | Không | Chạy local |
-| Google Flow | Không | Flow Assisted: Narra chuẩn bị prompt/mở Flow/phát hiện import; creator xác nhận generation và download |
+| Google Flow | Không | Phiên local tách biệt; creator đăng nhập/xác minh và chủ động bắt đầu generation |
 | Nano Banana/Veo API | Không | Không dùng trong V1; Gemini API là adapter có tính phí tùy chọn về sau |
 | English TTS | Không | Kokoro local mặc định; Chatterbox/Piper là adapter tùy chọn |
 | Caption alignment | Không | faster-whisper local khi cần word timestamps |
@@ -271,7 +274,7 @@ Desktop UI quản lý trực tiếp các artifact biên tập và bảy creative
 - Có thể thay một asset hoặc narration segment rồi render lại mà không tái tạo research/script.
 - Creator nhập prompt, xem web research, chọn topic/thesis/outline và duyệt script ngay trong Narra.
 - Narra dùng Codex App Server với đăng nhập ChatGPT; không cần copy dữ liệu qua lại với ChatGPT Web/Codex Desktop.
-- Flow Assisted tạo được prompt package, mở Flow và đưa media đã tải về đúng shot bằng bước xác nhận rõ ràng.
+- Narra Provider Hub tạo prompt package, chạy generation theo lệnh creator, nhập media đúng shot và giữ QA bắt buộc.
 - Narration tiếng Anh được tạo local bằng provider adapter và thay riêng từng segment được.
 - Remotion render kết hợp ảnh, video, text/data, caption và narration.
 - Output đạt preset kỹ thuật và có log/version đủ để tái hiện lỗi.
@@ -307,4 +310,4 @@ Tab `System` kiểm tra workspace, Codex login/model catalog, Kokoro, Remotion v
 
 Bản Windows được đóng gói bằng electron-builder. Remotion production runtime dùng pnpm hoisted để artifact không chứa symlink về `%TEMP%` hoặc repository máy build. `release/win-unpacked/Narra Studio.exe` phù hợp chạy hằng ngày; file portable một-file thuận tiện chuyển máy nhưng cold start chậm hơn vì phải giải nén runtime. Hướng dẫn đầy đủ nằm ở `docs/Setup_Backup_Troubleshooting.md`.
 
-Implementation U7 đã qua packaged smoke và local runtime checks. Exit criterion video 7–9 phút vẫn phụ thuộc creator duyệt các creative gate và cung cấp output Nano Banana/Veo thật từ Flow; trạng thái chi tiết nằm ở `docs/U7_Pilot_Report.md`.
+Implementation U7 đã qua packaged smoke và local runtime checks. Exit criterion video 7–9 phút vẫn phụ thuộc creator duyệt các creative gate và cung cấp output thật từ Narra Provider Hub; báo cáo pilot cũ nằm trong `docs/archive`.

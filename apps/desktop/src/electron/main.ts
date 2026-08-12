@@ -2,6 +2,7 @@ import {
   ProjectStore,
   LocalJobRunner,
   type AssetStatusInput,
+  type AttachGeneratedAssetInput,
   type CreateAssetTaskInput,
   type CreateProjectInput,
   type ApprovalGate,
@@ -33,38 +34,60 @@ import {
   type JsonRpcId,
 } from './codex-bridge.js';
 import {
-  buildProjectQuestionPrompt,
+  buildProjectQuestionRepairPrompt,
+  buildProjectQuestionResearchPrompt,
+  buildProjectQuestionSynthesisPrompt,
   buildProjectQuestionTranslationPrompt,
-  finalizeProjectQuestionResult,
+  applyProjectQuestionEvidenceGate,
+  createInsufficientProjectQuestionResult,
+  finalizeProjectQuestionSynthesis,
   normalizeSourceUrl,
+  parseProjectQuestionResearch,
+  parseProjectQuestionSynthesis,
   parseProjectQuestionTranslation,
-  parseProjectQuestionResult,
   PROJECT_QUESTION_EFFORT,
   PROJECT_QUESTION_MODEL,
-  PROJECT_QUESTION_OUTPUT_SCHEMA,
+  PROJECT_QUESTION_REPAIR_BUDGET,
+  PROJECT_QUESTION_RESEARCH_OUTPUT_SCHEMA,
+  PROJECT_QUESTION_SYNTHESIS_OUTPUT_SCHEMA,
   PROJECT_QUESTION_TRANSLATION_OUTPUT_SCHEMA,
+  partitionProjectQuestionResearch,
   shouldRecordOpenedSource,
   type OpenedProjectQuestionSource,
   type ProjectQuestionGenerationResult,
+  type ProjectQuestionSource,
 } from './project-question-generation.js';
+import {AvisProvider} from './avis-provider.js';
+import {FlowAutomationManager} from './flow-automation.js';
+import type {FlowAutomationJob} from './provider-types.js';
 
 const currentDirectory = path.dirname(fileURLToPath(import.meta.url));
 let projectStore: ProjectStore | null = null;
 let jobRunner: LocalJobRunner | null = null;
 let codexBridge: CodexBridge | null = null;
+let avisProvider: AvisProvider | null = null;
+let flowAutomationManager: FlowAutomationManager | null = null;
+const attachedProviderJobs = new Set<string>();
 const activeAiRuns = new Map<string, {projectId: string; runId: string; structuredStage?: AiStage}>();
 const pendingCodexRequests = new Map<JsonRpcId, string>();
 const pendingTurnCompletions = new Map<string, CodexBridgeNotification>();
 const completedAgentMessages = new Map<string, string>();
+type ProjectQuestionPhase = 'CONNECTING' | 'RESEARCHING' | 'VERIFYING' | 'REPAIRING' | 'SYNTHESIZING' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
 type PendingProjectQuestionGeneration = {
   requestId: string;
   threadId: string;
+  threadIds: Set<string>;
   turnId: string | null;
   openedSources: Map<string, OpenedProjectQuestionSource>;
   cancelRequested: boolean;
+  timedOut: boolean;
+  phase: ProjectQuestionPhase;
+  phaseStartedAt: number;
+  phaseDurations: Partial<Record<ProjectQuestionPhase, number>>;
+  synthesisBrowsed: boolean;
+  turnResolve: ((message: string) => void) | null;
+  turnReject: ((error: Error) => void) | null;
   timer: ReturnType<typeof setTimeout>;
-  resolve: (result: ProjectQuestionGenerationResult) => void;
-  reject: (error: Error) => void;
 };
 const projectQuestionGenerationsByRequest = new Map<string, PendingProjectQuestionGeneration>();
 const projectQuestionGenerationsByThread = new Map<string, PendingProjectQuestionGeneration>();
@@ -84,6 +107,35 @@ const projectQuestionTranslationsByTurn = new Map<string, PendingProjectQuestion
 const getRepositoryRoot = (): string => app.isPackaged
   ? path.join(process.resourcesPath, 'narra-runtime')
   : path.resolve(currentDirectory, '../../..');
+
+const broadcastProviderEvent = (type: string, payload: unknown): void => {
+  for (const window of BrowserWindow.getAllWindows()) window.webContents.send(IPC_CHANNELS.providerEvent, {type, payload});
+};
+
+const attachCompletedFlowJob = async (job: FlowAutomationJob): Promise<void> => {
+  if (job.status !== 'COMPLETED' || !job.outputPath || attachedProviderJobs.has(job.id)) return;
+  attachedProviderJobs.add(job.id);
+  try {
+    const storyboard = getProjectStore().getStoryboardWorkspace(job.projectId);
+    const asset = storyboard.assets.find(({id}) => id === job.assetId);
+    if (!asset) throw new Error(`Flow asset ${job.assetId} was not found.`);
+    const input: AttachGeneratedAssetInput = {
+      provider: 'GOOGLE_FLOW',
+      providerJobId: job.id,
+      ...(asset.task?.flow?.version ? {promptVersion: asset.task.flow.version} : {}),
+      model: job.model || (job.kind === 'VIDEO' ? asset.task?.flow?.videoModel : asset.task?.flow?.imageModel) || 'Google Flow',
+      prompt: job.prompt,
+    };
+    await getProjectStore().attachGeneratedAsset(job.projectId, job.assetId, job.outputPath, input);
+    broadcastProviderEvent('flow-asset-attached', {jobId: job.id, projectId: job.projectId, assetId: job.assetId});
+  } catch (error) {
+    attachedProviderJobs.delete(job.id);
+    broadcastProviderEvent('flow-asset-attach-failed', {
+      jobId: job.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+};
 
 const findLocalRepositoryRoot = (startPath: string): string | null => {
   let candidate = path.resolve(startPath);
@@ -156,15 +208,32 @@ const broadcastCodexEvent = (payload: Record<string, unknown>): void => {
 };
 
 const broadcastProjectQuestionProgress = (
-  pending: Pick<PendingProjectQuestionGeneration, 'requestId'>,
-  phase: 'CONNECTING' | 'RESEARCHING' | 'DRAFTING' | 'COMPLETED' | 'CANCELLED' | 'FAILED',
+  pending: Pick<PendingProjectQuestionGeneration, 'requestId' | 'phaseStartedAt' | 'phaseDurations'>,
+  phase: ProjectQuestionPhase,
   detail: Record<string, unknown> = {},
-): void => broadcastCodexEvent({type: 'projectQuestionGeneration', requestId: pending.requestId, phase, ...detail});
+): void => broadcastCodexEvent({
+  type: 'projectQuestionGeneration', requestId: pending.requestId, phase,
+  phaseStartedAt: new Date(pending.phaseStartedAt).toISOString(), phaseDurations: pending.phaseDurations, ...detail,
+});
+
+const transitionProjectQuestionPhase = (
+  pending: PendingProjectQuestionGeneration,
+  phase: ProjectQuestionPhase,
+  detail: Record<string, unknown> = {},
+): void => {
+  const now = Date.now();
+  if (pending.phase !== phase) {
+    pending.phaseDurations[pending.phase] = Math.max(0, now - pending.phaseStartedAt);
+    pending.phase = phase;
+    pending.phaseStartedAt = now;
+  }
+  broadcastProjectQuestionProgress(pending, phase, detail);
+};
 
 const cleanupProjectQuestionGeneration = (pending: PendingProjectQuestionGeneration): void => {
   clearTimeout(pending.timer);
   projectQuestionGenerationsByRequest.delete(pending.requestId);
-  projectQuestionGenerationsByThread.delete(pending.threadId);
+  for (const threadId of pending.threadIds) projectQuestionGenerationsByThread.delete(threadId);
   if (pending.turnId) {
     projectQuestionGenerationsByTurn.delete(pending.turnId);
     pendingTurnCompletions.delete(pending.turnId);
@@ -195,56 +264,88 @@ const trackProjectQuestionActivity = (notification: CodexBridgeNotification): vo
     if (item.type === 'webSearch') {
       const action = asRecord(item.action);
       const url = typeof action.url === 'string' ? action.url : null;
+      const query = typeof action.query === 'string'
+        ? action.query
+        : Array.isArray(action.queries) && typeof action.queries[0] === 'string' ? action.queries[0] : null;
+      if (pending.phase === 'SYNTHESIZING') pending.synthesisBrowsed = true;
       if (shouldRecordOpenedSource(notification.method, action.type, url)) {
         try {
           const accessedAt = new Date().toISOString();
           const normalizedUrl = normalizeSourceUrl(url);
-          if (!pending.openedSources.has(normalizedUrl)) {
-            pending.openedSources.set(normalizedUrl, {url, accessedAt});
-            broadcastProjectQuestionProgress(pending, 'RESEARCHING', {source: {url, accessedAt}});
-          }
+          if (!pending.openedSources.has(normalizedUrl)) pending.openedSources.set(normalizedUrl, {url, accessedAt});
+          broadcastProjectQuestionProgress(pending, pending.phase, {
+            source: {url, accessedAt},
+            activity: {kind: 'OPEN_PAGE', status: 'COMPLETED', url, occurredAt: accessedAt},
+          });
         } catch {
-          // Ignore malformed tool metadata; the final provenance check remains authoritative.
+          // Malformed tool metadata is ignored; deterministic provenance validation remains authoritative.
         }
-      } else {
-        broadcastProjectQuestionProgress(pending, 'RESEARCHING');
+      } else if (action.type === 'openPage' && url) {
+        broadcastProjectQuestionProgress(pending, pending.phase, {
+          activity: {kind: 'OPEN_PAGE', status: notification.method === 'item/started' ? 'STARTED' : 'COMPLETED', url, occurredAt: new Date().toISOString()},
+        });
+      } else if (action.type === 'search' && query) {
+        broadcastProjectQuestionProgress(pending, pending.phase, {
+          activity: {kind: 'SEARCH', status: notification.method === 'item/started' ? 'STARTED' : 'COMPLETED', query, occurredAt: new Date().toISOString()},
+        });
       }
     }
-  }
-  if (notification.method === 'item/agentMessage/delta') {
-    broadcastProjectQuestionProgress(pending, 'DRAFTING');
   }
   if (notification.method !== 'turn/completed') return;
   const turn = asRecord(params.turn);
   const turnId = typeof turn.id === 'string' ? turn.id : pending.turnId;
   if (!turnId) return;
   if (turn.status === 'interrupted' || pending.cancelRequested) {
-    broadcastProjectQuestionProgress(pending, 'CANCELLED');
-    cleanupProjectQuestionGeneration(pending);
-    pending.reject(new Error('Đã dừng tạo câu hỏi dẫn dắt.'));
+    pending.turnReject?.(new Error('Đã dừng tạo câu hỏi dẫn dắt.'));
     return;
   }
   if (turn.status !== 'completed') {
     const error = asRecord(turn.error);
-    const message = typeof error.message === 'string' ? error.message : 'Codex không thể hoàn tất câu hỏi dẫn dắt.';
-    broadcastProjectQuestionProgress(pending, 'FAILED', {message});
-    cleanupProjectQuestionGeneration(pending);
-    pending.reject(new Error(message));
+    pending.turnReject?.(new Error(typeof error.message === 'string' ? error.message : 'Codex không thể hoàn tất câu hỏi dẫn dắt.'));
     return;
   }
+  const message = completedAgentMessages.get(turnId);
+  if (!message) {
+    pending.turnReject?.(new Error('Codex hoàn tất nhưng không trả về kết quả có cấu trúc.'));
+    return;
+  }
+  pending.turnResolve?.(message);
+};
+
+const runProjectQuestionTurn = async (
+  bridge: CodexBridge,
+  pending: PendingProjectQuestionGeneration,
+  input: {threadId: string; text: string; outputSchema: Record<string, unknown>},
+): Promise<string> => {
+  pending.threadId = input.threadId;
+  pending.threadIds.add(input.threadId);
+  projectQuestionGenerationsByThread.set(input.threadId, pending);
+  const completion = new Promise<string>((resolve, reject) => {
+    pending.turnResolve = resolve;
+    pending.turnReject = reject;
+  });
+  const turn = await bridge.startTurn({
+    threadId: input.threadId,
+    text: input.text,
+    cwd: getRepositoryRoot(),
+    model: PROJECT_QUESTION_MODEL,
+    effort: PROJECT_QUESTION_EFFORT,
+    outputSchema: input.outputSchema,
+  });
+  pending.turnId = turn.turnId;
+  projectQuestionGenerationsByTurn.set(turn.turnId, pending);
+  if (pending.cancelRequested) await bridge.interruptTurn(input.threadId, turn.turnId);
+  const earlyCompletion = pendingTurnCompletions.get(turn.turnId);
+  if (earlyCompletion) trackProjectQuestionActivity(earlyCompletion);
   try {
-    const message = completedAgentMessages.get(turnId);
-    if (!message) throw new Error('Codex hoàn tất nhưng không trả về kết quả có cấu trúc.');
-    const draft = parseProjectQuestionResult(JSON.parse(message));
-    const result = finalizeProjectQuestionResult(draft, pending.openedSources.values());
-    broadcastProjectQuestionProgress(pending, 'COMPLETED', {sources: result.sources});
-    cleanupProjectQuestionGeneration(pending);
-    pending.resolve(result);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Kết quả tạo câu hỏi không hợp lệ.';
-    broadcastProjectQuestionProgress(pending, 'FAILED', {message});
-    cleanupProjectQuestionGeneration(pending);
-    pending.reject(new Error(message));
+    return await completion;
+  } finally {
+    projectQuestionGenerationsByTurn.delete(turn.turnId);
+    pendingTurnCompletions.delete(turn.turnId);
+    completedAgentMessages.delete(turn.turnId);
+    if (pending.turnId === turn.turnId) pending.turnId = null;
+    pending.turnResolve = null;
+    pending.turnReject = null;
   }
 };
 
@@ -437,52 +538,105 @@ const registerCodexHandlers = (): void => {
     if (!account.signedIn) throw new Error('Hãy đăng nhập Codex trong Không gian AI trước khi tạo câu hỏi.');
     await bridge.assertModelAvailable(PROJECT_QUESTION_MODEL, PROJECT_QUESTION_EFFORT);
     const thread = await bridge.startThread({cwd: getRepositoryRoot(), model: PROJECT_QUESTION_MODEL});
-
-    let resolveCompletion!: (result: ProjectQuestionGenerationResult) => void;
-    let rejectCompletion!: (error: Error) => void;
-    const completion = new Promise<ProjectQuestionGenerationResult>((resolve, reject) => {
-      resolveCompletion = resolve;
-      rejectCompletion = reject;
-    });
+    const now = Date.now();
     const pending: PendingProjectQuestionGeneration = {
       requestId,
       threadId: thread.threadId,
+      threadIds: new Set([thread.threadId]),
       turnId: null,
       openedSources: new Map(),
       cancelRequested: false,
+      timedOut: false,
+      phase: 'CONNECTING',
+      phaseStartedAt: now,
+      phaseDurations: {},
+      synthesisBrowsed: false,
+      turnResolve: null,
+      turnReject: null,
       timer: setTimeout(() => {
         const active = projectQuestionGenerationsByRequest.get(requestId);
         if (!active) return;
-        broadcastProjectQuestionProgress(active, 'FAILED', {message: 'Lượt tạo câu hỏi đã quá thời gian 3 phút.'});
-        cleanupProjectQuestionGeneration(active);
-        active.reject(new Error('Lượt tạo câu hỏi đã quá thời gian 3 phút. Hãy thử lại.'));
+        active.cancelRequested = true;
+        active.timedOut = true;
+        const timeoutError = new Error('Lượt tạo câu hỏi đã quá thời gian 6 phút. Hãy thử lại.');
+        transitionProjectQuestionPhase(active, 'FAILED', {message: timeoutError.message});
+        active.turnReject?.(timeoutError);
         if (active.turnId) void bridge.interruptTurn(active.threadId, active.turnId).catch(() => undefined);
-      }, 180_000),
-      resolve: resolveCompletion,
-      reject: rejectCompletion,
+      }, 360_000),
     };
     projectQuestionGenerationsByRequest.set(requestId, pending);
     projectQuestionGenerationsByThread.set(thread.threadId, pending);
-    broadcastProjectQuestionProgress(pending, 'RESEARCHING');
     try {
-      const turn = await bridge.startTurn({
+      transitionProjectQuestionPhase(pending, 'RESEARCHING');
+      const researchMessage = await runProjectQuestionTurn(bridge, pending, {
         threadId: thread.threadId,
-        text: buildProjectQuestionPrompt(title),
-        cwd: getRepositoryRoot(),
-        model: PROJECT_QUESTION_MODEL,
-        effort: PROJECT_QUESTION_EFFORT,
-        outputSchema: PROJECT_QUESTION_OUTPUT_SCHEMA,
+        text: buildProjectQuestionResearchPrompt(title),
+        outputSchema: PROJECT_QUESTION_RESEARCH_OUTPUT_SCHEMA,
       });
-      pending.turnId = turn.turnId;
-      projectQuestionGenerationsByTurn.set(turn.turnId, pending);
-      if (pending.cancelRequested) await bridge.interruptTurn(thread.threadId, turn.turnId);
-      const earlyCompletion = pendingTurnCompletions.get(turn.turnId);
-      if (earlyCompletion) trackProjectQuestionActivity(earlyCompletion);
-      return await completion;
+      const researchDraft = parseProjectQuestionResearch(JSON.parse(researchMessage));
+      transitionProjectQuestionPhase(pending, 'VERIFYING');
+      const initialPartition = partitionProjectQuestionResearch(researchDraft, pending.openedSources.values());
+      const repairCandidates = initialPartition.missingSources
+        .filter(({sourceUse}) => sourceUse === 'EVIDENCE')
+        .slice(0, PROJECT_QUESTION_REPAIR_BUDGET);
+      for (let index = 0; index < repairCandidates.length; index += 1) {
+        const candidate = repairCandidates[index]!;
+        transitionProjectQuestionPhase(pending, 'REPAIRING', {
+          repairAttempt: index + 1,
+          repairTotal: repairCandidates.length,
+          repairUrl: candidate.url,
+        });
+        const repairMessage = await runProjectQuestionTurn(bridge, pending, {
+          threadId: thread.threadId,
+          text: buildProjectQuestionRepairPrompt(candidate.url),
+          outputSchema: PROJECT_QUESTION_RESEARCH_OUTPUT_SCHEMA,
+        });
+        parseProjectQuestionResearch(JSON.parse(repairMessage));
+      }
+      transitionProjectQuestionPhase(pending, 'VERIFYING');
+      const finalPartition = partitionProjectQuestionResearch(researchDraft, pending.openedSources.values());
+      const verifiedSources: ProjectQuestionSource[] = finalPartition.verifiedSources;
+      const excludedSourceCount = finalPartition.missingSources.length;
+      if (!verifiedSources.some(({sourceUse}) => sourceUse === 'EVIDENCE')) {
+        const result = createInsufficientProjectQuestionResult(
+          verifiedSources,
+          excludedSourceCount,
+          researchDraft.warnings,
+        );
+        transitionProjectQuestionPhase(pending, 'COMPLETED', {
+          sources: result.sources,
+          excludedSources: finalPartition.missingSources.map(({title, url}) => ({title, url})),
+        });
+        cleanupProjectQuestionGeneration(pending);
+        return result;
+      }
+
+      const synthesisThread = await bridge.startThread({cwd: getRepositoryRoot(), model: PROJECT_QUESTION_MODEL});
+      pending.threadIds.add(synthesisThread.threadId);
+      projectQuestionGenerationsByThread.set(synthesisThread.threadId, pending);
+      pending.synthesisBrowsed = false;
+      transitionProjectQuestionPhase(pending, 'SYNTHESIZING', {
+        sources: verifiedSources,
+        excludedSources: finalPartition.missingSources.map(({title, url}) => ({title, url})),
+      });
+      const synthesisMessage = await runProjectQuestionTurn(bridge, pending, {
+        threadId: synthesisThread.threadId,
+        text: buildProjectQuestionSynthesisPrompt(title, verifiedSources),
+        outputSchema: PROJECT_QUESTION_SYNTHESIS_OUTPUT_SCHEMA,
+      });
+      if (pending.synthesisBrowsed) throw new Error('Pha soạn câu hỏi đã cố tìm kiếm web ngoài evidence ledger và bị chặn. Hãy thử lại.');
+      const synthesis = parseProjectQuestionSynthesis(JSON.parse(synthesisMessage), verifiedSources);
+      const result = applyProjectQuestionEvidenceGate(
+        finalizeProjectQuestionSynthesis(synthesis, verifiedSources),
+        excludedSourceCount,
+      );
+      transitionProjectQuestionPhase(pending, 'COMPLETED', {sources: result.sources});
+      cleanupProjectQuestionGeneration(pending);
+      return result;
     } catch (error) {
       if (projectQuestionGenerationsByRequest.has(requestId)) {
         const message = error instanceof Error ? error.message : 'Không thể bắt đầu tạo câu hỏi dẫn dắt.';
-        broadcastProjectQuestionProgress(pending, pending.cancelRequested ? 'CANCELLED' : 'FAILED', {message});
+        transitionProjectQuestionPhase(pending, pending.cancelRequested && !pending.timedOut ? 'CANCELLED' : 'FAILED', {message});
         cleanupProjectQuestionGeneration(pending);
       }
       throw error;
@@ -787,6 +941,61 @@ const registerProjectHandlers = (): void => {
     getProjectStore().selectFlowCandidate(projectId, candidateId, assetId));
   ipcMain.handle(IPC_CHANNELS.rejectFlowCandidate, (_event, projectId: string, candidateId: string) =>
     getProjectStore().rejectFlowCandidate(projectId, candidateId));
+  ipcMain.handle(IPC_CHANNELS.flowListAccounts, () => flowAutomationManager!.listAccounts());
+  ipcMain.handle(IPC_CHANNELS.flowLoginAccount, (_event, slotId: number) => flowAutomationManager!.login(slotId));
+  ipcMain.handle(IPC_CHANNELS.flowOpenAccount, (_event, slotId: number) => flowAutomationManager!.open(slotId));
+  ipcMain.handle(IPC_CHANNELS.flowLogoutAccount, (_event, slotId: number) => flowAutomationManager!.logout(slotId));
+  ipcMain.handle(IPC_CHANNELS.flowListJobs, (_event, projectId?: string) => flowAutomationManager!.listJobs(projectId));
+  ipcMain.handle(IPC_CHANNELS.flowCancelJob, (_event, jobId: string) => flowAutomationManager!.cancel(jobId));
+  ipcMain.handle(IPC_CHANNELS.flowRetryJob, (_event, jobId: string) => flowAutomationManager!.retry(jobId));
+  ipcMain.handle(IPC_CHANNELS.flowSubmitAsset, (_event, projectId: string, assetId: string, slotId?: number) => {
+    const flowWorkspace = getProjectStore().getFlowWorkspace(projectId);
+    if (!flowWorkspace.watchDirectory) throw new Error('Hãy chọn thư mục đầu ra Google Flow trước khi chạy tự động.');
+    const storyboard = getProjectStore().getStoryboardWorkspace(projectId);
+    const asset = storyboard.assets.find(({id}) => id === assetId);
+    if (!asset?.task?.flow || asset.task.provider !== 'GOOGLE_FLOW') throw new Error('Asset chưa có gói prompt Google Flow của Narra.');
+    if (!['IMAGE', 'VIDEO'].includes(asset.kind)) throw new Error('Google Flow chỉ nhận asset ảnh hoặc video.');
+    if (asset.status === 'PLANNED') getProjectStore().updateAssetStatus(projectId, assetId, {status: 'AWAITING_HUMAN'});
+    return flowAutomationManager!.submit({
+      projectId,
+      assetId,
+      shotId: asset.shotId,
+      shotToken: asset.task.flow.shotToken,
+      kind: asset.kind as 'IMAGE' | 'VIDEO',
+      prompt: asset.kind === 'VIDEO' ? asset.task.flow.videoPrompt : asset.task.flow.imagePrompt,
+      negativePrompt: asset.task.flow.negativeGuidance,
+      model: asset.kind === 'VIDEO' ? asset.task.flow.videoModel : asset.task.flow.imageModel,
+      aspectRatio: asset.task.flow.aspectRatio,
+      durationSec: asset.task.flow.generationDurationSec,
+      downloadDirectory: flowWorkspace.watchDirectory,
+      ...(slotId == null ? {} : {slotId}),
+    });
+  });
+  ipcMain.handle(IPC_CHANNELS.avisStatus, () => avisProvider!.status());
+  ipcMain.handle(IPC_CHANNELS.avisListModels, () => avisProvider!.listModels());
+  ipcMain.handle(IPC_CHANNELS.avisGenerateAsset, async (_event, projectId: string, assetId: string) => {
+    const project = getProjectStore().getProject(projectId).project;
+    const storyboard = getProjectStore().getStoryboardWorkspace(projectId);
+    const asset = storyboard.assets.find(({id}) => id === assetId);
+    if (!asset?.task || asset.task.provider !== 'AVIS') throw new Error('Asset chưa được cấu hình dùng Avis.');
+    if (!['IMAGE', 'VIDEO'].includes(asset.kind)) throw new Error('Avis chỉ nhận asset ảnh hoặc video trong Narra.');
+    if (asset.status === 'PLANNED') getProjectStore().updateAssetStatus(projectId, assetId, {status: 'AWAITING_HUMAN'});
+    const result = await avisProvider!.generate({
+      projectId,
+      assetId,
+      kind: asset.kind as 'IMAGE' | 'VIDEO',
+      prompt: asset.task.prompt,
+      model: asset.kind === 'VIDEO' ? 'veo-3.1' : 'gpt-image-2',
+      ratio: '16:9',
+      outputDirectory: path.join(project.rootPath, 'imports', 'avis'),
+    });
+    return getProjectStore().attachGeneratedAsset(projectId, assetId, result.outputPath, {
+      provider: 'AVIS',
+      providerJobId: result.jobId,
+      model: result.model,
+      prompt: asset.task.prompt,
+    });
+  });
   ipcMain.handle(IPC_CHANNELS.copyText, (_event, value: string) => {
     if (!value.trim()) throw new Error('Cannot copy empty text.');
     clipboard.writeText(value);
@@ -1012,12 +1221,18 @@ const installApplicationMenu = (): void => {
 
 void app.whenReady().then(async () => {
   installApplicationMenu();
+  const repositoryRoot = getRepositoryRoot();
+  if (!app.isPackaged) {
+    try { process.loadEnvFile(path.join(repositoryRoot, '.env')); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+    }
+  }
   const storageRoot = getLocalStorageRoot();
   const workspaceRoot =
     process.env.NARRA_WORKSPACE_ROOT ?? path.join(storageRoot, 'projects');
   const databaseRoot =
     process.env.NARRA_DATABASE_ROOT ?? path.join(storageRoot, 'database');
-  const repositoryRoot = getRepositoryRoot();
   projectStore = new ProjectStore(workspaceRoot, {
     databaseRoot,
     voiceProvider: new KokoroOnnxProvider({
@@ -1029,6 +1244,16 @@ void app.whenReady().then(async () => {
   });
   jobRunner = new LocalJobRunner(projectStore, repositoryRoot);
   jobRunner.start();
+  avisProvider = new AvisProvider({fetchImpl: net.fetch as typeof fetch});
+  flowAutomationManager = new FlowAutomationManager(
+    app.getPath('userData'),
+    Number.parseInt(process.env.NARRA_FLOW_ACCOUNT_SLOTS || '5', 10),
+  );
+  flowAutomationManager.on('job-updated', (job) => {
+    broadcastProviderEvent('flow-job-updated', job);
+    void attachCompletedFlowJob(job);
+  });
+  flowAutomationManager.on('accounts-updated', (accounts) => broadcastProviderEvent('flow-accounts-updated', accounts));
   registerProjectHandlers();
   registerCodexHandlers();
   protocol.handle('narra-media', (request) => {
@@ -1122,7 +1347,7 @@ void app.whenReady().then(async () => {
         new Promise((resolve) => {
           const startedAt = Date.now();
           const check = () => {
-            const panel = document.querySelector('.flow-assistant-panel');
+            const panel = document.querySelector('.provider-panel');
             if (panel || Date.now() - startedAt > 5000) {
               resolve({
                 hasPanel: Boolean(panel),
@@ -1398,6 +1623,9 @@ void app.whenReady().then(async () => {
   projectStore = null;
   codexBridge?.close();
   codexBridge = null;
+  flowAutomationManager?.dispose();
+  flowAutomationManager = null;
+  avisProvider = null;
   app.exit(1);
 });
 
@@ -1408,6 +1636,9 @@ app.on('before-quit', () => {
   projectStore = null;
   codexBridge?.close();
   codexBridge = null;
+  flowAutomationManager?.dispose();
+  flowAutomationManager = null;
+  avisProvider = null;
 });
 
 app.on('window-all-closed', () => {

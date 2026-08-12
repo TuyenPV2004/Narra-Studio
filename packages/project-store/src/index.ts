@@ -2,13 +2,14 @@ export {CURRENT_ARTIFACT_SCHEMA_VERSION, PROJECT_DIRECTORIES} from './artifact-l
 export {ProjectStore} from './project-store.js';
 export {LocalJobRunner} from './local-job-runner.js';
 export {probeMedia} from './media-probe.js';
-export {FlowAssistedProvider} from './flow-assisted-provider.js';
-export type {FlowPromptInput, MediaPromptProvider} from './flow-assisted-provider.js';
+export {NarraFlowProvider} from './narra-flow-provider.js';
+export type {FlowPromptInput, MediaPromptProvider} from './narra-flow-provider.js';
 export {KOKORO_PRESETS, KokoroOnnxProvider, UnavailableVoiceProvider, normalizeEnglishNarration, parsePronunciationNotes} from './voice-provider.js';
 export type {KokoroOnnxProviderOptions, PronunciationEntry, VoiceProvider, VoiceSynthesisInput, VoiceSynthesisResult} from './voice-provider.js';
 export {compareNarrationTranscript, parseTimedText, parseWordTimestamps} from './caption-parser.js';
 export type {
   AssetStatusInput,
+  AttachGeneratedAssetInput,
   CreateAssetTaskInput,
   CreateProjectInput,
   ProjectDetail,

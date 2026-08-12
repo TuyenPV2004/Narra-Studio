@@ -2,7 +2,7 @@
 
 ## 1. Phạm vi
 
-Tài liệu này áp dụng cho Narra Studio chạy local trên Windows x64. Narra không cần OpenAI API key cho luồng Codex và không tự động điều khiển Google Flow. Creator chỉ rời Narra để xác nhận generation và tải media từ Flow.
+Tài liệu này áp dụng cho Narra Studio chạy local trên Windows x64. Narra không cần OpenAI API key cho luồng Codex. Google Flow chạy trong các phiên local tách biệt của Narra; Avis là provider API tùy chọn cấu hình qua `.env`.
 
 Không ghi token, cookie, nội dung `.env` hoặc thông tin đăng nhập vào log, screenshot hay bản backup project.
 
@@ -89,16 +89,18 @@ Backup project không gồm `.env`, credential, cookie hoặc database index tro
 
 Không chọn thư mục đích nằm bên trong project nguồn. ProjectStore chặn trường hợp này để tránh backup đệ quy.
 
-## 7. Google Flow Assisted
+## 7. Narra Google Flow Automation và Avis
 
 Luồng đúng:
 
 1. Narra tạo prompt package cho shot.
-2. Creator copy prompt hoặc mở Flow.
-3. Creator chọn model, xác nhận generation và tải output bằng tài khoản Google của mình.
-4. Creator quay lại Narra, import candidate, xác nhận đúng shot, model/provenance và visual QA.
+2. Creator chọn một slot tài khoản, mở cửa sổ Flow của Narra và tự đăng nhập/xác minh.
+3. Creator bấm `Sinh tự động`; Narra điền prompt, gửi generation và tải output về thư mục đã chọn.
+4. Nếu Flow đổi DOM hoặc download không tự hoàn tất, dùng fallback copy prompt → tải file → quét thư mục.
 
-Nếu file không xuất hiện, kiểm tra đúng thư mục download/import, định dạng được hỗ trợ và thời điểm file. Narra không đọc session trình duyệt và không tự click nút generation.
+Avis: sao chép `.env.example` thành `.env`, đặt `AVIS_API_KEY` và tùy chọn `AVIS_API_BASE`. Không commit `.env`; Narra không đưa khóa vào renderer hoặc artifact dự án.
+
+Nếu file không xuất hiện, kiểm tra đúng thư mục download/import, trạng thái job và cửa sổ Flow. Trạng thái `WAITING_FOR_USER` có nghĩa creator phải xử lý CAPTCHA/2FA/xác minh rồi bấm thử lại.
 
 ## 8. Lỗi thường gặp
 
@@ -125,4 +127,4 @@ pnpm --filter @narra/render render:voice-smoke
 pnpm package:win
 ```
 
-Codex smoke dùng một turn ngắn qua App Server và tài khoản đã đăng nhập; nó không dùng OpenAI API key. Flow vẫn là manual smoke vì generation/download cần quyết định trực tiếp của creator.
+Codex smoke dùng một turn ngắn qua App Server và tài khoản đã đăng nhập; nó không dùng OpenAI API key. Flow live smoke vẫn cần creator đăng nhập/xác minh và chủ động cho phép một generation có thể tiêu credit.

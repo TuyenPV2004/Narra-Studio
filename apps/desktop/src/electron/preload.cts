@@ -3,6 +3,7 @@ import {contextBridge, ipcRenderer, webUtils} from 'electron';
 import type {CodexBridgeNotification} from './codex-bridge.js';
 import type {AiReasoningEffort, AiStage} from '@narra/contracts';
 import type {ProjectQuestionGenerationResult} from './project-question-generation.js';
+import type {AvisStatus, FlowAccount, FlowAutomationJob} from './provider-types.js';
 
 const channels = {
   listProjects: 'projects:list',
@@ -24,6 +25,17 @@ const channels = {
   prepareFlowAssetTask: 'flow:prepare-task',
   selectFlowCandidate: 'flow:select-candidate',
   rejectFlowCandidate: 'flow:reject-candidate',
+  flowListAccounts: 'flow:accounts-list',
+  flowLoginAccount: 'flow:account-login',
+  flowOpenAccount: 'flow:account-open',
+  flowLogoutAccount: 'flow:account-logout',
+  flowListJobs: 'flow:jobs-list',
+  flowSubmitAsset: 'flow:asset-submit',
+  flowCancelJob: 'flow:job-cancel',
+  flowRetryJob: 'flow:job-retry',
+  avisStatus: 'avis:status',
+  avisListModels: 'avis:models-list',
+  avisGenerateAsset: 'avis:asset-generate',
   copyText: 'system:copy-text',
   exportStoryboardRenderInput: 'render:export-storyboard-input',
   getVoiceWorkspace: 'voice:get',
@@ -70,11 +82,12 @@ const channels = {
   openExternalUrl: 'system:open-external-url',
   menuAction: 'system:menu-action',
   codexEvent: 'codex:event',
+  providerEvent: 'providers:event',
 } as const;
 
 const api = {
   runtime: 'electron',
-  version: 16,
+  version: 17,
   listProjects: () => ipcRenderer.invoke(channels.listProjects),
   createProject: (input: CreateProjectInput) => ipcRenderer.invoke(channels.createProject, input),
   chooseAndOpenProject: () => ipcRenderer.invoke(channels.chooseAndOpenProject),
@@ -101,6 +114,19 @@ const api = {
     ipcRenderer.invoke(channels.selectFlowCandidate, projectId, candidateId, assetId),
   rejectFlowCandidate: (projectId: string, candidateId: string) =>
     ipcRenderer.invoke(channels.rejectFlowCandidate, projectId, candidateId),
+  flowListAccounts: (): Promise<FlowAccount[]> => ipcRenderer.invoke(channels.flowListAccounts),
+  flowLoginAccount: (slotId: number): Promise<FlowAccount> => ipcRenderer.invoke(channels.flowLoginAccount, slotId),
+  flowOpenAccount: (slotId: number): Promise<FlowAccount> => ipcRenderer.invoke(channels.flowOpenAccount, slotId),
+  flowLogoutAccount: (slotId: number): Promise<FlowAccount> => ipcRenderer.invoke(channels.flowLogoutAccount, slotId),
+  flowListJobs: (projectId?: string): Promise<FlowAutomationJob[]> => ipcRenderer.invoke(channels.flowListJobs, projectId),
+  flowSubmitAsset: (projectId: string, assetId: string, slotId?: number): Promise<FlowAutomationJob> =>
+    ipcRenderer.invoke(channels.flowSubmitAsset, projectId, assetId, slotId),
+  flowCancelJob: (jobId: string): Promise<FlowAutomationJob> => ipcRenderer.invoke(channels.flowCancelJob, jobId),
+  flowRetryJob: (jobId: string): Promise<FlowAutomationJob> => ipcRenderer.invoke(channels.flowRetryJob, jobId),
+  avisStatus: (): Promise<AvisStatus> => ipcRenderer.invoke(channels.avisStatus),
+  avisListModels: (): Promise<unknown[]> => ipcRenderer.invoke(channels.avisListModels),
+  avisGenerateAsset: (projectId: string, assetId: string): Promise<unknown> =>
+    ipcRenderer.invoke(channels.avisGenerateAsset, projectId, assetId),
   copyText: (value: string) => ipcRenderer.invoke(channels.copyText, value),
   exportStoryboardRenderInput: (projectId: string) => ipcRenderer.invoke(channels.exportStoryboardRenderInput, projectId),
   getVoiceWorkspace: (projectId: string) => ipcRenderer.invoke(channels.getVoiceWorkspace, projectId),
@@ -174,6 +200,11 @@ const api = {
       listener(payload);
     ipcRenderer.on(channels.codexEvent, handler);
     return () => ipcRenderer.removeListener(channels.codexEvent, handler);
+  },
+  onProviderEvent: (listener: (event: {type: string; payload: unknown}) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, payload: {type: string; payload: unknown}) => listener(payload);
+    ipcRenderer.on(channels.providerEvent, handler);
+    return () => ipcRenderer.removeListener(channels.providerEvent, handler);
   },
 };
 

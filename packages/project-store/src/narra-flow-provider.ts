@@ -20,7 +20,7 @@ const supportedDuration = (durationSec: number): 4 | 6 | 8 => {
   return 8;
 };
 
-export class FlowAssistedProvider implements MediaPromptProvider {
+export class NarraFlowProvider implements MediaPromptProvider {
   readonly id = 'GOOGLE_FLOW' as const;
 
   createPromptPackage({project, scene, shot, version, imageModel, videoModel}: FlowPromptInput): FlowPromptPackage {

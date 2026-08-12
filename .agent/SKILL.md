@@ -14,7 +14,7 @@ Giữ mọi công việc trong repository bám phạm vi local-first, hợp đ�
 1. Đọc `docs/Tong_quan.md` khi công việc liên quan phạm vi sản phẩm, kiến trúc hoặc workflow.
 2. Đọc phase liên quan trong `docs/Ke_Hoach_V1.md` trước khi triển khai.
 3. Đọc `docs/SKILL.md` khi tác vụ liên quan AI workflow hoặc artifact do Codex tạo.
-4. Chỉ dùng `docs/Narra_Studio_Blueprint_V1.md` làm discovery context cho phần chưa được tài liệu mới quyết định.
+4. Chỉ dùng `docs/archive/Narra_Studio_Blueprint_V1.md` làm discovery context cho phần chưa được tài liệu mới quyết định.
 5. Đọc schema, test và implementation liên quan khi chúng tồn tại.
 
 ## Product guardrails
@@ -51,4 +51,3 @@ Không sửa code nếu chưa có yêu cầu triển khai rõ ràng. Trước th
 - Media: Remotion composition check, smoke render và ffprobe output khi thích hợp.
 
 Nếu không chạy được một kiểm tra, nêu chính xác nguyên nhân; không coi phần chưa kiểm tra là đã pass.
-

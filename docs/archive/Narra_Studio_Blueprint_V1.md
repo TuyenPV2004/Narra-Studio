@@ -1,5 +1,7 @@
 **NARRA**
 
+> **Ghi chú hiện hành — 12/08/2026:** đây là baseline lịch sử. Narra hiện dùng Provider Hub: Google Flow automation trong các phiên local tách biệt, Avis API tùy chọn qua `.env`, fallback import thủ công và QA bắt buộc. Các đoạn “Flow manual/không automation” phía dưới chỉ mô tả quyết định V1 ban đầu.
+
 **STUDIO**
 
 *From question to documentary.*

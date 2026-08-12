@@ -105,7 +105,7 @@ Skill đã được đóng gói tại `.agents/skills/narra/`. Trong Codex Deskt
 
 **Output:** `assets/manifest.json`, prompt/task cho từng shot và checklist import/QA.
 
-**Quy tắc:** không tự động điều khiển Google Flow; không tải media không rõ quyền; phân biệt planned, imported, selected, rejected và QA status.
+**Quy tắc:** chỉ gửi Google Flow/Avis generation sau yêu cầu rõ ràng của creator; dừng để creator xử lý CAPTCHA/2FA/xác minh; không chia sẻ cookie giữa tài khoản; không tải media không rõ quyền; output tự động chỉ đạt `SELECTED`, không tự `QA_PASS`.
 
 ### `$narra stage=voice`
 

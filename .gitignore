@@ -1,6 +1,8 @@
 node_modules/
 .pnpm-store/
 .smoke/
+.codex-build/
+.analysis/
 dist/
 dist-electron/
 coverage/

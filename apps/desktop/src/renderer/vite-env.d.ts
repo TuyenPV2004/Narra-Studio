@@ -27,10 +27,11 @@ import type {
   ProjectBackupResult,
 } from '@narra/project-store';
 import type {AiReasoningEffort, AiStage, AiProjectSettings} from '@narra/contracts';
+import type {AvisStatus, FlowAccount, FlowAutomationJob} from '../electron/provider-types';
 
 interface NarraDesktopApi {
   readonly runtime: 'electron';
-  readonly version: 16;
+  readonly version: 17;
   listProjects: () => Promise<ProjectRecord[]>;
   createProject: (input: CreateProjectInput) => Promise<ProjectDetail>;
   chooseAndOpenProject: () => Promise<ProjectDetail | null>;
@@ -50,6 +51,17 @@ interface NarraDesktopApi {
   prepareFlowAssetTask: (projectId: string, input: PrepareFlowTaskInput) => Promise<StoryboardWorkspace>;
   selectFlowCandidate: (projectId: string, candidateId: string, assetId: string) => Promise<StoryboardWorkspace>;
   rejectFlowCandidate: (projectId: string, candidateId: string) => Promise<FlowWorkspace>;
+  flowListAccounts: () => Promise<FlowAccount[]>;
+  flowLoginAccount: (slotId: number) => Promise<FlowAccount>;
+  flowOpenAccount: (slotId: number) => Promise<FlowAccount>;
+  flowLogoutAccount: (slotId: number) => Promise<FlowAccount>;
+  flowListJobs: (projectId?: string) => Promise<FlowAutomationJob[]>;
+  flowSubmitAsset: (projectId: string, assetId: string, slotId?: number) => Promise<FlowAutomationJob>;
+  flowCancelJob: (jobId: string) => Promise<FlowAutomationJob>;
+  flowRetryJob: (jobId: string) => Promise<FlowAutomationJob>;
+  avisStatus: () => Promise<AvisStatus>;
+  avisListModels: () => Promise<unknown[]>;
+  avisGenerateAsset: (projectId: string, assetId: string) => Promise<StoryboardWorkspace>;
   copyText: (value: string) => Promise<{copied: true}>;
   exportStoryboardRenderInput: (projectId: string) => Promise<string>;
   getVoiceWorkspace: (projectId: string) => Promise<VoiceWorkspace>;
@@ -146,6 +158,7 @@ interface NarraDesktopApi {
   openExternalUrl: (url: string) => Promise<{opened: true}>;
   onMenuAction: (listener: (action: 'NEW_PROJECT' | 'OPEN_PROJECT' | 'REFRESH_PROJECT') => void) => () => void;
   onCodexEvent: (listener: (event: Record<string, unknown>) => void) => () => void;
+  onProviderEvent: (listener: (event: {type: string; payload: unknown}) => void) => () => void;
 }
 
 declare global {

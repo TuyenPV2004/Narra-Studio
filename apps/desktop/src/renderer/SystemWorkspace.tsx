@@ -1,6 +1,7 @@
 import type {ProjectBackupResult, SystemDiagnostics} from '@narra/project-store';
 import {useEffect, useState} from 'react';
 import {Archive, CheckCircle2, CircleAlert, HardDrive, RefreshCw, Stethoscope, TriangleAlert} from 'lucide-react';
+import type {AvisStatus, FlowAccount} from '../electron/provider-types';
 
 const statusIcon = (status: 'PASS' | 'WARNING' | 'FAIL') => status === 'PASS'
   ? <CheckCircle2 aria-hidden="true" size={18} />
@@ -11,11 +12,20 @@ export const SystemWorkspaceView = ({projectId}: {projectId: string}) => {
   const [backup, setBackup] = useState<ProjectBackupResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [avis, setAvis] = useState<AvisStatus | null>(null);
+  const [flowAccounts, setFlowAccounts] = useState<FlowAccount[]>([]);
 
   const runDiagnostics = async (): Promise<void> => {
     setBusy(true);
     setError(null);
-    try { setDiagnostics(await window.narra.getSystemDiagnostics()); }
+    try {
+      const [nextDiagnostics, nextAvis, nextAccounts] = await Promise.all([
+        window.narra.getSystemDiagnostics(), window.narra.avisStatus(), window.narra.flowListAccounts(),
+      ]);
+      setDiagnostics(nextDiagnostics);
+      setAvis(nextAvis);
+      setFlowAccounts(nextAccounts);
+    }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Không thể chạy chẩn đoán hệ thống.'); }
     finally { setBusy(false); }
   };
@@ -53,6 +63,16 @@ export const SystemWorkspaceView = ({projectId}: {projectId: string}) => {
             <div><header><strong>{check.label}</strong><span>{check.status === 'PASS' ? 'Sẵn sàng' : check.status === 'WARNING' ? 'Cần chú ý' : 'Không khả dụng'}</span></header><p>{check.detail}</p>{check.remediation && <small>{check.remediation}</small>}</div>
           </article>
         ))}
+      </section>
+
+      <section className="backup-card">
+        <Stethoscope aria-hidden="true" size={22} />
+        <div>
+          <h3>Provider sinh media của Narra</h3>
+          <p>Avis: {avis?.configured ? 'đã cấu hình AVIS_API_KEY từ môi trường' : 'chưa cấu hình'} · Endpoint: {avis?.apiBase ?? '—'}</p>
+          <p>Google Flow dùng các phiên trình duyệt local tách biệt; Narra không lưu mật khẩu, không chia sẻ cookie giữa tài khoản.</p>
+          <div className="scope-row">{flowAccounts.map((account) => <span className={`scope-chip ${account.status === 'CONNECTED' ? 'fresh' : 'stale'}`} key={account.id}>Tài khoản {account.id + 1} · {account.status} · {account.cookieCount} cookie</span>)}</div>
+        </div>
       </section>
 
       <section className="backup-card">

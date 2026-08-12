@@ -47,7 +47,7 @@ const workspaceItems = [
   {id: 'system', label: 'Hệ thống', icon: Settings2},
 ] as const;
 
-type QuestionGenerationPhase = 'IDLE' | 'CONNECTING' | 'RESEARCHING' | 'DRAFTING' | 'STOPPING' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
+type QuestionGenerationPhase = 'IDLE' | 'CONNECTING' | 'RESEARCHING' | 'VERIFYING' | 'REPAIRING' | 'SYNTHESIZING' | 'STOPPING' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
 type QuestionEvidenceStatus = 'SUFFICIENT' | 'LIMITED' | 'INSUFFICIENT';
 type QuestionSource = {
   id?: string;
@@ -61,6 +61,41 @@ type QuestionSource = {
   supports?: Array<{premise: string; evidenceRole: 'PRIMARY' | 'SECONDARY'; limitations: string}>;
   discoveryNote?: string | null;
   relevantInterests?: string | null;
+};
+type QuestionResearchActivity = {
+  key: string;
+  kind: 'SEARCH' | 'OPEN_PAGE';
+  status: 'STARTED' | 'COMPLETED';
+  query?: string;
+  url?: string;
+  occurredAt: string;
+};
+type QuestionExcludedSource = {title: string; url: string};
+
+const timedQuestionPhases = [
+  {id: 'CONNECTING', label: 'Kết nối'},
+  {id: 'RESEARCHING', label: 'Tìm nguồn'},
+  {id: 'VERIFYING', label: 'Xác minh'},
+  {id: 'REPAIRING', label: 'Mở bù nguồn'},
+  {id: 'SYNTHESIZING', label: 'Tạo câu hỏi'},
+] as const;
+
+const formatElapsed = (milliseconds: number): string => {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  return `${Math.floor(totalSeconds / 60)}:${String(totalSeconds % 60).padStart(2, '0')}`;
+};
+
+const sourceHostname = (url: string): string => {
+  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
+};
+
+const SourceFavicon = ({url}: {url: string}) => {
+  const [failed, setFailed] = useState(false);
+  let favicon = '';
+  try { favicon = new URL('/favicon.ico', url).toString(); } catch { /* Render the local fallback. */ }
+  return failed || !favicon
+    ? <span className="source-favicon fallback"><Globe2 aria-hidden="true" size={13} /></span>
+    : <span className="source-favicon"><img alt="" src={favicon} onError={() => setFailed(true)} /></span>;
 };
 
 const questionGenerationSteps = [
@@ -88,6 +123,11 @@ export const App = () => {
   const [questionEvidenceStatus, setQuestionEvidenceStatus] = useState<QuestionEvidenceStatus | null>(null);
   const [questionWarnings, setQuestionWarnings] = useState<string[]>([]);
   const [questionGenerationError, setQuestionGenerationError] = useState<string | null>(null);
+  const [questionResearchActivity, setQuestionResearchActivity] = useState<QuestionResearchActivity[]>([]);
+  const [questionExcludedSources, setQuestionExcludedSources] = useState<QuestionExcludedSource[]>([]);
+  const [questionPhaseStartedAt, setQuestionPhaseStartedAt] = useState<number | null>(null);
+  const [questionPhaseDurations, setQuestionPhaseDurations] = useState<Partial<Record<QuestionGenerationPhase, number>>>({});
+  const [questionClockNow, setQuestionClockNow] = useState(Date.now());
   const questionGenerationRequest = useRef<string | null>(null);
   const questionGenerationCancelRequested = useRef(false);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -95,9 +135,10 @@ export const App = () => {
 
   const activeProjects = useMemo(() => projects.filter(({archived}) => !archived), [projects]);
   const archivedProjects = useMemo(() => projects.filter(({archived}) => archived), [projects]);
-  const questionIsGenerating = ['CONNECTING', 'RESEARCHING', 'DRAFTING', 'STOPPING'].includes(questionGenerationPhase);
+  const questionIsGenerating = ['CONNECTING', 'RESEARCHING', 'VERIFYING', 'REPAIRING', 'SYNTHESIZING', 'STOPPING'].includes(questionGenerationPhase);
   const questionIsWorking = questionIsGenerating || questionIsTranslating;
   const questionWordCount = question.trim() ? question.trim().split(/\s+/).length : 0;
+  const currentQuestionPhaseElapsed = questionPhaseStartedAt === null ? 0 : Math.max(0, questionClockNow - questionPhaseStartedAt);
 
   const reloadProjects = async (): Promise<void> => {
     setProjects(await window.narra.listProjects());
@@ -110,6 +151,12 @@ export const App = () => {
   }, []);
 
   useEffect(() => setActiveTab('overview'), [selected?.project.id]);
+
+  useEffect(() => {
+    if (!questionIsGenerating) return;
+    const timer = window.setInterval(() => setQuestionClockNow(Date.now()), 250);
+    return () => window.clearInterval(timer);
+  }, [questionIsGenerating]);
 
   useEffect(() => {
     if (!createDialogOpen && questionDisplayLanguage === 'vi' && questionEnglishOriginal) {
@@ -147,6 +194,10 @@ export const App = () => {
       setQuestionEvidenceStatus(null);
       setQuestionWarnings([]);
       setQuestionGenerationError(null);
+      setQuestionResearchActivity([]);
+      setQuestionExcludedSources([]);
+      setQuestionPhaseStartedAt(null);
+      setQuestionPhaseDurations({});
       setCreateDialogOpen(false);
       await reloadProjects();
     });
@@ -158,6 +209,10 @@ export const App = () => {
     setQuestionEvidenceStatus(null);
     setQuestionWarnings([]);
     setQuestionGenerationError(null);
+    setQuestionResearchActivity([]);
+    setQuestionExcludedSources([]);
+    setQuestionPhaseStartedAt(null);
+    setQuestionPhaseDurations({});
     if (!questionIsGenerating) setQuestionGenerationPhase('IDLE');
   };
 
@@ -179,6 +234,11 @@ export const App = () => {
     setQuestionEditorialNote('');
     setQuestionEvidenceStatus(null);
     setQuestionWarnings([]);
+    setQuestionResearchActivity([]);
+    setQuestionExcludedSources([]);
+    setQuestionPhaseDurations({});
+    setQuestionPhaseStartedAt(Date.now());
+    setQuestionClockNow(Date.now());
     setQuestionGenerationPhase('CONNECTING');
     try {
       const result = await window.narra.codexGenerateProjectQuestion({requestId, title: projectTitle});
@@ -315,11 +375,66 @@ export const App = () => {
     if (event.type !== 'projectQuestionGeneration' || event.requestId !== questionGenerationRequest.current) return;
     const phase = typeof event.phase === 'string' ? event.phase as QuestionGenerationPhase : null;
     if (phase && phase !== 'COMPLETED') setQuestionGenerationPhase(phase);
+    if (typeof event.phaseStartedAt === 'string') {
+      const phaseStartedAt = Date.parse(event.phaseStartedAt);
+      if (!Number.isNaN(phaseStartedAt)) setQuestionPhaseStartedAt(phaseStartedAt);
+    }
+    if (event.phaseDurations && typeof event.phaseDurations === 'object') {
+      setQuestionPhaseDurations(event.phaseDurations as Partial<Record<QuestionGenerationPhase, number>>);
+    }
+    if (Array.isArray(event.excludedSources)) {
+      setQuestionExcludedSources(event.excludedSources.flatMap((value) => {
+        if (!value || typeof value !== 'object') return [];
+        const source = value as Record<string, unknown>;
+        return typeof source.title === 'string' && typeof source.url === 'string'
+          ? [{title: source.title, url: source.url}]
+          : [];
+      }));
+    }
+    if (typeof event.repairUrl === 'string') {
+      const url = event.repairUrl;
+      const occurredAt = typeof event.phaseStartedAt === 'string' ? event.phaseStartedAt : new Date().toISOString();
+      const repairActivity: QuestionResearchActivity = {
+        key: `OPEN_PAGE:${url}`,
+        kind: 'OPEN_PAGE',
+        status: 'STARTED',
+        url,
+        occurredAt,
+      };
+      setQuestionResearchActivity((current) => current.some(({key}) => key === repairActivity.key)
+        ? current
+        : [...current.slice(-7), repairActivity]);
+    }
+    const activity = event.activity && typeof event.activity === 'object' ? event.activity as Record<string, unknown> : null;
+    if (
+      activity
+      && (activity.kind === 'SEARCH' || activity.kind === 'OPEN_PAGE')
+      && (activity.status === 'STARTED' || activity.status === 'COMPLETED')
+      && typeof activity.occurredAt === 'string'
+    ) {
+      const query = typeof activity.query === 'string' ? activity.query : undefined;
+      const url = typeof activity.url === 'string' ? activity.url : undefined;
+      const key = `${activity.kind}:${url ?? query ?? activity.occurredAt}`;
+      const next: QuestionResearchActivity = {
+        key,
+        kind: activity.kind,
+        status: activity.status,
+        occurredAt: activity.occurredAt,
+        ...(query ? {query} : {}),
+        ...(url ? {url} : {}),
+      };
+      setQuestionResearchActivity((current) => {
+        const existingIndex = current.findIndex((item) => item.key === key);
+        if (existingIndex < 0) return [...current.slice(-7), next];
+        const updated = [...current];
+        updated[existingIndex] = next;
+        return updated;
+      });
+    }
     const source = event.source && typeof event.source === 'object' ? event.source as Record<string, unknown> : null;
     if (source && typeof source.url === 'string') {
       const url = source.url;
-      let publisher = url;
-      try { publisher = new URL(url).hostname.replace(/^www\./, ''); } catch { /* Keep the URL as a visible fallback. */ }
+      const publisher = sourceHostname(url);
       setQuestionSources((current) => current.some((item) => item.url === url)
         ? current
         : [...current, {
@@ -485,8 +600,8 @@ export const App = () => {
               <ol className="create-project-steps" aria-label="Quy trình tạo dự án">
                 {questionGenerationSteps.map((step, index) => {
                   const activeIndex = questionGenerationPhase === 'CONNECTING' ? 0
-                    : questionGenerationPhase === 'RESEARCHING' ? 1
-                      : questionGenerationPhase === 'DRAFTING' || questionGenerationPhase === 'STOPPING' ? 2
+                    : ['RESEARCHING', 'VERIFYING', 'REPAIRING'].includes(questionGenerationPhase) ? 1
+                      : questionGenerationPhase === 'SYNTHESIZING' || questionGenerationPhase === 'STOPPING' ? 2
                         : questionGenerationPhase === 'COMPLETED' ? 3 : title.trim() ? 0 : -1;
                   const state = index < activeIndex ? 'complete' : index === activeIndex ? 'active' : 'pending';
                   return <li className={state} key={step.id}><span>{index + 1}</span><small>{step.label}</small></li>;
@@ -566,7 +681,9 @@ export const App = () => {
                 <section className={`question-generation-panel ${questionGenerationPhase.toLowerCase()} ${questionEvidenceStatus?.toLowerCase() ?? ''}`} id="project-question-status" aria-live="polite">
                   {questionGenerationPhase !== 'IDLE' && <p>{questionGenerationPhase === 'CONNECTING' && 'Đang kiểm tra đăng nhập và model…'}
                     {questionGenerationPhase === 'RESEARCHING' && 'Đang tìm và mở từng trang nguồn để xác minh phạm vi…'}
-                    {questionGenerationPhase === 'DRAFTING' && 'Đã có bằng chứng; đang soạn một câu hỏi có thể điều tra…'}
+                    {questionGenerationPhase === 'VERIFYING' && 'Đang đối chiếu nguồn trích dẫn với các trang Codex đã mở hoàn tất…'}
+                    {questionGenerationPhase === 'REPAIRING' && 'Một số nguồn chưa có bằng chứng mở trang; đang mở bù một lượt duy nhất…'}
+                    {questionGenerationPhase === 'SYNTHESIZING' && 'Nguồn đã được khóa; đang tạo câu hỏi trong một luồng cách ly không tìm kiếm web…'}
                     {questionGenerationPhase === 'STOPPING' && 'Đang dừng lượt chạy…'}
                     {questionGenerationPhase === 'COMPLETED' && questionEvidenceStatus === 'SUFFICIENT' && 'Đủ bằng chứng sơ bộ. Anh có thể sửa câu hỏi trước khi tạo dự án.'}
                     {questionGenerationPhase === 'COMPLETED' && questionEvidenceStatus === 'LIMITED' && 'Bằng chứng còn hạn chế; AI đã giữ câu hỏi rộng và thận trọng để anh duyệt.'}
@@ -575,11 +692,44 @@ export const App = () => {
                     {questionGenerationPhase === 'CANCELLED' && 'Đã dừng. Nội dung cũ trong khung không bị thay đổi.'}
                     {questionGenerationPhase === 'FAILED' && 'Chưa tạo được câu hỏi. Kiểm tra lỗi bên dưới rồi thử lại.'}</p>}
                   {questionGenerationError && <p className="field-error" role="alert">{questionGenerationError}</p>}
+                  <div className="question-phase-timers" aria-label="Thời gian từng giai đoạn">
+                    {timedQuestionPhases.map((phase) => {
+                      const duration = questionPhaseDurations[phase.id]
+                        ?? (questionGenerationPhase === phase.id ? currentQuestionPhaseElapsed : null);
+                      const state = questionGenerationPhase === phase.id ? 'active' : duration !== null ? 'complete' : 'pending';
+                      return (
+                        <div className={state} key={phase.id}>
+                          <span>{phase.label}</span>
+                          <strong>{duration === null ? '—' : formatElapsed(duration)}</strong>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {questionResearchActivity.length > 0 && (
+                    <div className="question-research-activity">
+                      <div><Search aria-hidden="true" size={14} /><strong>Hoạt động tìm nguồn</strong></div>
+                      {questionResearchActivity.map((activity) => activity.url ? (
+                        <button className="source-activity-row" key={activity.key} type="button" onClick={() => void window.narra.openExternalUrl(activity.url!)}>
+                          <span className="source-url-tooltip" role="tooltip">{activity.url}</span>
+                          <SourceFavicon url={activity.url} />
+                          <span><strong>{activity.status === 'COMPLETED' ? 'Đã mở' : 'Đang mở'} · {sourceHostname(activity.url)}</strong><small>{activity.url}</small></span>
+                          <ExternalLink aria-hidden="true" size={14} />
+                        </button>
+                      ) : (
+                        <div className="source-activity-row search-query" key={activity.key}>
+                          <span className="source-favicon fallback"><Search aria-hidden="true" size={13} /></span>
+                          <span><strong>{activity.status === 'COMPLETED' ? 'Đã tìm' : 'Đang tìm'}</strong><small>{activity.query}</small></span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                   {questionSources.length > 0 && (
                     <div className="question-source-list">
                       <div><Globe2 aria-hidden="true" size={14} /><strong>Nguồn Codex đã mở ({questionSources.length})</strong></div>
                       {questionSources.map((source) => (
                         <button key={source.id ?? source.url} type="button" onClick={() => void window.narra.openExternalUrl(source.url)}>
+                          <span className="source-url-tooltip" role="tooltip">{source.url}</span>
+                          <SourceFavicon url={source.url} />
                           <span>
                             <strong>{source.publisher}</strong>
                             <small>{source.publisherType && source.sourceUse ? `${formatUiLabel(source.publisherType)} · ${formatUiLabel(source.sourceUse)} · ${source.title}` : source.title}</small>
@@ -587,6 +737,19 @@ export const App = () => {
                             {source.discoveryNote && <small>{source.discoveryNote}</small>}
                             {source.relevantInterests && <small>Lợi ích liên quan: {source.relevantInterests}</small>}
                           </span>
+                          <ExternalLink aria-hidden="true" size={14} />
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  {questionExcludedSources.length > 0 && (
+                    <div className="question-source-list excluded">
+                      <div><TriangleAlert aria-hidden="true" size={14} /><strong>Nguồn đã loại ({questionExcludedSources.length})</strong></div>
+                      {questionExcludedSources.map((source) => (
+                        <button key={source.url} type="button" onClick={() => void window.narra.openExternalUrl(source.url)}>
+                          <span className="source-url-tooltip" role="tooltip">{source.url}</span>
+                          <span className="source-favicon fallback"><TriangleAlert aria-hidden="true" size={13} /></span>
+                          <span><strong>{source.title}</strong><small>Codex chưa mở trang hoàn tất · {sourceHostname(source.url)}</small></span>
                           <ExternalLink aria-hidden="true" size={14} />
                         </button>
                       ))}

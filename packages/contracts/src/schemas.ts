@@ -119,7 +119,7 @@ export const MediaMetadataSchema = z.object({
 });
 
 export const AssetTaskSchema = z.object({
-  provider: z.enum(['GOOGLE_FLOW', 'STOCK', 'LOCAL', 'OTHER']),
+  provider: z.enum(['GOOGLE_FLOW', 'AVIS', 'STOCK', 'LOCAL', 'OTHER']),
   brief: z.string().min(1),
   prompt: z.string().min(1),
   negativePrompt: z.string().optional(),
@@ -140,9 +140,10 @@ export const AssetTaskSchema = z.object({
 });
 
 export const AssetGenerationSchema = z.object({
-  provider: z.literal('GOOGLE_FLOW'),
-  candidateId: IdSchema,
-  promptVersion: z.number().int().positive(),
+  provider: z.enum(['GOOGLE_FLOW', 'AVIS']),
+  providerJobId: z.string().min(1).optional(),
+  candidateId: IdSchema.optional(),
+  promptVersion: z.number().int().positive().optional(),
   model: z.string().min(1),
   prompt: z.string().min(1),
   sourceFileName: z.string().min(1),

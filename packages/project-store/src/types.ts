@@ -103,6 +103,14 @@ export type AssetStatusInput = {
   qaNote?: string;
 };
 
+export type AttachGeneratedAssetInput = {
+  provider: 'GOOGLE_FLOW' | 'AVIS';
+  providerJobId?: string;
+  promptVersion?: number;
+  model: string;
+  prompt: string;
+};
+
 export type PrepareFlowTaskInput = {
   shotId: string;
   kind?: 'IMAGE' | 'VIDEO';

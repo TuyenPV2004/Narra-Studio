@@ -3,6 +3,8 @@
 **Ngày kiểm tra:** 2026-08-10  
 **Kết luận:** implementation/packaging đã hoàn thành; full live pilot 7–9 phút chưa hoàn thành.
 
+> Báo cáo này là snapshot lịch sử ngày 10/08/2026. Từ 12/08/2026, Flow manual smoke được thay bằng Narra Provider Hub; live verification vẫn cần creator đăng nhập tài khoản thật và chủ động cho phép một generation có thể tiêu credit.
+
 ## 1. Phạm vi đã hoàn thành
 
 - Thêm tab System với diagnostics cho workspace, Codex App Server/model, Kokoro, Remotion và FFmpeg.
@@ -49,7 +51,7 @@ Project đã có research, thesis, outline, script draft và claim mapping. Crea
 | ffprobe voice render | PASS: video 3,00 giây; audio 3,050667 giây, 48 kHz stereo |
 | Artifact validator ở gate hiện tại | PASS ở stage `script`: project, sources, facts, research packet, thesis, claims và script hợp lệ |
 | Full repository quality gate | PASS: lint, typecheck, production build; 47 test pass và 1 optional render smoke skip |
-| Flow manual smoke với output thật | PENDING creator |
+| Narra Flow automation smoke với output thật | PENDING creator |
 | Final 7–9 phút và ffprobe final | PENDING creator |
 
 ## 4. Thời gian và thao tác theo stage
@@ -75,7 +77,7 @@ Creator cần thực hiện trên giao diện Narra:
 
 1. Review/sửa script và duyệt `SCRIPT_APPROVED`.
 2. Sinh scene/shot plan, review và duyệt `STORYBOARD_APPROVED`.
-3. Dùng Flow Assisted cho ít nhất một ảnh Nano Banana và một clip Veo thật; import, map đúng shot, ghi provenance và QA.
+3. Dùng Narra Provider Hub cho ít nhất một ảnh và một clip Flow thật; xác nhận tự import đúng shot, provenance và QA.
 4. Tạo toàn bộ narration tiếng Anh bằng Kokoro local; nghe và duyệt từng segment.
 5. Sửa lại tối thiểu một source/claim, một asset và một voice segment để kiểm tra stale scope/incremental render.
 6. Hoàn tất caption/timeline, rough cut, rough approval, final render và final review.

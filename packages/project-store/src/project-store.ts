@@ -68,7 +68,7 @@ import {
 } from './artifact-layout.js';
 import {openWorkspaceDatabase} from './database.js';
 import {compareNarrationTranscript, parseTimedText, parseWordTimestamps} from './caption-parser.js';
-import {FlowAssistedProvider} from './flow-assisted-provider.js';
+import {NarraFlowProvider} from './narra-flow-provider.js';
 import {probeMedia} from './media-probe.js';
 import {UnavailableVoiceProvider, type VoiceProvider} from './voice-provider.js';
 import type {
@@ -76,6 +76,7 @@ import type {
   ApprovalRecord,
   CreateProjectInput,
   AssetStatusInput,
+  AttachGeneratedAssetInput,
   CreateAssetTaskInput,
   EditorialDocument,
   EditorialWorkspace,
@@ -713,6 +714,41 @@ export class ProjectStore {
     return this.getStoryboardWorkspace(projectId);
   }
 
+  async attachGeneratedAsset(
+    projectId: string,
+    assetId: string,
+    sourcePath: string,
+    input: AttachGeneratedAssetInput,
+  ): Promise<StoryboardWorkspace> {
+    await this.importAssetMedia(projectId, assetId, sourcePath);
+    const project = this.getProject(projectId).project;
+    const assetsPath = path.join(project.rootPath, 'assets/manifest.json');
+    const assets = AssetCollectionSchema.parse(parseJson(assetsPath));
+    const asset = assets.items.find(({id}) => id === assetId);
+    if (!asset) throw new Error(`Asset ${assetId} was not found after provider import.`);
+    const now = isoNow();
+    const generation = {
+      provider: input.provider,
+      ...(input.providerJobId ? {providerJobId: input.providerJobId} : {}),
+      ...(input.promptVersion ? {promptVersion: input.promptVersion} : {}),
+      model: input.model,
+      prompt: input.prompt,
+      sourceFileName: path.basename(sourcePath),
+      importedAt: now,
+    };
+    atomicWriteJson(assetsPath, {
+      ...assets,
+      updatedAt: now,
+      items: assets.items.map((item) => item.id === assetId
+        ? AssetSchema.parse({...item, status: 'SELECTED', generation})
+        : item),
+    });
+    this.refreshProject(projectId);
+    this.markScopes(projectId, ['ASSETS', 'RENDER'], `${input.provider} output attached for ${assetId}`);
+    this.syncAssetScope(projectId);
+    return this.getStoryboardWorkspace(projectId);
+  }
+
   getAssetFilePath(projectId: string, assetId: string): string {
     const project = this.getProject(projectId).project;
     const assets = AssetCollectionSchema.parse(parseJson(path.join(project.rootPath, 'assets/manifest.json')));
@@ -791,7 +827,7 @@ export class ProjectStore {
     }
     const kind = input.kind ?? (shot.visualType === 'AI_VIDEO' ? 'VIDEO' : 'IMAGE');
     const version = (existing?.task?.flow?.version ?? 0) + 1;
-    const provider = new FlowAssistedProvider();
+    const provider = new NarraFlowProvider();
     const flow = provider.createPromptPackage({
       project,
       scene,
@@ -898,6 +934,7 @@ export class ProjectStore {
       status: 'SELECTED',
       generation: {
         provider: 'GOOGLE_FLOW',
+        providerJobId: candidateId,
         candidateId,
         promptVersion: asset.task!.flow!.version,
         model: asset.kind === 'VIDEO' ? asset.task!.flow!.videoModel : asset.task!.flow!.imageModel,

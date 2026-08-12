@@ -1,10 +1,12 @@
 # Kế hoạch cập nhật luồng Narra Studio V1
 
+> **Quyết định hiện hành — 12/08/2026:** U4 được nâng từ `Flow Assisted` sang **Narra Provider Hub**. Google Flow có automation local với tối đa `NARRA_FLOW_ACCOUNT_SLOTS` phiên tài khoản tách biệt; Avis là provider API tùy chọn qua `.env`; import thủ công tiếp tục là fallback. Automation chỉ bắt đầu sau thao tác rõ ràng của creator, dừng tại CAPTCHA/2FA/xác minh, không chia sẻ cookie và không tự `QA_PASS`. Các mô tả U4 bán thủ công phía dưới được giữ làm lịch sử triển khai, không còn là kiến trúc đích.
+
 ## 1. Mục tiêu
 
-Tài liệu này điều chỉnh lộ trình sau các giai đoạn đã triển khai trong [Ke_Hoach_V1.md](Ke_Hoach_V1.md). Mục tiêu mới là biến Narra từ công cụ đọc/ghi artifact do Codex tạo ở cửa sổ khác thành một desktop tool có trải nghiệm vận hành thống nhất:
+Tài liệu này điều chỉnh lộ trình sau các giai đoạn đã triển khai trong [Ke_Hoach_V1.md](../Ke_Hoach_V1.md). Mục tiêu mới là biến Narra từ công cụ đọc/ghi artifact do Codex tạo ở cửa sổ khác thành một desktop tool có trải nghiệm vận hành thống nhất:
 
-`Prompt trong Narra → Codex research → creator chọn topic/thesis/outline → script/storyboard → Google Flow Assisted → English TTS local → caption/timeline → Remotion preview/render`
+`Prompt trong Narra → Codex research → creator chọn topic/thesis/outline → script/storyboard → Narra Provider Hub → English TTS local → caption/timeline → Remotion preview/render`
 
 Các quyết định khóa cho bản cập nhật:
 
@@ -240,7 +242,7 @@ Các phần trên là nền tảng. Kế hoạch cập nhật chỉ thay đổi 
 
 **Công việc:**
 
-- Tạo provider `FlowAssistedProvider` theo interface media provider.
+- Tạo provider `NarraFlowProvider` theo interface media provider.
 - Với mỗi shot, sinh:
   - image prompt cho Nano Banana;
   - video prompt cho Veo 3.1;
@@ -267,7 +269,7 @@ Các phần trên là nền tảng. Kế hoạch cập nhật chỉ thay đổi 
 
 **Trạng thái implementation:** hoàn thành. **Trạng thái live Flow smoke:** chờ creator tự xác nhận generation/download trong Google Flow để tránh tự tiêu credit hoặc điều khiển tài khoản ngoài ý muốn.
 
-- Thêm `FlowAssistedProvider` sinh prompt package có version cho từng shot: image prompt, video prompt, negative guidance, aspect ratio, thời lượng Flow hỗ trợ, model mặc định và shot token.
+- Thêm `NarraFlowProvider` sinh prompt package có version cho từng shot: image prompt, video prompt, negative guidance, aspect ratio, thời lượng Flow hỗ trợ, model mặc định và shot token.
 - Model mặc định hiện tại là `Nano Banana 2` cho ảnh và `Veo 3.1 Lite` cho video. Thời lượng generation được ánh xạ về `4/6/8 giây`, là các lựa chọn được Google Flow Help công bố; Narra không hard-code giá credit.
 - Asset workspace có thao tác chuẩn bị/tạo lại prompt, copy prompt, mở Google Flow, đánh dấu đang tạo, chọn thư mục download và quét thủ công. File picker/drag-drop cũ vẫn là fallback.
 - Watcher polling chỉ phát hiện ảnh/video mới trong thư mục creator chọn. File được deduplicate bằng SHA-256; đường dẫn và kích thước được kiểm tra trước để không băm lại video không đổi ở mỗi vòng quét.

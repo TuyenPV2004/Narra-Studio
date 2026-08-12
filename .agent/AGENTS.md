@@ -17,7 +17,7 @@
 4. `docs/SKILL.md` cho danh mục workflow Codex/Narra.
 5. Contract/schema máy đọc được khi chúng được tạo.
 6. `.agent/SKILL.md` và rule module cụ thể.
-7. `docs/Narra_Studio_Blueprint_V1.md` chỉ làm tài liệu khám phá/lịch sử ở những điểm đã được tài liệu mới sửa đổi.
+7. `docs/archive/Narra_Studio_Blueprint_V1.md` chỉ làm tài liệu khám phá/lịch sử ở những điểm đã được tài liệu mới sửa đổi.
 8. Pattern implementation hiện có.
 
 Nếu có xung đột, không âm thầm hòa trộn hai quyết định; nêu xung đột và ưu tiên nguồn mới hơn theo thứ tự trên.
