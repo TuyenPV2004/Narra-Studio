@@ -2,15 +2,14 @@ node_modules/
 .pnpm-store/
 .smoke/
 .codex-build/
-.analysis/
 dist/
 dist-electron/
 /apps/desktop/config/
 coverage/
 .vite/
-.runtime/
 .package-stage/
 release/
+release-*/
 
 # Local credentials and machine-specific configuration
 .env
@@ -27,6 +26,7 @@ renders/
 fixtures/**/assets/videos/*.mp4
 fixtures/**/audio/**/*.wav
 fixtures/**/renders/**
+.codex-config-cleanup.tmp.toml
 
 # OS/editor files
 .DS_Store

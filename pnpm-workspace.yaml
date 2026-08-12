@@ -1,10 +1,7 @@
 packages:
   - apps/*
-  - packages/*
-  - remotion
 allowBuilds:
   electron-winstaller: false
-  esbuild: true
   ffmpeg-static: true
   onnxruntime-node: true
   protobufjs: true

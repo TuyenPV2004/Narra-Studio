@@ -1,9 +1,0 @@
-{
-  "schemaVersion": 1,
-  "projectId": "ai-electricity-eval",
-  "updatedAt": "2026-08-10T00:00:00.000Z",
-  "items": [
-    {"id":"claim-global-growth","projectId":"ai-electricity-eval","statement":"Global data-center electricity use is projected to rise from 485 TWh in 2025 to 950 TWh in 2030.","factIds":["fact-global-demand"],"scriptVersion":1,"status":"SUPPORTED"},
-    {"id":"claim-us-range","projectId":"ai-electricity-eval","statement":"U.S. data centers could use 521–843 TWh in 2030, or 9.5%–15.3% of national electricity.","factIds":["fact-us-range"],"scriptVersion":1,"status":"SUPPORTED"}
-  ]
-}

@@ -1,4 +1,0 @@
-interface:
-  display_name: "Narra"
-  short_description: "Build sourced documentary artifacts locally"
-  default_prompt: "Use $narra to continue this Narra project to its next valid creative gate."

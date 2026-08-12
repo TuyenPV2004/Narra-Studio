@@ -19,10 +19,10 @@ const copies = [
 ];
 for (const [sourceName, destinationName] of copies) {
   const source = path.join(sourceRoot, sourceName);
-  if (!existsSync(source)) throw new Error(`Missing recovered Fibus source payload: ${source}`);
+  if (!existsSync(source)) throw new Error(`Missing Narra runtime source payload: ${source}`);
   const destination = path.join(desktopRoot, destinationName);
   mkdirSync(path.dirname(destination), {recursive: true});
   cpSync(source, destination, {recursive: true});
 }
 
-console.log('Built Narra desktop from the recovered Fibus runtime source.');
+console.log('Built Narra desktop from the local runtime source.');

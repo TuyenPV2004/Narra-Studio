@@ -1,5 +1,6 @@
 import {readFileSync, readdirSync, statSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
+import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
@@ -25,4 +26,8 @@ const rendererCheck = spawnSync(process.execPath, ['--check', '--input-type=modu
   stdio: ['pipe', 'inherit', 'inherit'],
 });
 if (rendererCheck.status !== 0) process.exit(rendererCheck.status || 1);
-console.log(`Syntax checked ${electronFiles.length} Electron files and the recovered renderer entry.`);
+
+const require = createRequire(import.meta.url);
+require(path.join(electronRoot, 'ipc', 'media', 'voice-cache.js'));
+
+console.log(`Syntax checked ${electronFiles.length} Electron files, the recovered renderer entry, and startup-loaded voice cache.`);

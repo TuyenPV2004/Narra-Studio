@@ -1,5 +1,4 @@
 'use strict';
-const { brand } = require('../../runtime/brand');
 
 /**
  * Voice-changer impulse-response asset cache: mirror table, on-disk cache,
@@ -33,28 +32,24 @@ const VOICE_ASSET_MIRRORS = {
   'ir-cathedral': {
     filename: 'cathedral-york-minster.wav',
     urls: [
-      `${brand.endpoints.publicApi}/voice-assets/cathedral-york-minster.wav`,
       'https://www.openair.hosted.york.ac.uk/wp-content/uploads/2010/05/yorkminsterstereo.wav',
     ],
   },
   'ir-auditorium': {
     filename: 'auditorium-st-andrews.wav',
     urls: [
-      `${brand.endpoints.publicApi}/voice-assets/auditorium-st-andrews.wav`,
       'https://www.openair.hosted.york.ac.uk/wp-content/uploads/2010/02/st-andrews-church.wav',
     ],
   },
   'ir-small-room': {
     filename: 'small-room.wav',
     urls: [
-      `${brand.endpoints.publicApi}/voice-assets/small-room.wav`,
       'https://www.openair.hosted.york.ac.uk/wp-content/uploads/2014/07/small-bedroom.wav',
     ],
   },
   'ir-mermaid': {
     filename: 'mermaid-underwater-chamber.wav',
     urls: [
-      `${brand.endpoints.publicApi}/voice-assets/mermaid-underwater-chamber.wav`,
       'https://www.openair.hosted.york.ac.uk/wp-content/uploads/2017/03/underwater-chamber.wav',
     ],
   },
