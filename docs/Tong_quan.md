@@ -1,3 +1,7 @@
+# Lưu ý về runtime hiện hành
+
+Narra Desktop hiện dùng bundle Electron đã khôi phục từ Fibus làm nền tảng thực thi, sau đó local hóa và đổi thương hiệu thành Narra. Tài liệu kiến trúc chính xác cho bản này là [Kien_truc_Runtime_Fibus_Narra_Local.md](Kien_truc_Runtime_Fibus_Narra_Local.md). Các phần mô tả kiến trúc React/TypeScript cũ bên dưới chỉ còn giá trị lịch sử và không phản ánh mã desktop đang được đóng gói.
+
 # Tổng quan Narra Studio V1
 
 ## 1. Trạng thái của tài liệu

@@ -3,15 +3,20 @@ productName: Narra Studio
 electronVersion: 43.3.0
 asar: true
 compression: normal
+npmRebuild: false
+nodeGypRebuild: false
 directories:
   output: ../../release
 files:
   - dist/**/*
   - dist-electron/**/*
+  - config/**/*
+  - node_modules/**/*
   - package.json
-extraResources:
-  - from: ../narra-runtime
-    to: narra-runtime
+asarUnpack:
+  - node_modules/ffmpeg-static/**/*
+  - node_modules/onnxruntime-*/**/*
+  - node_modules/sharp/**/*
 win:
   target:
     - target: portable

@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "id": "narra",
+  "displayName": "Narra Studio",
+  "displayNameUpper": "NARRA STUDIO",
+  "description": "AI Video & Image Studio",
+  "developer": {
+    "name": "Local creator",
+    "websiteUrl": "",
+    "logoUrl": ""
+  },
+  "assets": {
+    "mark": "brand/narra-mark.svg",
+    "appIcon": "brand/narra-mark.svg"
+  },
+  "theme": {
+    "primary": "#8b5cff",
+    "primaryHover": "#7547e8",
+    "primarySoft": "#d9ccff",
+    "onPrimary": "#ffffff",
+    "background0": "#0a0811",
+    "background1": "#100d18",
+    "background2": "#171222",
+    "background3": "#20182f",
+    "background4": "#2a203c",
+    "backgroundHover": "#33264a",
+    "border": "#3a2d50",
+    "borderSubtle": "#2a203b",
+    "text": "#f8f5ff",
+    "textSecondary": "#c9bfda",
+    "textMuted": "#9689ad",
+    "textQuiet": "#6c607e"
+  },
+  "features": {
+    "externalProviders": true,
+    "workspaceMembers": false
+  },
+  "packaging": {
+    "appId": "studio.narra.desktop",
+    "artifactName": "Narra-Studio-${version}-${arch}.${ext}",
+    "iconSource": "src/renderer/brand/narra-mark.svg"
+  },
+  "endpoints": {}
+}

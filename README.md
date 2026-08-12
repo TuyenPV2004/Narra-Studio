@@ -1,5 +1,22 @@
 # Narra Studio
 
+## Trạng thái triển khai hiện tại
+
+Desktop app hiện dùng trực tiếp runtime đã truy hồi tĩnh từ Fibus Studio làm nền: Electron Main/Preload, IPC media, Google Flow WebView automation, multi-account slot, CAPTCHA bridge, Avis, CapCut và renderer bundle. Source TypeScript/React của giao diện Narra thử nghiệm trước đây đã được loại khỏi `apps/desktop/src`; lệnh build chỉ sao chép và kiểm tra runtime mới, không dựng lại UI cũ bằng Vite.
+
+Các dịch vụ riêng của phần mềm mẫu đã được tách khỏi đường chạy: kích hoạt/gói thuê bao, telemetry, auto-update, community/marketplace và WebSocket cộng tác. API workspace/canvas mang tên tương thích `team-*` vẫn tồn tại vì renderer Agent gọi các tên này, nhưng implementation mới chỉ ghi JSON/media vào Electron `userData`; không kết nối team server. Cấu hình provider nhạy cảm được đọc từ `.env` cạnh executable hoặc thư mục chạy.
+
+Các lệnh chính:
+
+```powershell
+pnpm --filter @narra/desktop typecheck
+pnpm --filter @narra/desktop build
+node scripts/smoke-local-workspace.cjs
+pnpm package:win
+```
+
+Kiến trúc và ranh giới local/remote hiện hành được ghi tại [Kiến trúc runtime Fibus → Narra local](docs/Kien_truc_Runtime_Fibus_Narra_Local.md).
+
 **From question to documentary.**
 
 Narra Studio là công cụ desktop chạy local hỗ trợ quy trình sản xuất video YouTube dạng cinematic explainer và mini-documentary. Công cụ giúp creator tổ chức research, xây dựng luận đề, viết kịch bản, lập storyboard, quản lý media, tạo voice/caption và dựng rough cut có thể tiếp tục hoàn thiện trong phần mềm biên tập video.

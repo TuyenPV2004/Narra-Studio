@@ -5,6 +5,7 @@ node_modules/
 .analysis/
 dist/
 dist-electron/
+/apps/desktop/config/
 coverage/
 .vite/
 .runtime/

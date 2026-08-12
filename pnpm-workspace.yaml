@@ -5,3 +5,7 @@ packages:
 allowBuilds:
   electron-winstaller: false
   esbuild: true
+  ffmpeg-static: true
+  onnxruntime-node: true
+  protobufjs: true
+  sharp: true
