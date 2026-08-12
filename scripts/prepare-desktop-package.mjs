@@ -43,11 +43,13 @@ mkdirSync(path.join(appRoot, 'dist-electron'), {recursive: true});
 cpSync(path.join(repositoryRoot, 'apps/desktop/dist'), path.join(appRoot, 'dist'), {recursive: true});
 cpSync(path.join(repositoryRoot, 'apps/desktop/dist-electron/preload.cjs'), path.join(appRoot, 'dist-electron/preload.cjs'));
 
-const esbuild = spawnSync(path.join(repositoryRoot, 'node_modules/.bin/esbuild.cmd'), [
+const esbuildCli = path.join(repositoryRoot, 'node_modules/esbuild/bin/esbuild');
+const esbuild = spawnSync(process.execPath, [
+  esbuildCli,
   path.join(repositoryRoot, 'apps/desktop/dist-electron/main.js'),
   '--bundle', '--platform=node', '--format=esm', '--target=node24', '--external:electron',
   `--outfile=${path.join(appRoot, 'dist-electron/main.js')}`,
-], {cwd: repositoryRoot, stdio: 'inherit', shell: process.platform === 'win32'});
+], {cwd: repositoryRoot, stdio: 'inherit'});
 if (esbuild.status !== 0) throw new Error(`Electron main bundle failed with exit code ${esbuild.status ?? 'unknown'}.`);
 
 writeFileSync(path.join(appRoot, 'package.json'), `${JSON.stringify({
