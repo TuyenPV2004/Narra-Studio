@@ -1,5 +1,7 @@
 'use strict';
 
+const {findExtensionDirectory} = require('./extension-directory');
+
 /**
  * Flow webview diagnostics: CAPTCHA bridge status, extension folder, webview
  * reload/probe, and the debug-* DOM inspectors.
@@ -37,11 +39,17 @@ module.exports = function registerFlowDiagnosticsIpc(dependencies) {
 
 function getExtensionDirectory() {
   const candidates = [
+    path.join(app.getAppPath(), 'captcha-extension'),
+    path.join(process.resourcesPath || '', 'captcha-extension'),
     path.join(IPC_DIR, '..', '..', 'captcha-extension'),
     path.join(IPC_DIR, '..', 'captcha-extension'),
-    path.join(process.resourcesPath || '', 'captcha-extension'),
   ];
-  return candidates.find(p => { try { return fs.statSync(p).isDirectory(); } catch { return false; } }) || null;
+  return findExtensionDirectory({
+    fs,
+    path,
+    candidates,
+    requiredVersion: REQUIRED_EXTENSION_VERSION,
+  });
 }
 
 async function getCaptchaRuntimeStatus() {

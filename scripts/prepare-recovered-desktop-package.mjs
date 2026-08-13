@@ -3,6 +3,7 @@ import {cpSync, existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
+import {stageCaptchaExtension} from './lib/captcha-extension-package.mjs';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const desktopRoot = path.join(repositoryRoot, 'apps', 'desktop');
@@ -28,6 +29,12 @@ for (const name of ['dist', 'dist-electron', 'config']) {
   rmSync(destination, {recursive: true, force: true});
   cpSync(path.join(desktopRoot, name), destination, {recursive: true});
 }
+
+stageCaptchaExtension({
+  source: path.join(desktopRoot, 'captcha-extension'),
+  destination: path.join(appRoot, 'captcha-extension'),
+  requiredVersion: '1.3.1',
+});
 
 writeFileSync(path.join(appRoot, 'package.json'), `${JSON.stringify({
   name: 'narra-studio',

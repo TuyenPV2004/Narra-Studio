@@ -23,46 +23,13 @@
     }
 
     body {
-      background: #07111f;
+      background: #f8f7fc;
       /* Critical CSS chạy trước src/index.css nên không dùng được var(--font-ui): phải lặp nguyên stack */
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
         'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
         'Noto Sans SC', 'Source Han Sans SC', sans-serif;
       overflow: hidden;
-      color: #e4e4f0;
-    }
-
-    /* Emergency diagnostics stays outside React so it survives renderer UI errors. */
-    #devtools-trigger {
-      position: fixed;
-      left: 4px;
-      bottom: 4px;
-      z-index: 2147483647;
-      display: none;
-      align-items: center;
-      justify-content: center;
-      width: 22px;
-      height: 22px;
-      padding: 0;
-      border: 1px solid rgba(101, 196, 240, 0.28);
-      border-radius: 5px;
-      background: rgba(7, 17, 31, 0.86);
-      color: #8edcff;
-      font: 700 9px/1 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-      cursor: pointer;
-      -webkit-app-region: no-drag;
-      backdrop-filter: blur(12px);
-    }
-
-    #devtools-trigger:hover {
-      border-color: rgba(101, 196, 240, 0.58);
-      background: rgba(16, 38, 61, 0.96);
-      color: #d9f5ff;
-    }
-
-    #devtools-trigger:focus-visible {
-      outline: 2px solid #45c7ff;
-      outline-offset: 2px;
+      color: #211a2b;
     }
 
     .app-error-fallback {
@@ -70,19 +37,19 @@
       display: grid;
       place-items: center;
       padding: 32px;
-      background: #07111f;
+      background: #f8f7fc;
     }
 
     .app-error-fallback section {
       width: min(560px, 100%);
       padding: 28px;
-      border: 1px solid #253b52;
+      border: 1px solid #d8d1e2;
       border-radius: 14px;
-      background: #0a1726;
+      background: #ffffff;
     }
 
     .app-error-fallback__code {
-      color: #55cdf7;
+      color: #7c3aed;
       font-size: 11px;
       font-weight: 700;
       letter-spacing: 0.14em;
@@ -95,7 +62,7 @@
 
     .app-error-fallback p {
       margin-top: 10px;
-      color: #91a6ba;
+      color: #71667e;
       line-height: 1.55;
     }
 
@@ -108,17 +75,17 @@
     .app-error-fallback button {
       min-height: 40px;
       padding: 0 16px;
-      border: 1px solid #2b455e;
+      border: 1px solid #d8d1e2;
       border-radius: 9px;
-      background: #101f30;
-      color: #d7e8f5;
+      background: #f3f0f8;
+      color: #51465f;
       cursor: pointer;
     }
 
     .app-error-fallback button.primary {
-      border-color: #44bfea;
-      background: #44bfea;
-      color: #06121d;
+      border-color: #7c3aed;
+      background: #7c3aed;
+      color: #ffffff;
       font-weight: 700;
     }
 
@@ -128,8 +95,8 @@
       padding: 12px;
       overflow: auto;
       border-radius: 8px;
-      background: #060d16;
-      color: #e99898;
+      background: #f3f0f8;
+      color: #b42318;
       white-space: pre-wrap;
       font: 12px/1.5 'JetBrains Mono', monospace;
     }
@@ -164,8 +131,8 @@
 
     .sidebar {
       width: 200px;
-      background: #0a1523;
-      border-right: 1px solid #1c3047;
+      background: #ffffff;
+      border-right: 1px solid #e8e3ee;
       display: flex;
       flex-direction: column;
       flex-shrink: 0;
@@ -176,7 +143,7 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      background: #07111f;
+      background: #f8f7fc;
     }
 
     /* ── Splash Screen ── */
@@ -184,7 +151,7 @@
       position: fixed;
       inset: 0;
       z-index: 9999;
-      background: #07111f;
+      background: #f8f7fc;
       display: flex;
       flex-direction: column;
       align-items: center;
@@ -210,7 +177,7 @@
     .splash-title {
       font-size: 20px;
       font-weight: 700;
-      color: #e4e4f0;
+      color: #211a2b;
       letter-spacing: -0.5px;
       animation: splash-fade 0.5s ease 0.15s both;
     }
@@ -223,7 +190,7 @@
     .splash-bar-wrap {
       width: 160px;
       height: 2px;
-      background: rgba(255, 255, 255, 0.06);
+      background: #e8e3ee;
       border-radius: 2px;
       overflow: hidden;
       animation: splash-fade 0.4s ease 0.2s both;
@@ -301,11 +268,10 @@
   <link rel="modulepreload" crossorigin href="./assets/lucide-BG4Ur802.js">
   <link rel="modulepreload" crossorigin href="./assets/recharts-CJY_liWu.js">
   <link rel="stylesheet" crossorigin href="./assets/index-DNnmb74c.css">
+  <link rel="stylesheet" href="./light-theme.css">
 </head>
 
 <body>
-
-  <button id="devtools-trigger" type="button" title="Mở DevTools Console để kiểm tra lỗi" aria-label="Mở DevTools Console">&gt;_</button>
 
   <!-- Splash — hiện ngay, tự ẩn khi React mount xong -->
   <div id="splash">
@@ -320,16 +286,6 @@
   <div id="root"></div>
 
   <script>
-    var devtoolsTrigger = document.getElementById('devtools-trigger')
-    if (devtoolsTrigger && window.api && typeof window.api.openDevTools === 'function') {
-      devtoolsTrigger.style.display = 'inline-flex'
-      devtoolsTrigger.addEventListener('click', function () {
-        window.api.openDevTools().catch(function (error) {
-          console.error('Không thể mở DevTools:', error)
-        })
-      })
-    }
-
     // Ẩn splash khi React render xong + CSS đã load hoàn toàn
     var _splashStart = Date.now()
     function areSheetsReady() {

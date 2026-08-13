@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "Narra Captcha Bridge",
+  "version": "1.3.1",
+  "description": "Connects an open Google Flow project to Narra Studio's local CAPTCHA bridge.",
+  "permissions": [
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://labs.google/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}

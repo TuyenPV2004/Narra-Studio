@@ -12207,7 +12207,7 @@ function YS({ className: u = "", compact: l = !1, suffix: c }) {
       !l &&
         s.jsxs("span", {
           className: "brand-logo__wordmark",
-          children: [bt.displayNameUpper, c && s.jsx("em", { children: c })],
+          children: [bt.displayName, c && s.jsx("em", { children: c })],
         }),
     ],
   });
@@ -16834,7 +16834,7 @@ const VC = {},
       folderOpened: "Extension folder opened.",
       folderError: "Extension folder was not found.",
       copyChromeAddress: "Copy chrome://extensions",
-      downloadRequiredExtension: "Download Extension {{version}}",
+      downloadRequiredExtension: "Open Bundled Extension {{version}} Folder",
       addressCopied: "Chrome Extensions address copied.",
       openFlow: "Open Google Flow",
       verifyNow: "Test connection",
@@ -16867,10 +16867,10 @@ const VC = {},
       webview: "✅ WebView is ready — captcha tokens are available",
     },
     step1: {
-      downloadButton: "Download Extension (.zip)",
-      downloadPrompt: "Click the button below to download the extension:",
-      title: "Download the extension",
-      unzip: "After downloading, unzip the file into a folder.",
+      downloadButton: "Open Bundled Extension Folder",
+      downloadPrompt: "Open the extension folder bundled with {{brandName}}:",
+      title: "Open the extension folder",
+      unzip: "Use this folder with Load unpacked in Chrome.",
     },
     step2: {
       developerMode: "Turn on “Developer mode” in the top-right corner.",
@@ -21007,10 +21007,6 @@ function Jw({
           s.jsxs("nav", {
             className: "sidebar-nav",
             children: [
-              s.jsx("span", {
-                className: "atelier-nav-caption",
-                children: U("sidebar.sections.create"),
-              }),
               s.jsx(Le, {
                 page: "image-ultra",
                 icon: s.jsx(dS, { size: vt, strokeWidth: yt }),
@@ -21027,10 +21023,6 @@ function Jw({
                 page: "voice",
                 icon: s.jsx(fS, { size: vt, strokeWidth: yt }),
                 label: U("sidebar.navigation.voiceGenerator"),
-              }),
-              s.jsx("span", {
-                className: "atelier-nav-caption",
-                children: U("sidebar.sections.finish"),
               }),
               s.jsx(Le, {
                 page: "capcut-video",
@@ -21053,10 +21045,6 @@ function Jw({
                 page: "upload",
                 icon: s.jsx(vS, { size: vt, strokeWidth: yt }),
                 label: U("sidebar.navigation.library"),
-              }),
-              s.jsx("span", {
-                className: "atelier-nav-caption",
-                children: U("sidebar.sections.manage"),
               }),
               s.jsx(Le, {
                 page: "provider-account",
@@ -21083,20 +21071,6 @@ function Jw({
                 icon: s.jsx(CS, { size: vt, strokeWidth: yt }),
                 label: U("sidebar.account.settings"),
               }),
-            ],
-          }),
-          s.jsxs("div", {
-            className: "sidebar-footer",
-            children: [
-              s.jsx("div", {
-                className: "sidebar-brand",
-                children: s.jsx("span", {className: "sidebar-trust-label", children: "LOCAL ONLY"}),
-              }),
-              X &&
-                s.jsxs("div", {
-                  className: "sidebar-version",
-                  children: ["v", X],
-                }),
             ],
           }),
         ],

@@ -13,6 +13,11 @@ files:
   - config/**/*
   - node_modules/**/*
   - package.json
+extraResources:
+  - from: captcha-extension
+    to: captcha-extension
+    filter:
+      - "**/*"
 asarUnpack:
   - node_modules/ffmpeg-static/**/*
   - node_modules/onnxruntime-*/**/*

@@ -1,11 +1,11 @@
 import {spawnSync} from 'node:child_process';
-import {createRequire} from 'node:module';
 import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
+import {resolveElectronBuilderCli} from './resolve-electron-builder-cli.mjs';
+
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const desktopRequire = createRequire(path.join(repositoryRoot, 'apps', 'desktop', 'package.json'));
-const builderCli = desktopRequire.resolve('electron-builder/cli.js');
+const builderCli = resolveElectronBuilderCli(repositoryRoot);
 const builderArgs = [
   builderCli,
   '--projectDir', path.join(repositoryRoot, '.package-stage', 'app'),

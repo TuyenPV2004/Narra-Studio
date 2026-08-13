@@ -6,7 +6,7 @@
 const brand = Object.freeze({
   id: 'narra',
   displayName: 'Narra Studio',
-  displayNameUpper: 'NARRA STUDIO',
+  displayNameUpper: 'Narra Studio',
   developer: Object.freeze({
     name: 'Local creator',
   }),
@@ -14,7 +14,22 @@ const brand = Object.freeze({
     appIcon: 'brand/narra-mark.svg',
   }),
   theme: Object.freeze({
-    primary: '#8b5cff',
+    primary: '#7c3aed',
+    primaryHover: '#6d28d9',
+    primarySoft: '#ede9fe',
+    onPrimary: '#ffffff',
+    background0: '#f8f7fc',
+    background1: '#ffffff',
+    background2: '#f3f0f8',
+    background3: '#ebe7f2',
+    background4: '#ded8e8',
+    backgroundHover: '#f0ebf8',
+    border: '#d8d1e2',
+    borderSubtle: '#e8e3ee',
+    text: '#211a2b',
+    textSecondary: '#51465f',
+    textMuted: '#71667e',
+    textQuiet: '#776c82',
   }),
   features: Object.freeze({
     externalProviders: true,
