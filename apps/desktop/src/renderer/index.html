@@ -24,10 +24,7 @@
 
     body {
       background: #f8f7fc;
-      /* Critical CSS chạy trước src/index.css nên không dùng được var(--font-ui): phải lặp nguyên stack */
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI',
-        'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
-        'Noto Sans SC', 'Source Han Sans SC', sans-serif;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       overflow: hidden;
       color: #211a2b;
     }
@@ -98,7 +95,7 @@
       background: #f3f0f8;
       color: #b42318;
       white-space: pre-wrap;
-      font: 12px/1.5 'JetBrains Mono', monospace;
+      font: 12px/1.5 system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
     }
 
     /* Completely hidden until CSS ready — no layout, no paint */

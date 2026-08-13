@@ -97,8 +97,8 @@ ipcMain.handle('open-dev-tools', (event) => {
 
 // ── IPC: Ngôn ngữ giao diện (i18n) ──
 // A saved user choice always wins. Otherwise every install starts in English;
-// users can switch to Vietnamese or Chinese from Settings.
-const UI_LANGUAGES = ['vi', 'en', 'zh'];
+// users can switch to Vietnamese from Settings.
+const UI_LANGUAGES = ['vi', 'en'];
 
 function resolveUiLanguage() {
   const settings = loadSettings();

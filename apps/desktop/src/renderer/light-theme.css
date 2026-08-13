@@ -36,6 +36,12 @@
   --danger-bg: #fdecea;
 }
 
+*,
+*::before,
+*::after {
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif !important;
+}
+
 html,
 body,
 #root,
@@ -234,12 +240,32 @@ h3 {
 /* Light sidebar compatibility */
 .sidebar {
   background: var(--bg-0) !important;
-  border-right: 0 !important;
+  border-right: 2px solid #17131d !important;
   box-shadow: none !important;
 }
 
 .sidebar-nav {
   gap: 4px !important;
+}
+
+/* Keep sidebar actions icon-first instead of rendering each item as a dark card. */
+.sidebar-nav .nav-item,
+.sidebar-nav .nav-item:hover,
+.sidebar-nav .nav-item.active {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Active navigation keeps its text color, but the icon itself stays unboxed. */
+.sidebar-nav .nav-item .nav-icon,
+.sidebar-nav .nav-item:hover .nav-icon,
+.sidebar-nav .nav-item.active .nav-icon {
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
 }
 
 .sidebar-collapse-btn,
@@ -251,6 +277,13 @@ h3 {
   border-color: var(--border-subtle) !important;
   background: transparent !important;
   box-shadow: none !important;
+}
+
+/* Keep the sidebar collapse control available without requiring a hover. */
+.sidebar .sidebar-collapse-btn {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(-50%) !important;
 }
 
 .sidebar-collapse-btn:hover,
@@ -331,9 +364,198 @@ h3 {
   background: var(--bg-hover) !important;
 }
 
+/* Header copy needs dark, high-contrast text on the light theme surface. */
+.atelier-header-profile,
+.atelier-header-profile .sidebar-flow-project,
+.atelier-header-profile .sidebar-flow-project-link,
+.atelier-header-profile .sidebar-flow-project-empty,
+.atelier-header-profile .sidebar-captcha-status,
+.atelier-header-profile .sidebar-provider-copy strong,
+.atelier-header-profile .sidebar-provider-balance-value,
+.atelier-header-profile .sidebar-provider-balance > span {
+  color: var(--text-2) !important;
+}
+
+.atelier-header-profile .sidebar-flow-project code,
+.atelier-header-profile .sidebar-provider-balance small {
+  color: var(--brand-primary-hover) !important;
+}
+
+/* Settings tab interaction states */
+.settings-flat-tabs button,
+.settings-flat-tabs button:hover,
+.settings-flat-tabs button:active,
+.settings-flat-tabs button:focus-visible {
+  color: var(--text-2) !important;
+  background: transparent !important;
+}
+
+.settings-flat-tabs button.active,
+.settings-flat-tabs button.active:hover,
+.settings-flat-tabs button.active:active,
+.settings-flat-tabs button.active:focus-visible {
+  color: var(--brand-primary-hover) !important;
+  border-bottom-color: var(--brand-primary) !important;
+  background: transparent !important;
+}
+
+.settings-flat-tabs button svg {
+  color: currentColor !important;
+}
+
+.settings-flat-tabs button:focus-visible {
+  outline: 2px solid var(--brand-primary) !important;
+  outline-offset: 2px !important;
+}
+
+/* Settings output folders */
+.settings-flat-output > header p {
+  color: var(--text-2) !important;
+  opacity: 1 !important;
+}
+
+.settings-flat-folder-list {
+  overflow: hidden !important;
+  color: #111827 !important;
+  border: 1px solid #d8dee8 !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  box-shadow: 0 8px 24px rgba(53, 38, 68, 0.08) !important;
+}
+
+.settings-flat-folder-list > div {
+  padding: 0 16px !important;
+  border-bottom-color: #e5e7eb !important;
+  background: #ffffff !important;
+}
+
+.settings-flat-folder-list > div:last-child {
+  border-bottom: 0 !important;
+}
+
+.settings-flat-folder-list strong,
+.settings-flat-folder-list code {
+  color: #111827 !important;
+}
+
+.settings-flat-folder-list code {
+  opacity: 0.72 !important;
+}
+
+.settings-flat-folder-icon {
+  color: var(--brand-primary-hover) !important;
+  width: 24px !important;
+  height: 24px !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+
+.settings-flat-folder-list button:not(:last-child) {
+  color: #ffffff !important;
+}
+
+.settings-flat-folder-list button:not(:last-child) svg,
+.settings-flat-input-action button svg {
+  color: currentColor !important;
+}
+
+.settings-flat-folder-list button:last-child {
+  color: #111827 !important;
+  border-color: #cbd5e1 !important;
+  background: #ffffff !important;
+}
+
+.settings-flat-folder-list button:last-child:hover {
+  border-color: var(--brand-primary) !important;
+  background: var(--brand-primary-soft) !important;
+}
+
+.settings-flat-folder-list button:focus-visible {
+  outline: 2px solid var(--brand-primary) !important;
+  outline-offset: 2px !important;
+}
+
+/* Settings advanced readability */
+.settings-flat-input-action button {
+  min-height: 44px !important;
+  padding: 0 16px !important;
+  color: #ffffff !important;
+  font-size: 12px !important;
+}
+
+.settings-flat-details {
+  color: var(--text-2) !important;
+  font-size: 13px !important;
+}
+
+.settings-flat-details summary {
+  min-height: 48px !important;
+  display: flex !important;
+  align-items: center !important;
+  color: var(--text) !important;
+  font-size: 14px !important;
+  font-weight: 700 !important;
+}
+
+.settings-flat-technical-grid label span {
+  color: var(--text-2) !important;
+  font-size: 12px !important;
+  font-weight: 650 !important;
+}
+
+.settings-flat-technical-grid input {
+  height: 44px !important;
+  font-size: 12px !important;
+}
+
+.settings-flat-secondary {
+  min-height: 44px !important;
+  padding: 0 16px !important;
+  color: var(--text) !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+}
+
+/* Settings typography contract */
+.settings-flat-content,
+.settings-flat-content :where(h2, h3, p, strong, code, span, label, summary, button, input) {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  line-height: 1.5 !important;
+}
+
+.settings-flat-section :where(h2, h3) {
+  color: var(--text) !important;
+}
+
+.settings-flat-section > header p {
+  color: var(--text-2) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+}
+
 .atelier-header-profile .sidebar-captcha-status.connected strong {
-  color: var(--success-text) !important;
-  background: var(--success-bg) !important;
+  color: #ffffff !important;
+  background: #087a55 !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0 !important;
+}
+
+.atelier-header-profile .sidebar-captcha-status {
+  font-size: 11px !important;
+}
+
+.atelier-header-profile .sidebar-provider-balance small {
+  color: #ffffff !important;
+  background: #51465f !important;
+  padding: 4px 8px !important;
+  border-radius: 999px !important;
+  font-size: 9px !important;
+  line-height: 1.2 !important;
+  letter-spacing: 0 !important;
 }
 
 /* Light typography compatibility */
@@ -513,7 +735,7 @@ h3 {
 
 .captcha-setup-heading h1 {
   margin: 0 0 7px !important;
-  color: var(--text) !important;
+  color: #fff !important;
   font-size: clamp(28px, 3vw, 40px) !important;
   line-height: 1.12 !important;
   letter-spacing: -0.035em !important;
@@ -522,7 +744,7 @@ h3 {
 .captcha-setup-heading p {
   max-width: 660px !important;
   margin: 0 !important;
-  color: var(--text-2) !important;
+  color: #fff !important;
   font-size: 14px !important;
   line-height: 1.55 !important;
 }
@@ -643,9 +865,9 @@ h3 {
 }
 
 .captcha-setup-step.done .captcha-setup-step-number {
-  color: var(--success-text) !important;
-  border-color: color-mix(in srgb, var(--success-text) 25%, transparent) !important;
-  background: var(--success-bg) !important;
+  color: #ffffff !important;
+  border-color: #22c55e !important;
+  background: #22c55e !important;
 }
 
 .captcha-setup-step-copy {
@@ -700,8 +922,13 @@ h3 {
 }
 
 .captcha-setup-step-panel li > span {
-  color: var(--brand-primary-hover) !important;
-  background: var(--brand-primary-soft) !important;
+  width: 22px !important;
+  height: 22px !important;
+  color: #ffffff !important;
+  border: 1px solid rgba(255, 255, 255, 0.12) !important;
+  border-radius: 50% !important;
+  background: #302b45 !important;
+  font-size: 10px !important;
 }
 
 .captcha-setup-step-panel li p {
@@ -716,7 +943,15 @@ h3 {
 }
 
 .captcha-setup-step-actions {
+  flex-wrap: nowrap !important;
   border-top-color: var(--border-subtle) !important;
+}
+
+.captcha-setup-step-actions .brand-button {
+  width: auto !important;
+  min-width: 0 !important;
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
 }
 
 .captcha-setup-refresh {
@@ -730,6 +965,21 @@ h3 {
 .captcha-setup-refresh:hover {
   color: var(--brand-primary-hover) !important;
   background: var(--bg-hover) !important;
+}
+
+.captcha-refresh-icon {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.captcha-refresh-icon.is-spinning {
+  animation: captcha-refresh-clockwise 700ms linear infinite;
+  will-change: transform;
+}
+
+@keyframes captcha-refresh-clockwise {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(1turn); }
 }
 
 /* White semantic toast cards */
@@ -822,6 +1072,10 @@ h3 {
     margin: 0 14px 14px !important;
   }
 
+  .captcha-setup-step-actions {
+    flex-wrap: wrap !important;
+  }
+
   .captcha-setup-step-actions .brand-button,
   .captcha-setup-refresh {
     width: 100% !important;
@@ -832,6 +1086,7 @@ h3 {
   .captcha-setup-step,
   .captcha-setup-step-meta svg,
   .captcha-setup-progress-track i,
+  .captcha-refresh-icon.is-spinning,
   .toast {
     transition: none !important;
     animation: none !important;

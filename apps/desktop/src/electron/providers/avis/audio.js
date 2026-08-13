@@ -3,7 +3,7 @@
 const AUDIO_TERMINAL_STATUSES = new Set(['succeeded', 'failed']);
 const AUDIO_FORMATS = new Set(['mp3', 'wav', 'ogg_opus', 'pcm']);
 const AVIS_EXPLICIT_LANGUAGES = new Set([
-  'de', 'en', 'es', 'es-mx', 'fr', 'id', 'it', 'ja', 'ko', 'pt-br', 'zh', 'zh-cn',
+  'de', 'en', 'es', 'es-mx', 'fr', 'id', 'it', 'ja', 'ko', 'pt-br',
 ]);
 const AVIS_LANGUAGE_ALIASES = {
   'de-de': 'de',
@@ -16,9 +16,6 @@ const AVIS_LANGUAGE_ALIASES = {
   'ja-jp': 'ja',
   'ko-kr': 'ko',
   'pt-pt': 'pt-br',
-  'zh-hans': 'zh-cn',
-  'zh-hant': 'zh',
-  'zh-tw': 'zh',
 };
 
 function normalizeExplicitLanguage(value) {

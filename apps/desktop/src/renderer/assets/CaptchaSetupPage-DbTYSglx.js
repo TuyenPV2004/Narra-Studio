@@ -1,5 +1,5 @@
 import{u as D,j as e}from"./index-JlIFz2Wa.js";
-import{a as w,z as A,ax as U,K as k,aJ as N,aK as q,_ as L,a2 as M,i as E,a1 as b,F as z,C as T,aD as _}from"./lucide-BG4Ur802.js";
+import{a as w,K as k,aJ as N,aK as q,_ as L,a2 as M,i as E,a1 as b,F as z,C as T,aD as _,dn as W}from"./lucide-BG4Ur802.js";
 import{B as i}from"./BrandButton-BUkBwN3T.js";
 /* empty css                           */import"./recharts-CJY_liWu.js";
 const j="1.3.1";
@@ -24,7 +24,7 @@ e.jsxs(i,{variant:"secondary",onClick:()=>void v(),children:[e.jsx(z,{size:16}),
 " ",s("captcha.setup.openFolder")]})]}):a==="flow"?e.jsxs(i,{variant:"primary",onClick:()=>window.api.openExternalUrl("https://labs.google/fx/tools/flow"),children:[e.jsx(_,{size:16}),
 " ",s("captcha.setup.openFlow")]}):e.jsxs(i,{variant:"primary",disabled:!c||!t.labsProjectOpen||h,onClick:()=>void $(),children:[h?e.jsx(k,{size:16,className:"spin"}):e.jsx(E,{size:16}),
 s(h?"captcha.setup.verifying":"captcha.setup.verifyNow")]});
-return o?e.jsx("div",{className:"page active captcha-setup-page",children:e.jsxs("div",{className:"captcha-setup-shell",children:[e.jsxs("header",{className:"captcha-setup-hero",children:[e.jsx("div",{className:`captcha-setup-shield ${t.setupReady?"ready":""}`,children:t.setupReady?e.jsx(A,{size:28}):e.jsx(U,{size:28})}),
+return o?e.jsx("div",{className:"page active captcha-setup-page",children:e.jsxs("div",{className:"captcha-setup-shell",children:[e.jsxs("header",{className:"captcha-setup-hero",children:[e.jsx("div",{className:`captcha-setup-shield ${t.setupReady?"ready":""}`,children:e.jsx(W,{size:28})}),
 e.jsxs("div",{className:"captcha-setup-heading",children:[e.jsx("h1",{children:s("captcha.setup.title")}),
 e.jsx("p",{children:s("captcha.setup.description")})]}),
 
@@ -39,9 +39,8 @@ e.jsxs("small",{children:[e.jsx(L,{size:13}),
 " ",s("captcha.setup.autoDetect")]})]}),
 
 e.jsx("main",{className:"captcha-setup-wizard",children:n.map((a,r)=>{const u=S===r,C=r===p&&!t.setupReady;
-return e.jsxs("article",{className:`captcha-setup-step ${a.done?"done":""} ${C?"current":""} ${u?"expanded":""}`,children:[e.jsxs("button",{type:"button",className:"captcha-setup-step-summary","aria-expanded":u,"aria-controls":`captcha-step-${a.id}`,onClick:()=>y(u?-1:r),children:[e.jsx("span",{className:"captcha-setup-step-number",children:a.done?e.jsx(N,{size:16}):r+1}),
-e.jsxs("span",{className:"captcha-setup-step-copy",children:[e.jsx("small",{children:s("captcha.setup.stepLabel",{current:r+1,total:n.length})}),
-e.jsx("strong",{children:a.title}),
+return e.jsxs("article",{className:`captcha-setup-step ${a.done?"done":""} ${C?"current":""} ${u?"expanded":""}`,children:[e.jsxs("button",{type:"button",className:"captcha-setup-step-summary","aria-expanded":u,"aria-controls":`captcha-step-${a.id}`,onClick:()=>y(u?-1:r),children:[e.jsx("span",{className:"captcha-setup-step-number",children:a.done?e.jsx(N,{size:17,strokeWidth:3}):r+1}),
+e.jsxs("span",{className:"captcha-setup-step-copy",children:[e.jsxs("strong",{children:[s("captcha.setup.stepLabel",{current:r+1,total:n.length}).replace(/\s*\/\s*/,"/"),". ",a.title]}),
 e.jsx("span",{children:a.description})]}),
 
 e.jsxs("span",{className:"captcha-setup-step-meta",children:[e.jsx("em",{children:a.done?s("captcha.setup.complete"):s(C?"captcha.setup.inProgress":"captcha.setup.waiting")}),
@@ -51,6 +50,6 @@ u&&e.jsxs("div",{id:`captcha-step-${a.id}`,className:"captcha-setup-step-panel",
 e.jsx("p",{children:B})]},
 `${a.id}-${g}`))}),
 a.id==="extension"&&e.jsx("code",{children:"chrome://extensions"}),
-e.jsxs("div",{className:"captcha-setup-step-actions",children:[V(a.id),e.jsxs("button",{type:"button",className:"captcha-setup-refresh",onClick:()=>void O(),children:[e.jsx(E,{size:14,className:l?"spin":""}),
+e.jsxs("div",{className:"captcha-setup-step-actions",children:[V(a.id),e.jsxs("button",{type:"button",className:"captcha-setup-refresh",onClick:()=>void O(),children:[e.jsx(E,{size:14,className:`captcha-refresh-icon ${l?"is-spinning":""}`}),
 s("captcha.setup.refreshStatus")]})]})]})]},
 a.id)})})]})}):null}export{G as default};
