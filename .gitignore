@@ -6,6 +6,7 @@ node_modules/
 .codex-build/
 dist/
 dist-electron/
+/apps/desktop/dist-source-renderer/
 /apps/desktop/config/
 coverage/
 .vite/
