@@ -17,6 +17,8 @@
     "package:win": "pnpm build && node scripts/prepare-recovered-desktop-package.mjs && pnpm --filter @narra/desktop package:win",
     "package:electron-smoke": "pnpm build && node scripts/prepare-recovered-desktop-package.mjs && node scripts/package-electron-smoke.mjs",
     "smoke:electron-ui": "node scripts/smoke-electron-ui.mjs",
-    "smoke:electron-ui:update": "node scripts/smoke-electron-ui.mjs --update-baseline"
+    "smoke:electron-ui:update": "node scripts/smoke-electron-ui.mjs --update-baseline",
+    "smoke:electron-ui:captcha": "node scripts/smoke-electron-ui.mjs --page=captcha-setup",
+    "smoke:electron-ui:captcha:update": "node scripts/smoke-electron-ui.mjs --page=captcha-setup --update-baseline"
   }
 }

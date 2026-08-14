@@ -12,6 +12,10 @@ const mainJs = fs.readFileSync(
   path.join(rendererRoot, 'assets', 'index-JlIFz2Wa.js'),
   'utf8',
 );
+const mainCss = fs.readFileSync(
+  path.join(rendererRoot, 'assets', 'index-DNnmb74c.css'),
+  'utf8',
+);
 const captchaJs = fs.readFileSync(
   path.join(rendererRoot, 'assets', 'CaptchaSetupPage-DbTYSglx.js'),
   'utf8',
@@ -56,15 +60,26 @@ assert.equal(mainJs.includes('children: "LOCAL ONLY"'), false);
 assert.equal(mainJs.includes('className: "sidebar-footer"'), false);
 for (const sectionKey of [
   'sidebar.sections.create',
-  'sidebar.sections.finish',
-  'sidebar.sections.manage',
+  'sidebar.sections.edit',
+  'sidebar.sections.assets',
+  'sidebar.sections.system',
 ]) {
   assert.equal(
-    mainJs.includes(`children: U("${sectionKey}")`),
-    false,
-    `${sectionKey} must not render a sidebar caption`,
+    mainJs.includes(`label: U("${sectionKey}")`),
+    true,
+    `${sectionKey} must label a semantic sidebar group`,
   );
 }
+assert.match(mainJs, /s\.jsxs\("header",\s*\{\s*className: "app-header atelier-header-profile"/s);
+assert.match(
+  mainJs,
+  /className: "sidebar-nav-group",\s*role: "group",\s*"data-nav-group": P/s,
+);
+assert.match(mainJs, /className: "sidebar-nav-group-label",\s*"aria-hidden": "true"/s);
+assert.match(mainJs, /"aria-current": Ge \? "page" : void 0/);
+assert.match(mainJs, /"aria-disabled": Ye \|\| We \? "true" : void 0/);
+assert.match(mainJs, /className: "header-account-trigger sidebar-provider-current"/);
+assert.doesNotMatch(lightCss, /atelier-header-profile/);
 assert.match(
   lightCss,
   /\.narra-image-studio \.img-page-header:after\{content:none!important/,
@@ -97,7 +112,7 @@ assert.doesNotMatch(lightCss, /\.sidebar\s*\{[^}]*border-right:[^}]*#17131d/s);
 assert.match(lightCss, /\.sidebar\.is-collapsed\s*\{[^}]*width:\s*var\(--sidebar-collapsed-width\)/s);
 assert.match(
   lightCss,
-  /body\.sidebar-collapsed \.atelier-header-profile\s*\{[^}]*left:\s*var\(--sidebar-collapsed-width\)/s,
+  /body\.sidebar-collapsed \.app-header\s*\{[^}]*left:\s*var\(--sidebar-collapsed-width\)/s,
 );
 assert.match(
   lightCss,
@@ -109,7 +124,7 @@ assert.match(
 );
 assert.match(
   lightCss,
-  /\.atelier-header-profile\s*\{[^}]*height:\s*var\(--header-height\);[^}]*background:\s*var\(--surface\)\s*!important;/s,
+  /\.app-header\s*\{[^}]*height:\s*var\(--header-height\);[^}]*background:\s*var\(--surface\)\s*!important;/s,
 );
 assert.match(
   lightCss,
@@ -117,36 +132,61 @@ assert.match(
 );
 assert.match(
   lightCss,
-  /\.app:has\(> \.atelier-header-profile\) > \.main-content::before\s*\{[^}]*background:\s*var\(--bg-0\)\s*!important;/s,
+  /\.app:has\(> \.app-header\) > \.main-content::before\s*\{[^}]*background:\s*var\(--bg-0\)\s*!important;/s,
+);
+assert.match(
+  lightCss,
+  /\.sidebar-nav-group\s*\{[^}]*display:\s*flex;[^}]*flex-direction:\s*column;[^}]*gap:\s*4px;/s,
+);
+assert.match(lightCss, /\.sidebar-nav\s*\{[^}]*overflow-x:\s*hidden;[^}]*overflow-y:\s*auto;/s);
+assert.match(
+  lightCss,
+  /\.sidebar\.is-collapsed \.sidebar-nav-group-label\s*\{[^}]*display:\s*none;/s,
 );
 assert.match(lightCss, /\/\* Light typography compatibility \*\//);
 assert.match(lightCss, /\/\* Light component compatibility \*\//);
 assert.match(lightCss, /\/\* Intentional dark media surfaces \*\//);
-assert.match(lightCss, /\/\* Settings output folders \*\//);
+assert.match(lightCss, /\/\* Shared visual contracts for the recovered renderer\. \*\//);
 assert.match(
   lightCss,
   /\*,\s*\*::before,\s*\*::after\s*\{[^}]*font-family:\s*system-ui,[^}]*!important;/s,
 );
-assert.match(lightCss, /\/\* Settings tab interaction states \*\//);
+for (const primitiveToken of [
+  '--primary-hover',
+  '--control-height-sm',
+  '--control-height-md',
+  '--focus-ring',
+  '--control-disabled-opacity',
+]) {
+  assert.match(lightCss, new RegExp(`${primitiveToken}:\\s*[^;]+;`));
+}
+for (const primitiveSelector of [
+  '.brand-button',
+  '.brand-icon-button',
+  '.brand-input',
+  '.brand-surface',
+  '.brand-badge--success',
+]) {
+  assert.equal(mainCss.includes(primitiveSelector), true, `${primitiveSelector} must be defined`);
+}
+for (const typographySelector of ['.brand-section-title', '.brand-helper-text']) {
+  assert.equal(lightCss.includes(typographySelector), true, `${typographySelector} must be defined`);
+}
 assert.match(
   lightCss,
-  /\.settings-flat-tabs button,\s*\.settings-flat-tabs button:hover,\s*\.settings-flat-tabs button:active,\s*\.settings-flat-tabs button:focus-visible\s*\{[^}]*color:\s*var\(--text-2\)\s*!important;[^}]*background:\s*transparent\s*!important;/s,
+  /\.settings-flat-content \.settings-flat-folder-list button:disabled,[\s\S]*opacity:\s*var\(--control-disabled-opacity\);/,
 );
 assert.match(
   lightCss,
-  /\.settings-flat-tabs button\.active,\s*\.settings-flat-tabs button\.active:hover,\s*\.settings-flat-tabs button\.active:active,\s*\.settings-flat-tabs button\.active:focus-visible\s*\{[^}]*color:\s*var\(--brand-primary-hover\)\s*!important;[^}]*background:\s*transparent\s*!important;/s,
+  /\.settings-flat-tabs\.brand-tabs > button:focus-visible,[\s\S]*outline:\s*2px solid var\(--focus-ring\);/,
 );
 assert.match(
   lightCss,
-  /\.settings-flat-folder-list\s*\{[^}]*color:\s*#111827\s*!important;[^}]*background:\s*#ffffff\s*!important;/s,
+  /\.settings-flat-tabs\.brand-tabs > button\.active\s*\{[^}]*color:\s*var\(--primary-hover\)\s*!important;[^}]*border-bottom-color:\s*var\(--primary\)\s*!important;/s,
 );
 assert.match(
   lightCss,
-  /\.settings-flat-folder-list strong,\s*\.settings-flat-folder-list code\s*\{[^}]*color:\s*#111827\s*!important;/s,
-);
-assert.match(
-  lightCss,
-  /\.settings-flat-folder-list button:last-child\s*\{[^}]*color:\s*#111827\s*!important;[^}]*background:\s*#ffffff\s*!important;/s,
+  /\.settings-flat-folder-list\s*\{[^}]*background:\s*var\(--surface\)\s*!important;[^}]*box-shadow:\s*var\(--shadow-sm\)\s*!important;/s,
 );
 
 // Advanced VEO3 settings are backed by real auth and CAPTCHA actions.
@@ -163,27 +203,20 @@ assert.match(preloadJs, /setManualAuth:\s*\(d\)\s*=>\s*ipcRenderer\.invoke\('set
 assert.match(flowSessionJs, /ipcMain\.handle\('set-manual-auth'/);
 assert.match(
   lightCss,
-  /\.settings-flat-output > header p\s*\{[^}]*color:\s*var\(--text-2\)\s*!important;/s,
-);
-assert.match(
-  lightCss,
   /\.settings-flat-folder-icon\s*\{[^}]*border-radius:\s*0\s*!important;[^}]*background:\s*transparent\s*!important;/s,
 );
 assert.match(
   lightCss,
-  /\.settings-flat-folder-list button:not\(:last-child\)\s*\{[^}]*color:\s*#ffffff\s*!important;/s,
+  /\.settings-flat-folder-list button:not\(:last-child\)\s*\{[^}]*color:\s*var\(--primary-foreground\)\s*!important;/s,
+);
+assert.doesNotMatch(lightCss, /\.settings-flat-content\s+:where\([^)]*button[^)]*input[^)]*\)/);
+assert.match(
+  lightCss,
+  /\.settings-flat-section > header p,[\s\S]*\.settings-flat-result\s*\{[^}]*font-size:\s*14px\s*!important;[^}]*font-weight:\s*500\s*!important;/,
 );
 assert.match(
   lightCss,
-  /\/\* Settings typography contract \*\/[\s\S]*\.settings-flat-content :where\(h2, h3, p, strong, code, span, label, summary, button, input\)\s*\{[^}]*font-size:\s*16px\s*!important;[^}]*font-weight:\s*600\s*!important;/,
-);
-assert.match(
-  lightCss,
-  /\.settings-flat-section > header p\s*\{[^}]*color:\s*var\(--text-2\)\s*!important;[^}]*font-size:\s*14px\s*!important;[^}]*font-weight:\s*500\s*!important;/s,
-);
-assert.match(
-  lightCss,
-  /\.settings-flat-section :where\(h2, h3\)\s*\{[^}]*color:\s*var\(--text\)\s*!important;/s,
+  /\.settings-flat-section h2,[\s\S]*\.settings-flat-block-heading h3[\s\S]*\{[^}]*font-size:\s*16px\s*!important;[^}]*font-weight:\s*600\s*!important;/,
 );
 assert.equal(mainJs.includes('jc = ["vi", "en", "zh"]'), false);
 assert.equal(mainJs.includes('../locales/zh/'), false);
@@ -268,11 +301,15 @@ for (const expectedCopy of [
 assert.match(lightCss, /\/\* CAPTCHA light redesign \*\//);
 assert.match(
   lightCss,
-  /\.captcha-setup-step\.done \.captcha-setup-step-number\s*\{[^}]*color:\s*#ffffff\s*!important;[^}]*background:\s*#22c55e\s*!important;/s,
+  /\.captcha-setup-wizard\s*\{[^}]*display:\s*flex\s*!important;[^}]*flex-direction:\s*column\s*!important;[^}]*border:\s*0\s*!important;/s,
 );
 assert.match(
   lightCss,
-  /\.captcha-setup-step-panel li > span\s*\{[^}]*border-radius:\s*50%\s*!important;[^}]*background:\s*#302b45\s*!important;/s,
+  /\.captcha-setup-step\.done \.captcha-setup-step-number\s*\{[^}]*color:\s*var\(--primary-foreground\)\s*!important;[^}]*background:\s*var\(--success\)\s*!important;/s,
+);
+assert.match(
+  lightCss,
+  /\.captcha-setup-step-panel li > span\s*\{[^}]*border-radius:\s*50%\s*!important;[^}]*background:\s*var\(--foreground\)\s*!important;/s,
 );
 assert.match(
   lightCss,
@@ -282,6 +319,20 @@ assert.match(
   lightCss,
   /\.captcha-setup-step-actions \.brand-button\s*\{[^}]*width:\s*auto\s*!important;[^}]*min-width:\s*0\s*!important;[^}]*white-space:\s*nowrap\s*!important;/s,
 );
+assert.match(
+  lightCss,
+  /\.captcha-setup-step-copy strong\s*\{[^}]*font-size:\s*16px\s*!important;[^}]*font-weight:\s*600;/s,
+);
+assert.match(
+  lightCss,
+  /\.captcha-setup-step-copy > span\s*\{[^}]*font-size:\s*14px\s*!important;[^}]*font-weight:\s*500;/s,
+);
+assert.match(
+  lightCss,
+  /\.captcha-setup-refresh:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--focus-ring\)\s*!important;/s,
+);
+assert.doesNotMatch(lightCss, /\.captcha-setup-step\.done \.captcha-setup-step-number\s*\{[^}]*#22c55e/s);
+assert.doesNotMatch(lightCss, /\.captcha-setup-step-panel li > span\s*\{[^}]*#302b45/s);
 assert.match(lightCss, /@keyframes captcha-refresh-clockwise\s*\{[^}]*rotate\(0deg\)[\s\S]*rotate\(1turn\)/);
 assert.match(
   lightCss,

@@ -8,6 +8,13 @@ import {fileURLToPath} from 'node:url';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const updateBaseline = process.argv.includes('--update-baseline');
+const requestedPage = process.argv.find((argument) => argument.startsWith('--page='))?.slice('--page='.length) || 'settings';
+const smokeTargets = {
+  settings: {readySelector: '.settings-flat-content', artifactStem: 'app-shell'},
+  'captcha-setup': {readySelector: '.captcha-setup-shell', artifactStem: 'captcha-setup'},
+};
+const smokeTarget = smokeTargets[requestedPage];
+if (!smokeTarget) throw new Error(`Unsupported smoke page: ${requestedPage}`);
 const smokeRoot = path.join(repositoryRoot, '.smoke', 'electron-ui');
 const baselineRoot = path.join(repositoryRoot, 'tests', 'visual-baselines');
 const executable = process.env.NARRA_SMOKE_EXE
@@ -16,11 +23,11 @@ const executable = process.env.NARRA_SMOKE_EXE
 const packagedAsar = path.join(path.dirname(executable), 'resources', 'app.asar');
 const runtimeSourceRoot = path.join(repositoryRoot, 'apps', 'desktop', 'src');
 const profileRoot = mkdtempSync(path.join(os.tmpdir(), 'narra-electron-smoke-'));
-const currentExpanded = path.join(smokeRoot, 'app-shell-expanded.current.png');
-const currentCollapsed = path.join(smokeRoot, 'app-shell-collapsed.current.png');
-const baselineExpanded = path.join(baselineRoot, 'app-shell-expanded.png');
-const baselineCollapsed = path.join(baselineRoot, 'app-shell-collapsed.png');
-const reportFile = path.join(smokeRoot, 'report.json');
+const currentExpanded = path.join(smokeRoot, `${smokeTarget.artifactStem}-expanded.current.png`);
+const currentCollapsed = path.join(smokeRoot, `${smokeTarget.artifactStem}-collapsed.current.png`);
+const baselineExpanded = path.join(baselineRoot, `${smokeTarget.artifactStem}-expanded.png`);
+const baselineCollapsed = path.join(baselineRoot, `${smokeTarget.artifactStem}-collapsed.png`);
+const reportFile = path.join(smokeRoot, requestedPage === 'settings' ? 'report.json' : `report-${requestedPage}.json`);
 
 mkdirSync(smokeRoot, {recursive: true});
 mkdirSync(baselineRoot, {recursive: true});
@@ -284,14 +291,27 @@ try {
     document.head.appendChild(style);
     localStorage.setItem('narra-atelier-dock-collapsed', '0');
   })()`);
-  const shellDeadline = Date.now() + 10000;
+  const shellDeadline = Date.now() + 15000;
+  let initialExpansionRequested = false;
   while (Date.now() < shellDeadline) {
-    const shellReady = await client.evaluate(`Boolean(document.querySelector('.sidebar:not(.is-collapsed)') && document.querySelector('.atelier-header-profile'))`);
-    if (shellReady) break;
-    await client.evaluate(`window.dispatchEvent(new CustomEvent('genyu:navigate-page', {detail: {page: 'settings'}}))`);
+    const shellState = await client.evaluate(`(() => {
+      const sidebar = document.querySelector('.sidebar');
+      return {
+        mounted: Boolean(sidebar),
+        collapsed: Boolean(sidebar?.classList.contains('is-collapsed')),
+        headerMounted: Boolean(document.querySelector('.atelier-header-profile')),
+      };
+    })()`);
+    if (shellState.mounted && !shellState.collapsed && shellState.headerMounted) break;
+    if (shellState.mounted && shellState.collapsed && !initialExpansionRequested) {
+      initialExpansionRequested = true;
+      await client.evaluate(`document.querySelector('.sidebar-collapse-btn')?.click()`);
+    }
+    await client.evaluate(`window.dispatchEvent(new CustomEvent('genyu:navigate-page', {detail: {page: ${JSON.stringify(requestedPage)}}}))`);
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
-  await client.waitFor(`document.querySelector('.sidebar:not(.is-collapsed)') && document.querySelector('.atelier-header-profile')`, 1000);
+  await client.waitFor(`document.querySelector('.sidebar:not(.is-collapsed)') && document.querySelector('.atelier-header-profile')`, 5000);
+  await client.waitFor(`document.querySelector(${JSON.stringify(smokeTarget.readySelector)})`, 10000);
   await new Promise((resolve) => setTimeout(resolve, 300));
   await client.evaluate(`(() => {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
@@ -312,12 +332,32 @@ try {
     const sidebar = document.querySelector('.sidebar');
     const header = document.querySelector('.atelier-header-profile');
     const main = document.querySelector('.main-content');
+    const nav = sidebar.querySelector('.sidebar-nav');
+    const groups = [...nav.querySelectorAll(':scope > .sidebar-nav-group')];
+    const navItems = [...nav.querySelectorAll('.nav-item')];
     const rect = (element) => { const value = element.getBoundingClientRect(); return {x: value.x, y: value.y, width: value.width, height: value.height}; };
     return {
       rootChildren: root.children.length,
       rootDisplay: getComputedStyle(root).display,
       bodyCollapsed: document.body.classList.contains('sidebar-collapsed'),
       sidebar: rect(sidebar), header: rect(header), main: rect(main),
+      shellSemantics: {
+        headerTag: header.tagName,
+        headerLabel: header.getAttribute('aria-label'),
+        sidebarTag: sidebar.tagName,
+        sidebarLabel: sidebar.getAttribute('aria-label'),
+        navTag: nav.tagName,
+        navLabel: nav.getAttribute('aria-label'),
+        groupIds: groups.map((group) => group.dataset.navGroup),
+        groupLabels: groups.map((group) => group.getAttribute('aria-label')),
+        groupItemCounts: groups.map((group) => group.querySelectorAll('.nav-item').length),
+        pageOrder: navItems.map((item) => item.dataset.page),
+        currentPageCount: navItems.filter((item) => item.getAttribute('aria-current') === 'page').length,
+        semanticHeaderClass: header.classList.contains('app-header'),
+        semanticAccountTriggerClass: Boolean(header.querySelector('.header-account-trigger')),
+        navHorizontalOverflow: nav.scrollWidth > nav.clientWidth,
+        navOverflowX: getComputedStyle(nav).overflowX,
+      },
       horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
     };
   })()`;
@@ -332,13 +372,31 @@ try {
   await new Promise((resolve) => setTimeout(resolve, 500));
   const reexpanded = await client.evaluate(measure);
   await writeScreenshot(client, updateBaseline ? baselineExpanded : currentExpanded);
+  const targetPage = requestedPage === 'captcha-setup'
+    ? await client.evaluate(`(() => {
+        const page = document.querySelector('.captcha-setup-page');
+        const wizard = document.querySelector('.captcha-setup-wizard');
+        const steps = [...document.querySelectorAll('.captcha-setup-step')];
+        const actions = [...document.querySelectorAll('.captcha-setup-step-actions')];
+        const style = wizard ? getComputedStyle(wizard) : null;
+        return {
+          visible: Boolean(page && page.getClientRects().length),
+          stepCount: steps.length,
+          wizardDisplay: style?.display || null,
+          wizardFlexDirection: style?.flexDirection || null,
+          wizardGridTemplateColumns: style?.gridTemplateColumns || null,
+          stepRects: steps.map((step) => { const rect = step.getBoundingClientRect(); return {x: rect.x, width: rect.width}; }),
+          overflowingActionGroups: actions.filter((group) => group.scrollWidth > group.clientWidth).length,
+        };
+      })()`)
+    : {visible: Boolean(await client.evaluate(`document.querySelector(${JSON.stringify(smokeTarget.readySelector)})?.getClientRects().length`))};
   await Promise.allSettled(client.failureSnapshotTasks);
   runtime = {
     rendererTarget: {title: rendererTarget.title, url: rendererTarget.url},
     title: await client.evaluate('document.title'),
     url: await client.evaluate('location.href'),
     viewport: await client.evaluate('({width: innerWidth, height: innerHeight, devicePixelRatio})'),
-    startup: {targetDetectedMs, rootReadyMs, splashHiddenMs}, expanded, collapsed, reexpanded,
+    startup: {targetDetectedMs, rootReadyMs, splashHiddenMs}, expanded, collapsed, reexpanded, targetPage,
   };
 } finally {
   client?.close();
@@ -396,9 +454,46 @@ const shellValid = runtime.expanded.sidebar.width === 236
   && runtime.reexpanded.header.x === 236
   && !runtime.expanded.horizontalOverflow
   && !runtime.collapsed.horizontalOverflow;
+const expectedGroupIds = ['create', 'edit', 'assets', 'system'];
+const expectedPageOrder = [
+  'image-ultra',
+  'video-pro',
+  'voice',
+  'image-ultra',
+  'capcut-video',
+  'concat',
+  'upload',
+  'provider-account',
+  'webview',
+  'captcha-setup',
+  'settings',
+];
+const shellSemantics = runtime.expanded.shellSemantics;
+const shellSemanticsValid = shellSemantics.headerTag === 'HEADER'
+  && shellSemantics.sidebarTag === 'ASIDE'
+  && shellSemantics.navTag === 'NAV'
+  && Boolean(shellSemantics.headerLabel)
+  && Boolean(shellSemantics.sidebarLabel)
+  && Boolean(shellSemantics.navLabel)
+  && JSON.stringify(shellSemantics.groupIds) === JSON.stringify(expectedGroupIds)
+  && JSON.stringify(shellSemantics.groupItemCounts) === JSON.stringify([3, 3, 1, 4])
+  && JSON.stringify(shellSemantics.pageOrder) === JSON.stringify(expectedPageOrder)
+  && shellSemantics.currentPageCount === 1
+  && shellSemantics.semanticHeaderClass
+  && shellSemantics.semanticAccountTriggerClass
+  && shellSemantics.navOverflowX === 'hidden'
+  && runtime.collapsed.shellSemantics.navOverflowX === 'hidden';
+const targetPageValid = requestedPage !== 'captcha-setup'
+  ? runtime.targetPage.visible
+  : runtime.targetPage.visible
+    && runtime.targetPage.stepCount === 4
+    && runtime.targetPage.wizardDisplay === 'flex'
+    && runtime.targetPage.wizardFlexDirection === 'column'
+    && runtime.targetPage.overflowingActionGroups === 0;
 const baselineValid = updateBaseline || Object.values(screenshots).every((entry) => entry.status === 'MATCH');
 const report = {
   generatedAt: new Date().toISOString(),
+  requestedPage,
   executable: path.relative(repositoryRoot, executable).split(path.sep).join('/'),
   packagedAsarMtime: statSync(packagedAsar).mtime.toISOString(),
   latestRuntimeSourceMtime: new Date(runtimeSourceMtimeMs).toISOString(),
@@ -407,6 +502,8 @@ const report = {
     rootRendered: runtime.expanded.rootChildren > 0 && runtime.expanded.rootDisplay !== 'none',
     splashHidden: Number.isFinite(runtime.startup.splashHiddenMs),
     shellDimensionsAndOffsets: shellValid,
+    shellSemanticStructure: shellSemanticsValid,
+    targetPageLayout: targetPageValid,
     visualBaseline: baselineValid,
     noRuntimeErrors: runtimeErrors.length === 0,
   },

@@ -15008,6 +15008,9 @@ const VC = {},
     ),
   ),
   mh = {
+    label: "Primary workspace sidebar",
+    navigationLabel: "Workspace navigation",
+    header: { label: "Workspace status and account" },
     collapse: { expand: "Expand sidebar", collapse: "Collapse sidebar" },
     requirements: {
       ultraAccount: "Ultra account required",
@@ -15015,7 +15018,14 @@ const VC = {},
       activeLicense: "Active license required",
       comingSoonAvis: "Coming soon for AI provider",
     },
-    sections: { create: "Create", finish: "Finish", manage: "Manage" },
+    sections: {
+      create: "Create",
+      finish: "Finish",
+      edit: "Edit",
+      assets: "Assets",
+      system: "System",
+      manage: "Manage",
+    },
     navigation: {
       home: "Home",
       ultimateStudio: "Story Studio",
@@ -15095,6 +15105,9 @@ const VC = {},
     ),
   ),
   yh = {
+    label: "Thanh bên không gian làm việc",
+    navigationLabel: "Điều hướng không gian làm việc",
+    header: { label: "Trạng thái và tài khoản" },
     collapse: { expand: "Mở rộng sidebar", collapse: "Thu gọn sidebar" },
     requirements: {
       ultraAccount: "Cần tài khoản Ultra",
@@ -15102,7 +15115,14 @@ const VC = {},
       activeLicense: "Cần License đang hoạt động",
       comingSoonAvis: "Sắp mở cho nhà cung cấp AI",
     },
-    sections: { create: "Sáng tạo", finish: "Hoàn thiện", manage: "Quản lý" },
+    sections: {
+      create: "Sáng tạo",
+      finish: "Hoàn thiện",
+      edit: "Chỉnh sửa",
+      assets: "Tài nguyên",
+      system: "Hệ thống",
+      manage: "Quản lý",
+    },
     navigation: {
       home: "Trang chủ",
       ultimateStudio: "Workflow",
@@ -20710,9 +20730,14 @@ function Jw({
       active: qt,
       onSelect: ta,
     }) => {
-      const Ye = lt(P);
+      const Ye = lt(P),
+        Ge = qt ?? u === P;
       return s.jsxs("button", {
-        className: `nav-item ${(qt ?? u === P) ? "active" : ""} ${Ye ? "nav-locked" : ""} ${We ? "nav-disabled" : ""}`,
+        type: "button",
+        className: `nav-item ${Ge ? "active" : ""} ${Ye ? "nav-locked" : ""} ${We ? "nav-disabled" : ""}`,
+        "data-page": P,
+        "aria-current": Ge ? "page" : void 0,
+        "aria-disabled": Ye || We ? "true" : void 0,
         onClick: () => {
           We || Ye || (ta?.(), l(P));
         },
@@ -20731,11 +20756,26 @@ function Jw({
         ],
       });
     };
+  const Pe = ({ section: P, label: Fe, children: ke }) =>
+    s.jsxs("div", {
+      className: "sidebar-nav-group",
+      role: "group",
+      "data-nav-group": P,
+      "aria-label": Fe,
+      children: [
+        s.jsx("span", {
+          className: "sidebar-nav-group-label",
+          "aria-hidden": "true",
+          children: Fe,
+        }),
+        ke,
+      ],
+    });
   return s.jsxs(s.Fragment, {
     children: [
-      s.jsxs("section", {
-        className: "atelier-header-profile",
-        "aria-label": U("sidebar.account.trigger"),
+      s.jsxs("header", {
+        className: "app-header atelier-header-profile",
+        "aria-label": U("sidebar.header.label"),
         children: [
           p === "veo3" &&
             g &&
@@ -20743,11 +20783,12 @@ function Jw({
             s.jsxs(s.Fragment, {
               children: [
                 s.jsxs("div", {
-                  className: "sidebar-flow-project",
+                  className: "header-flow-project sidebar-flow-project",
                   children: [
                     H
                       ? s.jsxs("a", {
-                          className: "sidebar-flow-project-link",
+                          className:
+                            "header-flow-project-link sidebar-flow-project-link",
                           href: `https://labs.google/fx/tools/flow/project/${encodeURIComponent(H)}`,
                           target: "_blank",
                           rel: "noreferrer",
@@ -20759,7 +20800,8 @@ function Jw({
                           ],
                         })
                       : s.jsxs("span", {
-                          className: "sidebar-flow-project-empty",
+                          className:
+                            "header-flow-project-empty sidebar-flow-project-empty",
                           title: le || "Chưa có Google Flow project",
                           children: [
                             "Project ",
@@ -20782,7 +20824,7 @@ function Jw({
                 }),
                 s.jsxs("button", {
                   type: "button",
-                  className: `sidebar-captcha-status ${S ? "connected" : "attention"}`,
+                  className: `header-captcha-status sidebar-captcha-status ${S ? "connected" : "attention"}`,
                   onClick: () => l("captcha-setup"),
                   title: U("sidebar.account.captchaSetup"),
                   children: [
@@ -20807,7 +20849,7 @@ function Jw({
             }),
           s.jsxs("button", {
             type: "button",
-            className: "sidebar-provider-current",
+            className: "header-account-trigger sidebar-provider-current",
             "data-account-trigger": !0,
             onClick: () => J((P) => !P),
             "aria-expanded": Te,
@@ -20816,7 +20858,7 @@ function Jw({
             title: U("sidebar.account.trigger"),
             children: [
               s.jsx("span", {
-                className: "sidebar-provider-balance",
+                className: "header-provider-balance sidebar-provider-balance",
                 children: s.jsxs(s.Fragment, {
                         children: [
                           s.jsx(rS, { size: 14, strokeWidth: 2 }),
@@ -20841,7 +20883,7 @@ function Jw({
                       }),
               }),
               s.jsx("span", {
-                className: "sidebar-provider-mark",
+                className: "header-provider-mark sidebar-provider-mark",
                 children: _.avatarUrl
                   ? s.jsx("img", { src: _.avatarUrl, alt: "" })
                   : F
@@ -20849,7 +20891,7 @@ function Jw({
                     : s.jsx(nh, { size: 16, strokeWidth: 1.8 }),
               }),
               s.jsx("span", {
-                className: "sidebar-provider-copy",
+                className: "header-provider-copy sidebar-provider-copy",
                 children: s.jsx("strong", {
                   children: _.displayName || U("sidebar.account.unnamed"),
                 }),
@@ -20873,6 +20915,7 @@ function Jw({
       }),
       s.jsxs("aside", {
         className: `sidebar ${re ? "is-collapsed" : ""}`,
+        "aria-label": U("sidebar.label"),
         children: [
           s.jsx("div", {
             className: "sidebar-logo",
@@ -20893,70 +20936,93 @@ function Jw({
           }),
           s.jsxs("nav", {
             className: "sidebar-nav",
+            "aria-label": U("sidebar.navigationLabel"),
             children: [
-              s.jsx(Le, {
-                page: "image-ultra",
-                icon: s.jsx(dS, { size: vt, strokeWidth: yt }),
-                label: U("sidebar.navigation.imageGenerator"),
-                active: u === "image-ultra" && b === "generate",
-                onSelect: () => R?.("generate"),
+              s.jsxs(Pe, {
+                section: "create",
+                label: U("sidebar.sections.create"),
+                children: [
+                  s.jsx(Le, {
+                    page: "image-ultra",
+                    icon: s.jsx(dS, { size: vt, strokeWidth: yt }),
+                    label: U("sidebar.navigation.imageGenerator"),
+                    active: u === "image-ultra" && b === "generate",
+                    onSelect: () => R?.("generate"),
+                  }),
+                  s.jsx(Le, {
+                    page: "video-pro",
+                    icon: s.jsx(pS, { size: vt, strokeWidth: yt }),
+                    label: U("sidebar.navigation.videoGenerator"),
+                  }),
+                  s.jsx(Le, {
+                    page: "voice",
+                    icon: s.jsx(fS, { size: vt, strokeWidth: yt }),
+                    label: U("sidebar.navigation.voiceGenerator"),
+                  }),
+                ],
               }),
-              s.jsx(Le, {
-                page: "video-pro",
-                icon: s.jsx(pS, { size: vt, strokeWidth: yt }),
-                label: U("sidebar.navigation.videoGenerator"),
+              s.jsxs(Pe, {
+                section: "edit",
+                label: U("sidebar.sections.edit"),
+                children: [
+                  s.jsx(Le, {
+                    page: "image-ultra",
+                    icon: s.jsx(gS, { size: vt, strokeWidth: yt }),
+                    label: U("sidebar.navigation.imageEditor"),
+                    active: u === "image-ultra" && b === "edit",
+                    onSelect: () => R?.("edit"),
+                  }),
+                  s.jsx(Le, {
+                    page: "capcut-video",
+                    icon: s.jsx(hS, { size: vt, strokeWidth: yt }),
+                    label: U("sidebar.navigation.gencut"),
+                  }),
+                  s.jsx(Le, {
+                    page: "concat",
+                    icon: s.jsx(mS, { size: vt, strokeWidth: yt }),
+                    label: U("sidebar.navigation.concatVideo"),
+                  }),
+                ],
               }),
-              s.jsx(Le, {
-                page: "voice",
-                icon: s.jsx(fS, { size: vt, strokeWidth: yt }),
-                label: U("sidebar.navigation.voiceGenerator"),
-              }),
-              s.jsx(Le, {
-                page: "capcut-video",
-                icon: s.jsx(hS, { size: vt, strokeWidth: yt }),
-                label: U("sidebar.navigation.gencut"),
-              }),
-              s.jsx(Le, {
-                page: "concat",
-                icon: s.jsx(mS, { size: vt, strokeWidth: yt }),
-                label: U("sidebar.navigation.concatVideo"),
-              }),
-              s.jsx(Le, {
-                page: "image-ultra",
-                icon: s.jsx(gS, { size: vt, strokeWidth: yt }),
-                label: U("sidebar.navigation.imageEditor"),
-                active: u === "image-ultra" && b === "edit",
-                onSelect: () => R?.("edit"),
-              }),
-              s.jsx(Le, {
-                page: "upload",
-                icon: s.jsx(vS, { size: vt, strokeWidth: yt }),
-                label: U("sidebar.navigation.library"),
-              }),
-              s.jsx(Le, {
-                page: "provider-account",
-                icon: s.jsx(bS, { size: vt, strokeWidth: yt }),
-                label: U("sidebar.account.providerAccount"),
-              }),
-              p === "veo3" &&
-                s.jsxs(s.Fragment, {
-                  children: [
-                    s.jsx(Le, {
-                      page: "webview",
-                      icon: s.jsx(SS, { size: vt, strokeWidth: yt }),
-                      label: U("sidebar.account.veo3Login"),
-                    }),
-                    s.jsx(Le, {
-                      page: "captcha-setup",
-                      icon: s.jsx(Af, { size: vt, strokeWidth: yt }),
-                      label: U("sidebar.account.captchaSetup"),
-                    }),
-                  ],
+              s.jsx(Pe, {
+                section: "assets",
+                label: U("sidebar.sections.assets"),
+                children: s.jsx(Le, {
+                  page: "upload",
+                  icon: s.jsx(vS, { size: vt, strokeWidth: yt }),
+                  label: U("sidebar.navigation.library"),
                 }),
-              s.jsx(Le, {
-                page: "settings",
-                icon: s.jsx(CS, { size: vt, strokeWidth: yt }),
-                label: U("sidebar.account.settings"),
+              }),
+              s.jsxs(Pe, {
+                section: "system",
+                label: U("sidebar.sections.system"),
+                children: [
+                  s.jsx(Le, {
+                    page: "provider-account",
+                    icon: s.jsx(bS, { size: vt, strokeWidth: yt }),
+                    label: U("sidebar.account.providerAccount"),
+                  }),
+                  p === "veo3" &&
+                    s.jsxs(s.Fragment, {
+                      children: [
+                        s.jsx(Le, {
+                          page: "webview",
+                          icon: s.jsx(SS, { size: vt, strokeWidth: yt }),
+                          label: U("sidebar.account.veo3Login"),
+                        }),
+                        s.jsx(Le, {
+                          page: "captcha-setup",
+                          icon: s.jsx(Af, { size: vt, strokeWidth: yt }),
+                          label: U("sidebar.account.captchaSetup"),
+                        }),
+                      ],
+                    }),
+                  s.jsx(Le, {
+                    page: "settings",
+                    icon: s.jsx(CS, { size: vt, strokeWidth: yt }),
+                    label: U("sidebar.account.settings"),
+                  }),
+                ],
               }),
             ],
           }),
