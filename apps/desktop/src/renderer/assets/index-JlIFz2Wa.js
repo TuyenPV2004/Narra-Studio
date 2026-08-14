@@ -23695,7 +23695,7 @@ const B0 = v.lazy(() =>
   sA = v.lazy(() =>
     Z(
       () => import("./ProviderHubPage-D4vFdETf.js"),
-      __vite__mapDeps([66, 1, 3, 50, 2, 55, 33, 45, 67, 13]),
+      __vite__mapDeps([66, 1, 3, 50, 2, 55, 33, 45, 67]),
       import.meta.url,
     ),
   ),

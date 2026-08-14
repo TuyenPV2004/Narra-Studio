@@ -1,39 +1,79 @@
 /* Narra light theme */
 :root {
   color-scheme: light;
-  --brand-primary: #7c3aed;
+  --brand-primary: var(--primary);
   --brand-primary-hover: #6d28d9;
-  --brand-primary-soft: #ede9fe;
+  --brand-primary-soft: var(--primary-muted);
   --brand-primary-rgb: 124, 58, 237;
   --brand-primary-hover-rgb: 109, 40, 217;
   --brand-primary-soft-rgb: 237, 233, 254;
-  --brand-on-primary: #ffffff;
+  --brand-on-primary: var(--primary-foreground);
   --brand-focus: rgba(124, 58, 237, 0.24);
-  --brand-accent: #7c3aed;
-  --bg-0: #f8f7fc;
-  --bg-1: #ffffff;
-  --bg-2: #f3f0f8;
+  --brand-accent: var(--primary);
+  --bg-0: var(--background);
+  --bg-1: var(--surface);
+  --bg-2: var(--surface-muted);
   --bg-3: #ebe7f2;
   --bg-4: #ded8e8;
-  --bg-hover: #f0ebf8;
+  --bg-hover: var(--surface-hover);
   --border: #d8d1e2;
   --border-subtle: #e8e3ee;
-  --text: #211a2b;
+  --text: var(--foreground);
   --text-2: #51465f;
-  --text-3: #71667e;
+  --text-3: var(--muted-foreground);
   --text-4: #776c82;
-  --green: #087a55;
-  --amber: #a15c00;
-  --red: #b42318;
-  --surface-raised: #ffffff;
-  --surface-sunken: #f3f0f8;
+  --green: var(--success);
+  --amber: var(--warning);
+  --red: var(--danger);
+  --surface-raised: var(--surface);
+  --surface-sunken: var(--surface-muted);
   --surface-media: #11131a;
-  --success-text: #087a55;
+  --success-text: var(--success);
   --success-bg: #e5f7ef;
   --warning-text: #8a4b00;
   --warning-bg: #fff3d6;
-  --danger-text: #b42318;
+  --danger-text: var(--danger);
   --danger-bg: #fdecea;
+
+  /* Semantic design system */
+  --background: #f8f7fc;
+  --surface: #ffffff;
+  --surface-muted: #f3f0f8;
+  --surface-hover: #f0ebf8;
+  --foreground: #211a2b;
+  --muted-foreground: #71667e;
+  --border-strong: #c7bed3;
+  --primary: #7c3aed;
+  --primary-foreground: #ffffff;
+  --primary-muted: #ede9fe;
+  --success: #087a55;
+  --warning: #a15c00;
+  --danger: #b42318;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  --radius-sm: 6px;
+  --radius-md: 9px;
+  --radius-lg: 14px;
+  --control-height-sm: 32px;
+  --control-height-md: 40px;
+
+  --sidebar-width: 236px;
+  --sidebar-collapsed-width: 66px;
+  --header-height: 64px;
+  --z-sidebar: 30;
+  --z-header: 48;
+  --z-overlay: 100;
+
+  --motion-fast: 150ms;
+  --motion-normal: 220ms;
+  --motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --focus-ring: #7c3aed;
 }
 
 *,
@@ -177,7 +217,6 @@ h3 {
   letter-spacing: -0.01em !important;
 }
 
-.nav-item,
 .sidebar-group-header,
 .sidebar-collapse-btn,
 .vpro-tab,
@@ -186,7 +225,6 @@ h3 {
   color: var(--text-2) !important;
 }
 
-.nav-item:hover,
 .sidebar-group-header:hover,
 .sidebar-collapse-btn:hover,
 .vpro-tab:hover,
@@ -196,7 +234,6 @@ h3 {
   background: var(--bg-hover) !important;
 }
 
-.nav-item.active,
 .vpro-tab.active,
 .vpro-pill.active {
   color: var(--brand-primary-hover) !important;
@@ -220,7 +257,7 @@ h3 {
 }
 
 :where(button, a, input, textarea, select, [tabindex]):focus-visible {
-  outline: 2px solid var(--brand-primary) !important;
+  outline: 2px solid var(--focus-ring) !important;
   outline-offset: 2px;
 }
 
@@ -235,27 +272,78 @@ h3 {
   *::after {
     scroll-behavior: auto !important;
   }
+
+  .sidebar,
+  .atelier-header-profile,
+  .sidebar-nav .nav-item {
+    transition: none !important;
+  }
 }
 
 /* Light sidebar compatibility */
 .sidebar {
+  width: var(--sidebar-width);
+  height: 100dvh;
   background: var(--bg-0) !important;
-  border-right: 2px solid #17131d !important;
+  border-right: 1px solid var(--border-subtle) !important;
   box-shadow: none !important;
+  transition: width var(--motion-normal) var(--motion-ease);
+  z-index: var(--z-sidebar);
+}
+
+.sidebar.is-collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+.atelier-header-profile {
+  top: 0;
+  left: var(--sidebar-width);
+  height: var(--header-height);
+  padding: 0 var(--space-4);
+  border-bottom: 1px solid var(--border-subtle) !important;
+  background: var(--surface) !important;
+  box-shadow: none !important;
+  z-index: var(--z-header);
+  transition: left var(--motion-normal) var(--motion-ease);
+}
+
+body.sidebar-collapsed .atelier-header-profile {
+  left: var(--sidebar-collapsed-width);
+}
+
+.app:has(> .atelier-header-profile) > .main-content {
+  padding-top: var(--header-height);
+}
+
+.app:has(> .atelier-header-profile) > .main-content::before {
+  height: calc(var(--header-height) - 1px);
 }
 
 .sidebar-nav {
   gap: 4px !important;
 }
 
-/* Keep sidebar actions icon-first instead of rendering each item as a dark card. */
-.sidebar-nav .nav-item,
-.sidebar-nav .nav-item:hover,
+/* Stable navigation states: no glow, no layout movement. */
+.sidebar-nav .nav-item {
+  min-height: var(--control-height-md);
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  box-shadow: none;
+  transition:
+    color var(--motion-fast) ease,
+    background-color var(--motion-fast) ease;
+}
+
+.sidebar-nav .nav-item:hover {
+  color: var(--foreground);
+  background: var(--surface-hover);
+}
+
 .sidebar-nav .nav-item.active {
-  border: 0 !important;
-  border-radius: 0 !important;
-  background: transparent !important;
-  box-shadow: none !important;
+  color: var(--primary);
+  background: var(--primary-muted);
+  font-weight: 600;
 }
 
 /* Active navigation keeps its text color, but the icon itself stays unboxed. */
@@ -271,8 +359,7 @@ h3 {
 .sidebar-collapse-btn,
 .sidebar-provider-summary,
 .sidebar-provider-current,
-.sidebar-flow-project,
-.atelier-header-profile {
+.sidebar-flow-project {
   color: var(--text-2) !important;
   border-color: var(--border-subtle) !important;
   background: transparent !important;
@@ -299,7 +386,7 @@ h3 {
 .nav-item.active :is(.nav-icon, .nav-label),
 .sidebar-provider-current:hover :is(.sidebar-provider-mark, .sidebar-provider-copy strong),
 .sidebar-provider-switch:hover {
-  color: var(--brand-primary-hover) !important;
+  color: var(--primary) !important;
 }
 
 .nav-item :is(.nav-icon, .nav-label),

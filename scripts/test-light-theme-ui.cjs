@@ -72,13 +72,48 @@ assert.match(
 assert.match(lightCss, /Narra light theme/);
 assert.match(lightCss, /\.vpro-output-open\{[^}]*display:inline-flex[^}]*gap:/);
 assert.match(lightCss, /--surface-media:\s*#11131a/);
+for (const designToken of [
+  '--background',
+  '--surface',
+  '--surface-muted',
+  '--surface-hover',
+  '--foreground',
+  '--muted-foreground',
+  '--border-strong',
+  '--primary',
+  '--primary-foreground',
+  '--primary-muted',
+  '--sidebar-width',
+  '--sidebar-collapsed-width',
+  '--header-height',
+]) {
+  assert.match(lightCss, new RegExp(`${designToken}:\\s*[^;]+;`));
+}
 assert.match(
   lightCss,
-  /\.sidebar\s*\{[^}]*background:\s*var\(--bg-0\)\s*!important;[^}]*border-right:\s*0\s*!important;/s,
+  /\.sidebar\s*\{[^}]*background:\s*var\(--bg-0\)\s*!important;[^}]*border-right:\s*1px\s+solid\s+var\(--border-subtle\)\s*!important;/s,
+);
+assert.doesNotMatch(lightCss, /\.sidebar\s*\{[^}]*border-right:[^}]*#17131d/s);
+assert.match(lightCss, /\.sidebar\.is-collapsed\s*\{[^}]*width:\s*var\(--sidebar-collapsed-width\)/s);
+assert.match(
+  lightCss,
+  /body\.sidebar-collapsed \.atelier-header-profile\s*\{[^}]*left:\s*var\(--sidebar-collapsed-width\)/s,
 );
 assert.match(
   lightCss,
-  /\.nav-item:hover\s+:is\(\.nav-icon,\s*\.nav-label\)[^{]*\{[^}]*color:\s*var\(--brand-primary-hover\)\s*!important;/s,
+  /\.sidebar-nav \.nav-item:hover\s*\{[^}]*background:\s*var\(--surface-hover\);/s,
+);
+assert.match(
+  lightCss,
+  /\.sidebar-nav \.nav-item\.active\s*\{[^}]*color:\s*var\(--primary\);[^}]*background:\s*var\(--primary-muted\);/s,
+);
+assert.match(
+  lightCss,
+  /\.atelier-header-profile\s*\{[^}]*height:\s*var\(--header-height\);[^}]*background:\s*var\(--surface\)\s*!important;/s,
+);
+assert.match(
+  lightCss,
+  /\.nav-item:hover\s+:is\(\.nav-icon,\s*\.nav-label\)[^{]*\{[^}]*color:\s*var\(--primary\)\s*!important;/s,
 );
 assert.match(
   lightCss,
@@ -186,6 +221,10 @@ assert.match(
 );
 assert.equal(html.includes("'Inter'"), false);
 assert.equal(html.includes("'JetBrains Mono'"), false);
+assert.equal(html.includes('fonts.googleapis.com'), false);
+assert.equal(html.includes('sheet.cssRules'), false);
+assert.match(html, /setTimeout\(hideSplash, 3000\)/);
+assert.match(html, /\.sidebar\s*\{[^}]*width:\s*var\(--sidebar-width,\s*236px\)/s);
 assert.equal(html.includes('id="devtools-trigger"'), false);
 
 // CAPTCHA setup must behave like a light, accessible accordion.

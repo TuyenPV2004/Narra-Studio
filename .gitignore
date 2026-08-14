@@ -1,6 +1,8 @@
 node_modules/
 .pnpm-store/
 .smoke/
+.playwright-cli/
+.runtime-smoke-build/
 .codex-build/
 dist/
 dist-electron/

@@ -12,7 +12,11 @@
     "dev": "pnpm --filter @narra/desktop dev",
     "test": "node scripts/smoke-local-workspace.cjs && node scripts/test-captcha-extension.cjs && node scripts/test-captcha-extension-package.mjs && node scripts/test-light-theme-ui.cjs && node scripts/test-package-windows-resolver.mjs",
     "typecheck": "pnpm --filter @narra/desktop typecheck",
-    "validate": "pnpm typecheck && pnpm test && pnpm build",
-    "package:win": "pnpm build && node scripts/prepare-recovered-desktop-package.mjs && pnpm --filter @narra/desktop package:win"
+    "check:frontend-contract": "node scripts/check-frontend-contract.mjs",
+    "validate": "pnpm typecheck && pnpm check:frontend-contract && pnpm test && pnpm build",
+    "package:win": "pnpm build && node scripts/prepare-recovered-desktop-package.mjs && pnpm --filter @narra/desktop package:win",
+    "package:electron-smoke": "pnpm build && node scripts/prepare-recovered-desktop-package.mjs && node scripts/package-electron-smoke.mjs",
+    "smoke:electron-ui": "node scripts/smoke-electron-ui.mjs",
+    "smoke:electron-ui:update": "node scripts/smoke-electron-ui.mjs --update-baseline"
   }
 }
