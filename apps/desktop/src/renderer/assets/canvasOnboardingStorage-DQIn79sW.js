@@ -1,1 +1,0 @@
-const t="genyu-canvas-onboarding-completed-v1",e="genyu-canvas-onboarding-workspace-v1";function o(a){try{localStorage.getItem(t)!=="1"&&localStorage.setItem(e,a)}catch{}}function n(a){if(!a)return!1;try{return localStorage.getItem(t)!=="1"}catch{return!1}}function r(){try{localStorage.setItem(t,"1"),localStorage.removeItem(e)}catch{}}export{r as c,o as r,n as s};

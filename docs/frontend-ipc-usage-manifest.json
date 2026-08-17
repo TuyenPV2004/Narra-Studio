@@ -1,12 +1,11 @@
 {
-  "schemaVersion": 1,
-  "baseCommit": "7d89b49fa484135019f08beeb3e0e1e2fc606d16",
+  "schemaVersion": 2,
   "guard": {
     "name": "static frontend IPC surface guard",
     "protects": [
-      "direct static frontend method-name surface",
+      "direct static frontend adapter method-name surface",
       "methods missing from preload baseline",
-      "dynamic import target baseline"
+      "static dynamic import target baseline"
     ],
     "doesNotProtect": [
       "argument order or count",
@@ -17,28 +16,28 @@
       "backend handler semantics"
     ]
   },
-  "rendererRoot": "apps/desktop/src/renderer",
+  "rendererRoot": "apps/desktop/src/renderer-source",
   "preloadFile": "apps/desktop/src/electron/preload.js",
   "summary": {
-    "usedMethods": 215,
-    "usedApiMethods": 215,
+    "usedMethods": 177,
+    "usedApiMethods": 177,
     "usedElectronApiMethods": 0,
     "exposedPreloadMethods": 266,
-    "missingFromPreload": 15,
-    "missingFromPreloadDistinctMethodCount": 15,
-    "missingFromPreloadCallSiteCount": 16,
-    "exposedButUnused": 66,
-    "dynamicImports": 38,
-    "missingDynamicImports": 4
+    "missingFromPreload": 0,
+    "missingFromPreloadDistinctMethodCount": 0,
+    "missingFromPreloadCallSiteCount": 0,
+    "exposedButUnused": 89,
+    "dynamicImports": 0,
+    "missingDynamicImports": 0
   },
   "methods": [
     {
       "global": "api",
       "method": "aiAgentChat",
       "businessArea": "AI Agent / Avis",
-      "callCount": 6,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -51,9 +50,9 @@
       "global": "api",
       "method": "aiAgentChatStream",
       "businessArea": "AI Agent / Avis",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -69,7 +68,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -84,7 +83,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -99,7 +98,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -114,7 +113,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -129,7 +128,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -144,7 +143,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -159,7 +158,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -174,7 +173,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -187,10 +186,10 @@
       "global": "api",
       "method": "applyVideoFilters",
       "businessArea": "Media / Generation",
-      "callCount": 6,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -205,7 +204,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -220,7 +219,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/avisMedia-BOEqY9mQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -233,9 +232,9 @@
       "global": "api",
       "method": "avisCancelScriptStage",
       "businessArea": "AI Agent / Avis",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -250,22 +249,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisCreateKycAsset",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/avisKyc-CXDbl6cD.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -280,7 +264,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/avisMedia-BOEqY9mQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -295,7 +279,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/avisMedia-BOEqY9mQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -310,7 +294,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -323,9 +307,9 @@
       "global": "api",
       "method": "avisGenerateScriptStage",
       "businessArea": "AI Agent / Avis",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -339,11 +323,10 @@
       "global": "api",
       "method": "avisGetBalance",
       "businessArea": "AI Agent / Avis",
-      "callCount": 3,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/DashboardPage-D3BkCBhj.js",
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/dashboard.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -354,41 +337,11 @@
     },
     {
       "global": "api",
-      "method": "avisGetKycAsset",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/avisKyc-CXDbl6cD.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisGetKycStatus",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/avisKyc-CXDbl6cD.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": []
-      }
-    },
-    {
-      "global": "api",
       "method": "avisGetUsage",
       "businessArea": "AI Agent / Avis",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/DashboardPage-D3BkCBhj.js",
-        "apps/desktop/src/renderer/assets/ProviderAccountPage-BpvuEEDb.js"
+        "apps/desktop/src/renderer-source/services/electron-api/dashboard.ts"
       ],
       "preload": {
         "exposed": true,
@@ -403,7 +356,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -418,7 +371,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -429,15 +382,18 @@
     },
     {
       "global": "api",
-      "method": "avisMediaInfo",
+      "method": "avisListModels",
       "businessArea": "AI Agent / Avis",
-      "callCount": 1,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/avisMedia-BOEqY9mQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
-        "parameters": []
+        "parameters": [
+          "opts"
+        ]
       }
     },
     {
@@ -446,23 +402,7 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisPollImage",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 2,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/avisMedia-BOEqY9mQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -475,10 +415,9 @@
       "global": "api",
       "method": "avisPollVideo",
       "businessArea": "AI Agent / Avis",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/avisMedia-BOEqY9mQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -493,23 +432,8 @@
       "businessArea": "AI Agent / Avis",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/avisMedia-BOEqY9mQ.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisUploadVideoReference",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/avisKyc-CXDbl6cD.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -524,7 +448,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -539,7 +463,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -552,9 +476,9 @@
       "global": "api",
       "method": "cancelVideoAudioSeparation",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -567,12 +491,9 @@
       "global": "api",
       "method": "changeImageOutputFolder",
       "businessArea": "Media / Generation",
-      "callCount": 4,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ImagePage-CLuS7-y2.js",
-        "apps/desktop/src/renderer/assets/SettingsPage-DD4JanXX.js",
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js",
-        "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js"
+        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -583,13 +504,9 @@
       "global": "api",
       "method": "changeOutputFolder",
       "businessArea": "Desktop / Local utility",
-      "callCount": 5,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/ConcatPage-vv7Ao5sf.js",
-        "apps/desktop/src/renderer/assets/SettingsPage-DD4JanXX.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js"
+        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -598,68 +515,11 @@
     },
     {
       "global": "api",
-      "method": "cloudflareR2UploadMedia",
-      "businessArea": "Provider",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/avisKyc-CXDbl6cD.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "communityAvatarUpload",
-      "businessArea": "Media / Generation",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
-      "method": "communityPublicationStatus",
-      "businessArea": "Other frontend runtime",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/refreshWorkspaceAvisMedia-ci86cgx6.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
-      "method": "communityPublish",
-      "businessArea": "Other frontend runtime",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/refreshWorkspaceAvisMedia-ci86cgx6.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
       "method": "concatVideos",
       "businessArea": "Media / Generation",
-      "callCount": 4,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/ConcatPage-vv7Ao5sf.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -672,9 +532,9 @@
       "global": "api",
       "method": "concatVideosWithTransitions",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -689,7 +549,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -702,16 +562,9 @@
       "global": "api",
       "method": "copyToClipboard",
       "businessArea": "Desktop / Local utility",
-      "callCount": 13,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js",
-        "apps/desktop/src/renderer/assets/CaptchaSetupPage-DbTYSglx.js",
-        "apps/desktop/src/renderer/assets/ProviderAccountPage-BpvuEEDb.js",
-        "apps/desktop/src/renderer/assets/ResultCard-Dqi8qEkj.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js",
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/captcha.ts"
       ],
       "preload": {
         "exposed": true,
@@ -726,7 +579,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/director.ts"
       ],
       "preload": {
         "exposed": true,
@@ -741,7 +594,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -756,7 +609,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -769,9 +622,9 @@
       "global": "api",
       "method": "deleteFile",
       "businessArea": "Desktop / Local utility",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -786,7 +639,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -801,7 +654,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -816,7 +669,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -829,25 +682,9 @@
       "global": "api",
       "method": "downloadAvisVideo",
       "businessArea": "Media / Generation",
-      "callCount": 2,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/avisMedia-BOEqY9mQ.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "downloadMediaToTemp",
-      "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -860,11 +697,9 @@
       "global": "api",
       "method": "downloadVideo",
       "businessArea": "Media / Generation",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -879,12 +714,27 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ImageEditPage-Cn-n70-t.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
         "parameters": [
           "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "exportUserPresetTemplate",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/user-presets.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "params"
         ]
       }
     },
@@ -892,31 +742,9 @@
       "global": "api",
       "method": "extractAudio",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "extractThumbnail",
-      "businessArea": "Media / Generation",
-      "callCount": 16,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/MediaPickerModal-C6QiLgBU.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js",
-        "apps/desktop/src/renderer/assets/VideoTrimModal-NM3_PIL1.js",
-        "apps/desktop/src/renderer/assets/videoThumbnailQueue-DdIKPyjL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -929,11 +757,9 @@
       "global": "api",
       "method": "generateFlowVoicePreview",
       "businessArea": "Google Flow / Session",
-      "callCount": 4,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/GraphFlowVoicePickerModal-Ci0YrqfY.js",
-        "apps/desktop/src/renderer/assets/VoicePage-BY6fV03e.js"
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -948,7 +774,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -963,7 +789,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -976,10 +802,9 @@
       "global": "api",
       "method": "generateViaPage",
       "businessArea": "Other frontend runtime",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ImagePage-CLuS7-y2.js",
-        "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -994,7 +819,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1009,7 +834,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1024,7 +849,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1039,7 +864,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1054,7 +879,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1067,39 +892,10 @@
       "global": "api",
       "method": "getAllSlots",
       "businessArea": "Google Flow / Session",
-      "callCount": 6,
-      "files": [
-        "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js",
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/flowProjectInitialData-DF7ldHDm.js",
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": []
-      }
-    },
-    {
-      "global": "api",
-      "method": "getAppArch",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": []
-      }
-    },
-    {
-      "global": "api",
-      "method": "getAppVersion",
-      "businessArea": "Desktop / Local utility",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1112,7 +908,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1123,27 +919,13 @@
     },
     {
       "global": "api",
-      "method": "getAuthInfo",
-      "businessArea": "Google Flow / Session",
-      "callCount": 3,
-      "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js",
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": []
-      }
-    },
-    {
-      "global": "api",
       "method": "getCaptchaBridgeStatus",
       "businessArea": "CAPTCHA / Extension",
       "callCount": 4,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/captcha-V3drNB7x.js",
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/captcha.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1154,10 +936,9 @@
       "global": "api",
       "method": "getCredits",
       "businessArea": "Google Flow / Session",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js",
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1172,7 +953,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/DashboardPage-D3BkCBhj.js"
+        "apps/desktop/src/renderer-source/services/electron-api/dashboard.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1183,16 +964,10 @@
       "global": "api",
       "method": "getFilePath",
       "businessArea": "Desktop / Local utility",
-      "callCount": 12,
+      "callCount": 4,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js",
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/CharSyncPanel-DkALmaWe.js",
-        "apps/desktop/src/renderer/assets/MediaPickerModal-C6QiLgBU.js",
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1207,7 +982,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/flowProjectInitialData-DF7ldHDm.js"
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1220,12 +995,9 @@
       "global": "api",
       "method": "getImageOutputPath",
       "businessArea": "Media / Generation",
-      "callCount": 4,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ImagePage-CLuS7-y2.js",
-        "apps/desktop/src/renderer/assets/SettingsPage-DD4JanXX.js",
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js",
-        "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js"
+        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1234,25 +1006,11 @@
     },
     {
       "global": "api",
-      "method": "getMachineId",
+      "method": "getOllamaSettings",
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
-      "method": "getOllamaSettings",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 2,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1263,9 +1021,9 @@
       "global": "api",
       "method": "getVideoDuration",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1278,14 +1036,9 @@
       "global": "api",
       "method": "getVideoInfo",
       "businessArea": "Media / Generation",
-      "callCount": 13,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js",
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/MediaPickerModal-C6QiLgBU.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1298,13 +1051,9 @@
       "global": "api",
       "method": "getVideoOutputPath",
       "businessArea": "Media / Generation",
-      "callCount": 6,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/ConcatPage-vv7Ao5sf.js",
-        "apps/desktop/src/renderer/assets/SettingsPage-DD4JanXX.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js"
+        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1313,41 +1062,24 @@
     },
     {
       "global": "api",
-      "method": "imageGridSegment",
-      "businessArea": "Media / Generation",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "imageThumbnail",
-      "businessArea": "Media / Generation",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
       "method": "importSkillFolder",
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/skills.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "importUserPresetFile",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/user-presets.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1360,7 +1092,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1371,12 +1103,37 @@
     },
     {
       "global": "api",
+      "method": "listDirectorScenes",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/director.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
       "method": "listImageFiles",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/MediaPickerModal-C6QiLgBU.js",
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "listVideoFiles",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1389,7 +1146,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1398,15 +1155,26 @@
     },
     {
       "global": "api",
+      "method": "loadDirectorScene",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/director.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
       "method": "loadHistory",
       "businessArea": "Desktop / Local utility",
-      "callCount": 6,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js",
-        "apps/desktop/src/renderer/assets/ConcatPage-vv7Ao5sf.js",
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js",
-        "apps/desktop/src/renderer/assets/useResultHistory-BcE5YQMt.js"
+        "apps/desktop/src/renderer-source/services/electron-api/history.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1417,11 +1185,11 @@
     },
     {
       "global": "api",
-      "method": "loadMediaLibrary",
-      "businessArea": "Media / Generation",
+      "method": "loadUserPresets",
+      "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/user-presets.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1432,9 +1200,9 @@
       "global": "api",
       "method": "loadVideoProject",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1449,7 +1217,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1460,27 +1228,11 @@
     },
     {
       "global": "api",
-      "method": "onAuthCaptured",
-      "businessArea": "Google Flow / Session",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "cb"
-        ]
-      }
-    },
-    {
-      "global": "api",
       "method": "onAutoEnteredProject",
       "businessArea": "Other frontend runtime",
-      "callCount": 4,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js",
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1495,7 +1247,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1508,9 +1260,9 @@
       "global": "api",
       "method": "onFlowProjectChanged",
       "businessArea": "Google Flow / Session",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/flowProjectInitialData-DF7ldHDm.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1521,24 +1273,11 @@
     },
     {
       "global": "api",
-      "method": "onMacUpdateProgress",
-      "businessArea": "Other frontend runtime",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
       "method": "onSlotEmailUpdated",
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1553,7 +1292,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1568,7 +1307,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1583,7 +1322,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1594,24 +1333,11 @@
     },
     {
       "global": "api",
-      "method": "onUpdaterStatus",
-      "businessArea": "Other frontend runtime",
-      "callCount": 2,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
       "method": "onVideoAudioDemuxProgress",
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1626,7 +1352,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1637,69 +1363,11 @@
     },
     {
       "global": "api",
-      "method": "onVideoDownloaded",
-      "businessArea": "Media / Generation",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "cb"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "onVideoDownloadFailed",
-      "businessArea": "Media / Generation",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "cb"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "onWebviewSwitchSlot",
-      "businessArea": "Google Flow / Session",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "cb"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "onWinUpdateProgress",
-      "businessArea": "Other frontend runtime",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
       "method": "openExtensionFolder",
       "businessArea": "CAPTCHA / Extension",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CaptchaSetupPage-DbTYSglx.js"
+        "apps/desktop/src/renderer-source/services/electron-api/captcha.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1710,12 +1378,9 @@
       "global": "api",
       "method": "openExternalUrl",
       "businessArea": "Desktop / Local utility",
-      "callCount": 6,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/CaptchaSetupPage-DbTYSglx.js",
-        "apps/desktop/src/renderer/assets/ProviderAccountPage-BpvuEEDb.js",
-        "apps/desktop/src/renderer/assets/ProviderHubPage-D4vFdETf.js"
+        "apps/desktop/src/renderer-source/services/electron-api/captcha.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1730,7 +1395,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1743,19 +1408,10 @@
       "global": "api",
       "method": "openOutputFolder",
       "businessArea": "Desktop / Local utility",
-      "callCount": 20,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/ConcatPage-vv7Ao5sf.js",
-        "apps/desktop/src/renderer/assets/ImageEditPage-Cn-n70-t.js",
-        "apps/desktop/src/renderer/assets/ImagePage-CLuS7-y2.js",
-        "apps/desktop/src/renderer/assets/SettingsPage-DD4JanXX.js",
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js",
-        "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js",
-        "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1768,11 +1424,10 @@
       "global": "api",
       "method": "pickRandomSlot",
       "businessArea": "Google Flow / Session",
-      "callCount": 3,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1783,10 +1438,9 @@
       "global": "api",
       "method": "pollVideoStatus",
       "businessArea": "Media / Generation",
-      "callCount": 3,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1799,9 +1453,9 @@
       "global": "api",
       "method": "projectsDelete",
       "businessArea": "Workspace",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1814,9 +1468,9 @@
       "global": "api",
       "method": "projectsDuplicate",
       "businessArea": "Workspace",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1832,7 +1486,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1845,9 +1499,9 @@
       "global": "api",
       "method": "projectsList",
       "businessArea": "Workspace",
-      "callCount": 4,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1858,9 +1512,9 @@
       "global": "api",
       "method": "projectsRename",
       "businessArea": "Workspace",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1874,9 +1528,9 @@
       "global": "api",
       "method": "projectsSave",
       "businessArea": "Workspace",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1889,10 +1543,9 @@
       "global": "api",
       "method": "providerClearCredential",
       "businessArea": "Provider",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ProviderAccountPage-BpvuEEDb.js",
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1907,7 +1560,7 @@
       "businessArea": "Provider",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1920,7 +1573,7 @@
       "businessArea": "Provider",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ProviderAccountPage-BpvuEEDb.js"
+        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1933,9 +1586,9 @@
       "global": "api",
       "method": "providerGetStatus",
       "businessArea": "Provider",
-      "callCount": 4,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1950,8 +1603,7 @@
       "businessArea": "Provider",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/ProviderAccountPage-BpvuEEDb.js",
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1966,22 +1618,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "readLocalAudioFile",
-      "businessArea": "Media / Generation",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1996,7 +1633,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/skills.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2011,7 +1648,7 @@
       "businessArea": "Media / Generation",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/ImageEditPage-Cn-n70-t.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2026,7 +1663,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/director.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2041,23 +1678,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "saveFile",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 4,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/director.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2072,8 +1693,8 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/VoicePage-BY6fV03e.js"
+        "apps/desktop/src/renderer-source/services/electron-api/agent-conversations.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2086,12 +1707,9 @@
       "global": "api",
       "method": "saveHistory",
       "businessArea": "Desktop / Local utility",
-      "callCount": 9,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js",
-        "apps/desktop/src/renderer/assets/ConcatPage-vv7Ao5sf.js",
-        "apps/desktop/src/renderer/assets/useResultHistory-BcE5YQMt.js"
+        "apps/desktop/src/renderer-source/services/electron-api/history.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2105,34 +1723,16 @@
       "global": "api",
       "method": "saveImageLocally",
       "businessArea": "Media / Generation",
-      "callCount": 9,
+      "callCount": 6,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/ImageEditPage-Cn-n70-t.js",
-        "apps/desktop/src/renderer/assets/ImagePage-CLuS7-y2.js",
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js",
-        "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
         "parameters": [
           "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "saveMediaLibrary",
-      "businessArea": "Media / Generation",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "items"
         ]
       }
     },
@@ -2140,12 +1740,9 @@
       "global": "api",
       "method": "saveOllamaSettings",
       "businessArea": "Desktop / Local utility",
-      "callCount": 7,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/ProviderAccountPage-BpvuEEDb.js",
-        "apps/desktop/src/renderer/assets/ProviderHubPage-D4vFdETf.js"
+        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2156,11 +1753,26 @@
     },
     {
       "global": "api",
+      "method": "saveUserPresets",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/user-presets.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "payload"
+        ]
+      }
+    },
+    {
+      "global": "api",
       "method": "saveVideoProject",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2173,9 +1785,10 @@
       "global": "api",
       "method": "selectAgentCanvasMediaFiles",
       "businessArea": "Media / Generation",
-      "callCount": 1,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2186,9 +1799,9 @@
       "global": "api",
       "method": "selectAspectOnWebview",
       "businessArea": "Google Flow / Session",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ImagePage-CLuS7-y2.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2201,23 +1814,10 @@
       "global": "api",
       "method": "selectAudioFile",
       "businessArea": "Media / Generation",
-      "callCount": 3,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": []
-      }
-    },
-    {
-      "global": "api",
-      "method": "selectAudioUploadFile",
-      "businessArea": "Media / Generation",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2228,25 +1828,9 @@
       "global": "api",
       "method": "selectFiles",
       "businessArea": "Desktop / Local utility",
-      "callCount": 6,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js",
-        "apps/desktop/src/renderer/assets/MediaPickerModal-C6QiLgBU.js",
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": []
-      }
-    },
-    {
-      "global": "api",
-      "method": "selectImageFolder",
-      "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2259,7 +1843,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2270,9 +1854,9 @@
       "global": "api",
       "method": "selectModelOnWebview",
       "businessArea": "Google Flow / Session",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ImagePage-CLuS7-y2.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2287,7 +1871,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2298,9 +1882,9 @@
       "global": "api",
       "method": "selectQuantityOnWebview",
       "businessArea": "Google Flow / Session",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ImagePage-CLuS7-y2.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2315,7 +1899,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2326,14 +1910,10 @@
       "global": "api",
       "method": "selectVideoFiles",
       "businessArea": "Media / Generation",
-      "callCount": 8,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js",
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/MediaPickerModal-C6QiLgBU.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2346,7 +1926,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2361,7 +1941,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2374,10 +1954,10 @@
       "global": "api",
       "method": "showInFolder",
       "businessArea": "Desktop / Local utility",
-      "callCount": 5,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2392,7 +1972,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2405,10 +1985,9 @@
       "global": "api",
       "method": "syncSlotSession",
       "businessArea": "Google Flow / Session",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js",
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2423,7 +2002,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2436,10 +2015,9 @@
       "global": "api",
       "method": "teamCanvasCreate",
       "businessArea": "Workspace",
-      "callCount": 5,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/cloneWorkspace-DewZpUTl.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2454,7 +2032,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2467,11 +2045,9 @@
       "global": "api",
       "method": "teamCanvasEpisodesReorder",
       "businessArea": "Workspace",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js",
-        "apps/desktop/src/renderer/assets/cloneWorkspace-DewZpUTl.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2484,11 +2060,9 @@
       "global": "api",
       "method": "teamCanvasEpisodeUpdate",
       "businessArea": "Workspace",
-      "callCount": 4,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js",
-        "apps/desktop/src/renderer/assets/cloneWorkspace-DewZpUTl.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2501,12 +2075,9 @@
       "global": "api",
       "method": "teamCanvasGet",
       "businessArea": "Workspace",
-      "callCount": 12,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js",
-        "apps/desktop/src/renderer/assets/cloneWorkspace-DewZpUTl.js",
-        "apps/desktop/src/renderer/assets/refreshWorkspaceAvisMedia-ci86cgx6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2519,11 +2090,9 @@
       "global": "api",
       "method": "teamCanvasList",
       "businessArea": "Workspace",
-      "callCount": 7,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js",
-        "apps/desktop/src/renderer/assets/cloneWorkspace-DewZpUTl.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2538,7 +2107,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2553,7 +2122,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2568,7 +2137,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2581,11 +2150,9 @@
       "global": "api",
       "method": "teamCanvasSync",
       "businessArea": "Workspace",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/cloneWorkspace-DewZpUTl.js",
-        "apps/desktop/src/renderer/assets/refreshWorkspaceAvisMedia-ci86cgx6.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2598,41 +2165,9 @@
       "global": "api",
       "method": "teamMediaUpload",
       "businessArea": "Workspace",
-      "callCount": 3,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "teamNodeAuditAppend",
-      "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "teamNodeAuditList",
-      "businessArea": "Workspace",
-      "callCount": 5,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2647,7 +2182,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2662,7 +2197,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2677,65 +2212,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "teamPresenceCursor",
-      "businessArea": "Workspace",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "teamPresenceDisconnect",
-      "businessArea": "Workspace",
-      "callCount": 2,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": []
-      }
-    },
-    {
-      "global": "api",
-      "method": "teamWorkspaceAccept",
-      "businessArea": "Workspace",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "teamWorkspaceActivity",
-      "businessArea": "Workspace",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2750,7 +2227,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2765,7 +2242,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2778,11 +2255,9 @@
       "global": "api",
       "method": "teamWorkspaceAssetList",
       "businessArea": "Workspace",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js",
-        "apps/desktop/src/renderer/assets/cloneWorkspace-DewZpUTl.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2795,11 +2270,9 @@
       "global": "api",
       "method": "teamWorkspaceAssetUpsert",
       "businessArea": "Workspace",
-      "callCount": 3,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js",
-        "apps/desktop/src/renderer/assets/cloneWorkspace-DewZpUTl.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2812,10 +2285,9 @@
       "global": "api",
       "method": "teamWorkspaceCreate",
       "businessArea": "Workspace",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js",
-        "apps/desktop/src/renderer/assets/cloneWorkspace-DewZpUTl.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2828,25 +2300,9 @@
       "global": "api",
       "method": "teamWorkspaceDelete",
       "businessArea": "Workspace",
-      "callCount": 3,
-      "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js",
-        "apps/desktop/src/renderer/assets/cloneWorkspace-DewZpUTl.js"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "teamWorkspaceGet",
-      "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2861,7 +2317,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2874,7 +2330,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2889,7 +2345,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2904,7 +2360,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2919,7 +2375,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2934,7 +2390,7 @@
       "businessArea": "CAPTCHA / Extension",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
+        "apps/desktop/src/renderer-source/services/electron-api/captcha.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2947,7 +2403,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2960,9 +2416,9 @@
       "global": "api",
       "method": "textToSpeechCancel",
       "businessArea": "Other frontend runtime",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
+        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2977,7 +2433,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ImageEditPage-Cn-n70-t.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2992,7 +2448,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AgentPreviewModal-CfScymDX.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3005,10 +2461,9 @@
       "global": "api",
       "method": "trimVideo",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js",
-        "apps/desktop/src/renderer/assets/VideoTrimModal-NM3_PIL1.js"
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3021,11 +2476,9 @@
       "global": "api",
       "method": "uploadImage",
       "businessArea": "Media / Generation",
-      "callCount": 3,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ImageEditPage-Cn-n70-t.js",
-        "apps/desktop/src/renderer/assets/MediaPickerModal-C6QiLgBU.js",
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3038,11 +2491,10 @@
       "global": "api",
       "method": "uploadImageFromPath",
       "businessArea": "Media / Generation",
-      "callCount": 5,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer/assets/MediaPickerModal-C6QiLgBU.js",
-        "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js",
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3057,7 +2509,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3070,10 +2522,9 @@
       "global": "api",
       "method": "upscaleImage",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3088,7 +2539,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js"
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3101,10 +2552,9 @@
       "global": "api",
       "method": "waitPageGenResult",
       "businessArea": "Other frontend runtime",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/ImagePage-CLuS7-y2.js",
-        "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3115,115 +2565,11 @@
     },
     {
       "global": "api",
-      "method": "workflowAppCommentCreate",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
-      "method": "workflowAppLike",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
-      "method": "workflowAppOwnerContext",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
-      "method": "workflowAppPublish",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
-      "method": "workflowAppRunCreate",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
-      "method": "workflowAppRunHistory",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
-      "method": "workflowAppRunStatus",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
-      "method": "workflowAppUpload",
-      "businessArea": "Media / Generation",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js"
-      ],
-      "preload": {
-        "exposed": false,
-        "parameters": null
-      }
-    },
-    {
-      "global": "api",
       "method": "workspaceBackupLocal",
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3238,7 +2584,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3251,7 +2597,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3266,7 +2612,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3281,7 +2627,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3292,9 +2638,9 @@
       "global": "api",
       "method": "workspaceImportRelease",
       "businessArea": "Workspace",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js"
+        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -3304,73 +2650,80 @@
       }
     }
   ],
-  "missingFromPreload": [
-    "api.communityAvatarUpload",
-    "api.communityPublicationStatus",
-    "api.communityPublish",
-    "api.getMachineId",
-    "api.onMacUpdateProgress",
-    "api.onUpdaterStatus",
-    "api.onWinUpdateProgress",
-    "api.workflowAppCommentCreate",
-    "api.workflowAppLike",
-    "api.workflowAppOwnerContext",
-    "api.workflowAppPublish",
-    "api.workflowAppRunCreate",
-    "api.workflowAppRunHistory",
-    "api.workflowAppRunStatus",
-    "api.workflowAppUpload"
-  ],
+  "missingFromPreload": [],
   "exposedButUnused": [
     "aiTranscribeAudio",
     "aiTranscribeCancel",
     "autoEnterProject",
+    "avisCreateKycAsset",
+    "avisGetKycAsset",
+    "avisGetKycStatus",
     "avisListAudioModels",
-    "avisListModels",
+    "avisMediaInfo",
+    "avisPollImage",
+    "avisUploadVideoReference",
     "captureRegion",
+    "cloudflareR2UploadMedia",
     "debugSlotClick",
     "debugStartEndDom",
     "debugUploadClick",
     "diagnoseWebview",
+    "downloadMediaToTemp",
     "downloadVoiceAsset",
-    "exportUserPresetTemplate",
+    "extractThumbnail",
+    "getAppArch",
+    "getAppVersion",
+    "getAuthInfo",
     "getLastProjectUrl",
     "getLipSyncSettings",
     "getLocalLipSyncStatus",
     "getLocalTtsStatus",
     "getSpyLogs",
     "getUiLanguage",
+    "imageGridSegment",
+    "imageThumbnail",
     "importDirectorAsset",
     "importSlotCookies",
-    "importUserPresetFile",
-    "listDirectorScenes",
-    "listVideoFiles",
     "listVoiceAssetsCached",
-    "loadDirectorScene",
-    "loadUserPresets",
+    "loadMediaLibrary",
+    "onAuthCaptured",
     "onExportProgress",
     "onSttProgress",
     "onTeamPresence",
+    "onVideoDownloadFailed",
+    "onVideoDownloaded",
     "onVoiceAssetProgress",
+    "onWebviewSwitchSlot",
     "openDevTools",
     "openLoginWindow",
     "prepareLocalLipSyncEngine",
     "prepareLocalTtsEngine",
     "providersList",
+    "readLocalAudioFile",
     "readSkillFolder",
     "reloadAndWaitWebview",
     "resolveDownloadedVideo",
+    "saveFile",
     "saveLipSyncSettings",
-    "saveUserPresets",
+    "saveMediaLibrary",
+    "selectAudioUploadFile",
     "selectDirectorAssets",
     "selectFile",
+    "selectImageFolder",
     "setUiLanguage",
     "spyUpload",
     "syncSession",
+    "teamNodeAuditAppend",
+    "teamNodeAuditList",
     "teamPresenceConnect",
+    "teamPresenceCursor",
+    "teamPresenceDisconnect",
     "teamPresenceDocUpdate",
     "teamPresenceWalClear",
     "teamPresenceWalStatus",
+    "teamWorkspaceAccept",
+    "teamWorkspaceActivity",
+    "teamWorkspaceGet",
     "teamWorkspaceInvite",
     "teamWorkspaceMemberRole",
     "teamWorkspaceRemoveMember",
@@ -3390,257 +2743,7 @@
     "uploadStartImageOnWebview"
   ],
   "dynamicImports": {
-    "entries": [
-      {
-        "importer": "apps/desktop/src/renderer/assets/ImageEditPage-Cn-n70-t.js",
-        "specifier": "./captcha-V3drNB7x.js",
-        "target": "apps/desktop/src/renderer/assets/captcha-V3drNB7x.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./AIAgentPage-U9bSXPET.js",
-        "target": "apps/desktop/src/renderer/assets/AIAgentPage-U9bSXPET.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./capcut-CA4hEGG7.js",
-        "target": "apps/desktop/src/renderer/assets/capcut-CA4hEGG7.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./CapcutVideoPage-4kkKmhqV.js",
-        "target": "apps/desktop/src/renderer/assets/CapcutVideoPage-4kkKmhqV.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./CaptchaSetupPage-DbTYSglx.js",
-        "target": "apps/desktop/src/renderer/assets/CaptchaSetupPage-DbTYSglx.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./CommunityPage-Cjuo0iuT.js",
-        "target": "apps/desktop/src/renderer/assets/CommunityPage-Cjuo0iuT.js",
-        "exists": false
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./concat-CCPp8Tge.js",
-        "target": "apps/desktop/src/renderer/assets/concat-CCPp8Tge.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./ConcatPage-vv7Ao5sf.js",
-        "target": "apps/desktop/src/renderer/assets/ConcatPage-vv7Ao5sf.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./DashboardPage-D3BkCBhj.js",
-        "target": "apps/desktop/src/renderer/assets/DashboardPage-D3BkCBhj.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./DashboardPage-D3BkCBhj.js",
-        "target": "apps/desktop/src/renderer/assets/DashboardPage-D3BkCBhj.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./ExplorePage-Db5ZPOvh.js",
-        "target": "apps/desktop/src/renderer/assets/ExplorePage-Db5ZPOvh.js",
-        "exists": false
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./generation-Cwa9DMFz.js",
-        "target": "apps/desktop/src/renderer/assets/generation-Cwa9DMFz.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./guide-BmpY89bt.js",
-        "target": "apps/desktop/src/renderer/assets/guide-BmpY89bt.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./GuidePage-A49yvVIu.js",
-        "target": "apps/desktop/src/renderer/assets/GuidePage-A49yvVIu.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./home-D64lSryx.js",
-        "target": "apps/desktop/src/renderer/assets/home-D64lSryx.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./HomePage-CmVI9USd.js",
-        "target": "apps/desktop/src/renderer/assets/HomePage-CmVI9USd.js",
-        "exists": false
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./image-BvxDLmc1.js",
-        "target": "apps/desktop/src/renderer/assets/image-BvxDLmc1.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./ImagePage-CLuS7-y2.js",
-        "target": "apps/desktop/src/renderer/assets/ImagePage-CLuS7-y2.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./library-jiqvg9pn.js",
-        "target": "apps/desktop/src/renderer/assets/library-jiqvg9pn.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./ProviderAccountPage-BpvuEEDb.js",
-        "target": "apps/desktop/src/renderer/assets/ProviderAccountPage-BpvuEEDb.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./ProviderHubPage-D4vFdETf.js",
-        "target": "apps/desktop/src/renderer/assets/ProviderHubPage-D4vFdETf.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./settings-DpDNdXj0.js",
-        "target": "apps/desktop/src/renderer/assets/settings-DpDNdXj0.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./SettingsPage-DD4JanXX.js",
-        "target": "apps/desktop/src/renderer/assets/SettingsPage-DD4JanXX.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./UploadPage-C2Nni6f8.js",
-        "target": "apps/desktop/src/renderer/assets/UploadPage-C2Nni6f8.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./Veo3ImagePage-BcPUwTC-.js",
-        "target": "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./Veo3ImagePage-BcPUwTC-.js",
-        "target": "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./Veo3LoginPage-D2tPD0vF.js",
-        "target": "apps/desktop/src/renderer/assets/Veo3LoginPage-D2tPD0vF.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./Veo3VideoPage-re2qsNhL.js",
-        "target": "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./Veo3VideoPage-re2qsNhL.js",
-        "target": "apps/desktop/src/renderer/assets/Veo3VideoPage-re2qsNhL.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./video-CdvfQCde.js",
-        "target": "apps/desktop/src/renderer/assets/video-CdvfQCde.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./VideoEditorPage-C_kA3vw6.js",
-        "target": "apps/desktop/src/renderer/assets/VideoEditorPage-C_kA3vw6.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./VideoStandardPage-CHXSVjWB.js",
-        "target": "apps/desktop/src/renderer/assets/VideoStandardPage-CHXSVjWB.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./voice-D2bJuGji.js",
-        "target": "apps/desktop/src/renderer/assets/voice-D2bJuGji.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./VoicePage-BY6fV03e.js",
-        "target": "apps/desktop/src/renderer/assets/VoicePage-BY6fV03e.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./WorkflowAppDetailPage-BPgOUN4a.js",
-        "target": "apps/desktop/src/renderer/assets/WorkflowAppDetailPage-BPgOUN4a.js",
-        "exists": false
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./workspace-BzCdwPIR.js",
-        "target": "apps/desktop/src/renderer/assets/workspace-BzCdwPIR.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./WorkspacePage-CoYeqvBQ.js",
-        "target": "apps/desktop/src/renderer/assets/WorkspacePage-CoYeqvBQ.js",
-        "exists": true
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/Veo3ImagePage-BcPUwTC-.js",
-        "specifier": "./ImageEditPage-Cn-n70-t.js",
-        "target": "apps/desktop/src/renderer/assets/ImageEditPage-Cn-n70-t.js",
-        "exists": true
-      }
-    ],
-    "missing": [
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./CommunityPage-Cjuo0iuT.js",
-        "target": "apps/desktop/src/renderer/assets/CommunityPage-Cjuo0iuT.js"
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./ExplorePage-Db5ZPOvh.js",
-        "target": "apps/desktop/src/renderer/assets/ExplorePage-Db5ZPOvh.js"
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./HomePage-CmVI9USd.js",
-        "target": "apps/desktop/src/renderer/assets/HomePage-CmVI9USd.js"
-      },
-      {
-        "importer": "apps/desktop/src/renderer/assets/index-JlIFz2Wa.js",
-        "specifier": "./WorkflowAppDetailPage-BPgOUN4a.js",
-        "target": "apps/desktop/src/renderer/assets/WorkflowAppDetailPage-BPgOUN4a.js"
-      }
-    ]
+    "entries": [],
+    "missing": []
   }
 }

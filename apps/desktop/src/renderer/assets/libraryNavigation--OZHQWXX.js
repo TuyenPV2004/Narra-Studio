@@ -1,1 +1,0 @@
-const r="genyu-requested-library-source-v1";function t(e){try{window.sessionStorage.setItem(r,e)}catch{}}function o(){try{const e=window.sessionStorage.getItem(r);return window.sessionStorage.removeItem(r),e==="local"||e==="avis"?e:null}catch{return null}}export{o as c,t as r};

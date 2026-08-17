@@ -38,7 +38,7 @@
   "packaging": {
     "appId": "studio.narra.desktop",
     "artifactName": "Narra-Studio-${version}-${arch}.${ext}",
-    "iconSource": "src/renderer/brand/narra-mark.svg"
+    "iconSource": "src/renderer-source/public/brand/narra-mark.svg"
   },
   "endpoints": {}
 }

@@ -3,6 +3,7 @@ node_modules/
 .smoke/
 .playwright-cli/
 .runtime-smoke-build/
+.runtime-source-smoke-build/
 .codex-build/
 dist/
 dist-electron/

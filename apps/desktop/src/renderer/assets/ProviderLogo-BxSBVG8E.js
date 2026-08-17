@@ -1,1 +1,0 @@
-import{j as t}from"./index-JlIFz2Wa.js";const a={veo3:"https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg",avis:"https://www.avis.xyz/logo-avis-logomask-blue.svg"};function e({providerId:s,className:o}){return t.jsx("img",{className:o,src:a[s],alt:s==="avis"?"External AI":"Google"})}export{e as P};

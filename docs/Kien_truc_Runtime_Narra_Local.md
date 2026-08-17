@@ -2,7 +2,7 @@
 
 ## Phạm vi
 
-Narra Studio là ứng dụng Electron single-user. Renderer là bundle JavaScript đã khôi phục và local hóa; Electron Main/Preload cung cấp IPC cho Google Flow, provider, media và lưu trữ local.
+Narra Studio là ứng dụng Electron single-user. Renderer chính được build từ React/TypeScript source bằng Vite; Electron Main/Preload cung cấp IPC cho Google Flow, provider, media và lưu trữ local.
 
 ## Luồng giữ lại
 
@@ -32,8 +32,8 @@ Narra Studio là ứng dụng Electron single-user. Renderer là bundle JavaScri
 
 - Source runtime: `apps/desktop/src`.
 - Electron Main: `apps/desktop/src/electron/main.js`.
-- Renderer: `apps/desktop/src/renderer`.
-- Build chỉ sao chép source runtime sang `dist` và `dist-electron`; không dùng Vite.
+- Renderer React/TypeScript: `apps/desktop/src/renderer-source`.
+- Vite build renderer source vào `dist`; Electron Main/config được sao chép nguyên trạng vào `dist-electron` và `config`.
 - `.package-stage`, `release` và `release-*` là output tái tạo được, không phải source.
 
 ## Giới hạn kiểm chứng

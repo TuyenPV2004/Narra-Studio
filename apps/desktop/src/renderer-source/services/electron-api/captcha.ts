@@ -1,4 +1,4 @@
-import {getElectronApi} from '@/services/electron-api/client';
+import { getElectronApi } from "@/services/electron-api/client";
 
 export const captchaApi = {
   getBridgeStatus(): Promise<unknown> {
@@ -9,5 +9,13 @@ export const captchaApi = {
   },
   openExtensionFolder(): Promise<unknown> {
     return getElectronApi().openExtensionFolder();
+  },
+  copyChromeExtensionsAddress(): Promise<unknown> {
+    return getElectronApi().copyToClipboard("chrome://extensions");
+  },
+  openGoogleFlow(): Promise<unknown> {
+    return getElectronApi().openExternalUrl(
+      "https://labs.google/fx/tools/flow",
+    );
   },
 };

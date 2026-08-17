@@ -1,1 +1,0 @@
-const n=new Map;function c(t){for(const e of t){const a=e.displayName||(e.email?e.email.split("@")[0]:null);a&&n.set(e.id,a)}}function s(t){const e=n.get(t);return e?e.length>14?e.slice(0,13)+"…":e:`Acc ${t+1}`}export{s as g,c as u};

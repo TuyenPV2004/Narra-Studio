@@ -1,8 +1,88 @@
-import {sourceRoutes} from '@/app/routes';
+import { AppShell } from "@/app/AppShell";
+import { ErrorBoundary } from "@/app/ErrorBoundary";
+import { LocaleProvider } from "@/i18n/LocaleProvider";
+import { useAppRuntime } from "@/hooks/useAppRuntime";
+import { ProviderHubPage } from "@/pages/ProviderHub/ProviderHubPage";
+import { SettingsPage } from "@/pages/Settings/SettingsPage";
+import { CaptchaSetupPage } from "@/pages/CaptchaSetup/CaptchaSetupPage";
+import { ImageGeneratorPage } from "@/pages/Image/ImageGeneratorPage";
+import { ImageEditorPage } from "@/pages/Image/ImageEditorPage";
+import { VoicePage } from "@/pages/Voice/VoicePage";
+import { VideoGeneratorPage } from "@/pages/Video/VideoGeneratorPage";
+import { MediaLibraryPage } from "@/pages/MediaLibrary/MediaLibraryPage";
+import { VideoEditorPage } from "@/pages/VideoEditor/VideoEditorPage";
+import { SceneMergePage } from "@/pages/SceneMerge/SceneMergePage";
+import { ProviderAccountPage } from "@/pages/ProviderAccount/ProviderAccountPage";
+import { GoogleFlowPage } from "@/pages/GoogleFlow/GoogleFlowPage";
+import { DashboardPage } from "@/pages/Dashboard/DashboardPage";
+import { GuidePage } from "@/pages/Guide/GuidePage";
+import { AIAgentSourcePage } from "@/pages/AIAgent/AIAgentSourcePage";
+import { CapcutEditorPage } from "@/pages/CapcutEditor/CapcutEditorPage";
 
 export function App() {
-  const bootstrapRoute = sourceRoutes.sourceRecoveryStatus;
-  const Page = bootstrapRoute.component;
+  return (
+    <ErrorBoundary>
+      <LocaleProvider>
+        <SourceApplication />
+      </LocaleProvider>
+    </ErrorBoundary>
+  );
+}
 
-  return <Page />;
+function SourceApplication() {
+  const runtime = useAppRuntime();
+  if (runtime.currentPage === "provider-hub") {
+    return (
+      <ProviderHubPage
+        error={runtime.error}
+        loading={runtime.loading}
+        onActivate={runtime.activateProvider}
+      />
+    );
+  }
+  return (
+    <AppShell
+      activeProvider={runtime.activeProvider}
+      captchaReady={runtime.captchaReady}
+      currentPage={runtime.currentPage}
+      imageMode={runtime.imageMode}
+      onNavigate={runtime.navigate}
+    >
+      {runtime.currentPage === "settings" ? (
+        <SettingsPage activeProvider={runtime.activeProvider} />
+      ) : runtime.currentPage === "captcha-setup" ? (
+        <CaptchaSetupPage />
+      ) : (runtime.currentPage === "image" ||
+          runtime.currentPage === "image-ultra") &&
+        runtime.imageMode === "generate" ? (
+        <ImageGeneratorPage providerId={runtime.activeProvider} />
+      ) : runtime.currentPage === "image-ultra" &&
+        runtime.imageMode === "edit" ? (
+        <ImageEditorPage providerId={runtime.activeProvider} />
+      ) : runtime.currentPage === "video-pro" ||
+        runtime.currentPage === "video-standard" ? (
+        <VideoGeneratorPage providerId={runtime.activeProvider} />
+      ) : runtime.currentPage === "voice" ? (
+        <VoicePage />
+      ) : runtime.currentPage === "upload" ? (
+        <MediaLibraryPage />
+      ) : runtime.currentPage === "capcut-video" ? (
+        <CapcutEditorPage />
+      ) : runtime.currentPage === "video-editor" ? (
+        <VideoEditorPage />
+      ) : runtime.currentPage === "concat" ? (
+        <SceneMergePage />
+      ) : runtime.currentPage === "provider-account" ? (
+        <ProviderAccountPage providerId={runtime.activeProvider} />
+      ) : runtime.currentPage === "webview" ? (
+        <GoogleFlowPage />
+      ) : runtime.currentPage === "dashboard" ? (
+        <DashboardPage providerId={runtime.activeProvider} />
+      ) : runtime.currentPage === "ai-agent" ? (
+        <AIAgentSourcePage providerId={runtime.activeProvider} />
+      ) : (
+        <GuidePage />
+      )}
+    </AppShell>
+  );
 }

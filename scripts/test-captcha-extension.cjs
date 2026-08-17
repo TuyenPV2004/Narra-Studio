@@ -268,21 +268,22 @@ function testSetupUsesBundledExtension() {
   const setupAsset = fs.readFileSync(
     path.join(
       repositoryRoot,
-      'apps', 'desktop', 'src', 'renderer', 'assets',
-      'CaptchaSetupPage-DbTYSglx.js',
+      'apps', 'desktop', 'src', 'renderer-source', 'pages', 'CaptchaSetup',
+      'CaptchaSetupPage.tsx',
     ),
     'utf8',
   );
   assert.equal(setupAsset.includes('captcha-extension.zip'), false);
   assert.equal(setupAsset.includes('endpoints.updatesBase'), false);
-  assert.equal(setupAsset.includes('window.api.openExtensionFolder()'), true);
-  const translationAsset = fs.readFileSync(
-    path.join(repositoryRoot, 'apps', 'desktop', 'src', 'renderer', 'assets', 'index-JlIFz2Wa.js'),
+  assert.equal(setupAsset.includes('captchaApi.openExtensionFolder()'), true);
+  const captchaAdapter = fs.readFileSync(
+    path.join(repositoryRoot, 'apps', 'desktop', 'src', 'renderer-source', 'services', 'electron-api', 'captcha.ts'),
     'utf8',
   );
-  assert.equal(translationAsset.includes('Download Extension (.zip)'), false);
-  assert.equal(translationAsset.includes('After downloading, unzip the file into a folder.'), false);
-  assert.equal(translationAsset.includes('Open Bundled Extension Folder'), true);
+  assert.equal(captchaAdapter.includes("getElectronApi().openExtensionFolder()"), true);
+  assert.equal(setupAsset.includes('Download Extension (.zip)'), false);
+  assert.equal(setupAsset.includes('Tải Extension'), true);
+  assert.equal(setupAsset.includes('Mở thư mục'), true);
 }
 
 (async () => {
