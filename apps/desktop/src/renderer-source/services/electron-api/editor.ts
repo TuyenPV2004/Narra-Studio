@@ -1,4 +1,5 @@
 import { getElectronApi } from "@/services/electron-api/client";
+import { aiProviderApi } from "@/services/electron-api/ai-providers";
 
 export interface EditorProjectMeta extends Record<string, unknown> {
   id: string;
@@ -552,10 +553,9 @@ export const editorApi = {
     if (!output) throw new Error("Không nhận được đường dẫn audio đã tách.");
     return output;
   },
-  async ollamaReady(): Promise<boolean> {
-    return (
-      object(await getElectronApi().getOllamaSettings()).apiKeySet === true
-    );
+  async aiProviderReady(): Promise<boolean> {
+    const { profiles } = await aiProviderApi.list();
+    return profiles.some((profile) => profile.hasApiKey && Boolean(profile.model));
   },
   async suggestDeflicker(clip: EditorClip): Promise<EditorDeflickerSuggestion> {
     const value = object(

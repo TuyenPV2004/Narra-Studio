@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, clipboard, protocol, net, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, session, clipboard, protocol, net, shell, dialog, safeStorage } = require('electron');
 const path = require('path');
 const https = require('https');
 const http = require('http');
@@ -18,11 +18,8 @@ for (const envFile of [path.join(process.cwd(), '.env'), path.join(path.dirname(
 app.setName('Narra Studio');
 
 const captchaBridge = require('./captcha-bridge');
-const avisProviderModule = require('./providers/avis/module');
-const avisProvider = avisProviderModule.provider;
 const veo3ProviderModule = require('./providers/veo3/module');
-const cloudflareImagesProvider = require('./providers/cloudflare-images');
-const cloudflareR2Provider = require('./providers/cloudflare-r2');
+const createOpenAiCompatibleProvider = require('./providers/openai-compatible');
 
 // ── Runtime composition ─────────────────────────────────────────────────
 const createSupportRuntime = require('./runtime/support');
@@ -55,20 +52,25 @@ const baseDependencies = {
   pathToFileURL,
   fileURLToPath,
   captchaBridge,
-  avisProvider,
-  cloudflareImagesProvider,
-  cloudflareR2Provider,
+  safeStorage,
 };
 const supportRuntime = createSupportRuntime(baseDependencies);
 const appCore = createAppCore({ ...baseDependencies, ...supportRuntime });
 const captchaRuntime = createCaptchaRuntime({ ...baseDependencies, ...supportRuntime, ...appCore });
 const sharedDependencies = { ...baseDependencies, ...supportRuntime, ...appCore, ...captchaRuntime };
+const openAiProvider = createOpenAiCompatibleProvider({
+  loadSettings: sharedDependencies.loadSettings,
+  saveSettings: sharedDependencies.saveSettings,
+  safeStorage,
+  net,
+  crypto,
+});
+const providerDependencies = { ...sharedDependencies, openAiProvider };
 const { runtime, isDev } = supportRuntime;
 const { createWindow, refreshCapturedCookies } = appCore;
 
 let aiRuntime;
 const crossDomainDependencies = {
-  getAvisMediaRuntime: (...args) => aiRuntime.getAvisMediaRuntime(...args),
   localPiperTextToSpeech: (...args) => aiRuntime.localPiperTextToSpeech(...args),
 };
 
@@ -78,13 +80,12 @@ const generationRuntime = veo3ProviderModule.register({
 });
 registerStorageIpc(sharedDependencies);
 registerMediaIpc(sharedDependencies);
-aiRuntime = registerAiIpc(sharedDependencies);
+aiRuntime = registerAiIpc(providerDependencies);
 registerProviderIpc({
-  ...sharedDependencies,
-  getAvisMediaRuntime: (...args) => aiRuntime.getAvisMediaRuntime(...args),
+  ...providerDependencies,
 });
 registerLocalWorkspaceIpc(sharedDependencies);
-registerSystemIpc({ ...sharedDependencies, ...crossDomainDependencies });
+registerSystemIpc({ ...sharedDependencies, ...crossDomainDependencies, openAiProvider });
 
 
 registerAppLifecycle({

@@ -17,6 +17,8 @@ const settings = read('pages/Settings/SettingsPage.tsx');
 const captcha = read('pages/CaptchaSetup/CaptchaSetupPage.tsx');
 const canvasGraph = read('pages/AIAgent/components/CanvasGraphPanel.tsx');
 const mediaTools = read('pages/AIAgent/components/MediaToolsPanel.tsx');
+const providerConnections = read('pages/ProviderAccount/ProviderConnectionsPage.tsx');
+const aiProviders = read('pages/ProviderAccount/AiProviderProfilesPanel.tsx');
 
 for (const token of ['--background', '--surface', '--surface-muted', '--surface-hover', '--foreground', '--muted-foreground', '--border', '--border-strong', '--primary', '--primary-hover', '--primary-muted', '--primary-foreground', '--focus-ring', '--sidebar-width', '--sidebar-collapsed-width', '--header-height']) {
   assert.match(tokens, new RegExp(`${token}:\\s*[^;]+;`), `Missing design token ${token}`);
@@ -33,6 +35,10 @@ assert.match(settings, /<Tabs\b/);
 assert.match(captcha, /aria-live=/);
 assert.match(canvasGraph, /<audio controls/);
 assert.match(mediaTools, /Audio trim start/);
+assert.match(providerConnections, /AiProviderProfilesPanel/);
+for (const token of ['Base URL', 'API key', 'Kiểm tra kết nối', 'Tải danh sách model', 'Lưu provider']) {
+  assert.match(aiProviders, new RegExp(token));
+}
 
 const sourceFiles = [];
 const visit = (directory) => {

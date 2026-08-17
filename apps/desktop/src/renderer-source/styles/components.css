@@ -2241,6 +2241,94 @@
   gap: var(--space-2);
   font-weight: 650;
 }
+.source-ai-providers {
+  display: grid;
+  gap: var(--space-4);
+  margin-top: var(--space-5);
+}
+.source-ai-providers > header,
+.source-ai-providers__form > header,
+.source-ai-providers__list article,
+.source-ai-providers__list article > div:last-child,
+.source-ai-providers__test-actions {
+  align-items: center;
+  display: flex;
+  gap: var(--space-3);
+  justify-content: space-between;
+}
+.source-ai-providers > header p,
+.source-ai-providers__list p,
+.source-ai-providers__form small {
+  color: var(--muted-foreground);
+}
+.source-ai-providers__feedback {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.source-ai-providers__feedback[data-tone="success"] {
+  border-color: color-mix(in srgb, var(--success) 55%, var(--border));
+  color: var(--success);
+}
+.source-ai-providers__feedback[data-tone="error"] {
+  border-color: color-mix(in srgb, var(--danger) 55%, var(--border));
+  color: var(--danger);
+}
+.source-ai-providers__layout {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.8fr);
+}
+.source-ai-providers__list,
+.source-ai-providers__form {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+.source-ai-providers__list article {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+}
+.source-ai-providers__list article[data-active="true"] {
+  border-color: color-mix(in srgb, var(--primary) 65%, var(--border));
+}
+.source-ai-providers__list article > div:first-child {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+.source-ai-providers__list code {
+  color: var(--muted-foreground);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.source-ai-providers__form label {
+  display: grid;
+  gap: var(--space-2);
+}
+.source-ai-providers__form select {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  color: var(--foreground);
+  min-height: var(--control-height-md);
+  padding: 0 var(--space-3);
+}
+.source-ai-providers__form select:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+@media (max-width: 980px) {
+  .source-ai-providers__layout {
+    grid-template-columns: 1fr;
+  }
+}
 .source-flow-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));

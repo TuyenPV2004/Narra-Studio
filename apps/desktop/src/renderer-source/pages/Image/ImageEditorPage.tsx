@@ -40,9 +40,7 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
     (count: number) => setAnnotationCount(count),
     [],
   );
-  const [model, setModel] = useState(
-    providerId === "avis" ? "seedream-4-5" : "NARWHAL",
-  );
+  void providerId;
   useEffect(() => {
     if (!file) {
       setPreview("");
@@ -52,39 +50,16 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
     setPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [file]);
-  useEffect(() => {
-    setModel(providerId === "avis" ? "seedream-4-5" : "NARWHAL");
-    if (providerId === "avis")
-      void imageApi
-        .listAvisModels()
-        .then((items) => setModel(items[0]?.value || "seedream-4-5"))
-        .catch(() => undefined);
-  }, [providerId]);
   const edit = async () => {
     if (!file || !prompt.trim() || !canvasRef.current) return;
     setRunning(true);
     setError(undefined);
     try {
       const dataUrl = canvasRef.current.toDataURL("image/jpeg", 0.92);
-      const output =
-        providerId === "veo3"
-          ? await imageApi.editVeoImage({ dataUrl, prompt: prompt.trim() })
-          : await (async () => {
-              const blob = await (await fetch(dataUrl)).blob();
-              const referenceImage = new File(
-                [blob],
-                `edit-${Date.now()}.jpg`,
-                { type: "image/jpeg" },
-              );
-              return imageApi.generate({
-                providerId,
-                prompt: prompt.trim(),
-                model,
-                aspect: "16:9",
-                seed: Math.floor(Math.random() * 9_999_999),
-                referenceImage,
-              });
-            })();
+      const output = await imageApi.editVeoImage({
+        dataUrl,
+        prompt: prompt.trim(),
+      });
       setResult(output);
       await imageApi.save(output.src);
     } catch (value) {
@@ -233,13 +208,6 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
               </label>
             </fieldset>
           )}
-          <label>
-            Model
-            <input
-              value={model}
-              onChange={(event) => setModel(event.target.value)}
-            />
-          </label>
           <label>
             Prompt
             <textarea

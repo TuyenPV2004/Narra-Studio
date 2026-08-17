@@ -44,10 +44,7 @@ export function Header({
     const handleVisibility = () => {
       if (document.visibilityState === "visible") void refresh();
     };
-    const interval = window.setInterval(
-      refresh,
-      activeProvider === "avis" ? 30_000 : 60_000,
-    );
+    const interval = window.setInterval(refresh, 60_000);
     document.addEventListener("visibilitychange", handleVisibility);
     return () => {
       active = false;
@@ -65,7 +62,7 @@ export function Header({
         {balance !== undefined && (
           <output className="source-header__balance" aria-label="Credits">
             {balance.toLocaleString("vi-VN", {
-              maximumFractionDigits: activeProvider === "avis" ? 2 : 0,
+              maximumFractionDigits: 0,
             })}{" "}
             credits
           </output>
@@ -96,9 +93,7 @@ export function Header({
           aria-label={messages.shell.providerAccount}
         >
           <UserRound size={17} aria-hidden="true" />
-          <span>
-            {activeProvider === "veo3" ? "Google VEO3" : "External AI"}
-          </span>
+          <span>Google VEO3</span>
           <ChevronDown size={14} aria-hidden="true" />
         </button>
       </div>

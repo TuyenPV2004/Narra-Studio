@@ -20,8 +20,6 @@ module.exports = function registerSystemIpc(dependencies) {
     pathToFileURL,
     fileURLToPath,
     captchaBridge,
-    avisProvider,
-    cloudflareImagesProvider,
     runtime,
     getFfmpegBin,
     maybePromoteFilterComplexToScript,
@@ -53,6 +51,7 @@ module.exports = function registerSystemIpc(dependencies) {
     setupRequestInterception,
     getPlatformChHint,
     getChromeMajorVersion,
+    openAiProvider,
     buildHeaders,
     generateUUID,
     DRYRUN_FLAG_FILE,
@@ -124,34 +123,11 @@ ipcMain.handle('set-ui-language', (_event, language) => {
 // ── IPC: Mac Auto-Install Update (download ZIP → extract → reveal) ──
 
 const loadTtsRuntime = () => {
-  const settings = loadSettings();
-  const secretCandidates = [
-    process.env.ITERA102_KEY_FILE,
-    path.join(process.cwd(), '.secrets', 'tts.json'),
-    (() => { try { return path.join(app.getAppPath(), '.secrets', 'tts.json'); } catch { return null; } })(),
-    // Internal test builds bundle the itera102 credential as an Electron
-    // extraResource. This is intentionally a test-only fallback: a packaged
-    // desktop secret can be extracted and must not be treated as secure.
-    (() => { try { return path.join(process.resourcesPath, 'tts.json'); } catch { return null; } })(),
-    (() => { try { return path.join(app.getPath('userData'), 'tts.json'); } catch { return null; } })(),
-  ].filter(Boolean);
-  let secret = {};
-  for (const candidate of secretCandidates) {
-    try {
-      if (!fs.existsSync(candidate)) continue;
-      secret = JSON.parse(fs.readFileSync(candidate, 'utf8')) || {};
-      break;
-    } catch (error) {
-      console.warn('[TTS] Cannot read secret config:', error.message);
-    }
+  const profile = openAiProvider?.getActiveRuntime?.('text-to-speech');
+  if (profile) {
+    return { apiKey: profile.apiKey, baseUrl: profile.apiBase, model: profile.visionModel, source: 'custom-provider' };
   }
-  return {
-    apiKey: String(
-      settings.ttsApiKey || process.env.ITERA102_API_KEY ||
-      process.env.ELEVENLABS_API_KEY || secret.apiKey || secret.api_key || ''
-    ).trim(),
-    baseUrl: String(secret.baseUrl || secret.base_url || secret.apiBase || 'https://api.itera102.space').replace(/\/$/, ''),
-  };
+  return { apiKey: '', baseUrl: '', model: '', source: 'none' };
 };
 const getTtsHeaders = (json = false) => {
   const { apiKey } = loadTtsRuntime();
@@ -189,13 +165,15 @@ ipcMain.handle('text-to-speech-cancel', async (_event, { requestId, progressTag 
 ipcMain.handle('text-to-speech', async (event, { text, voiceId, stability, language, provider: prov, model, progressTag, requestId }) => {
   if (!text || !text.trim()) throw new Error('Text is required');
 
-  const useProvider = prov || 'elevenlabs';
+  const useProvider = prov || 'custom-provider';
   const vid = voiceId || (useProvider === 'minimax' ? 'Vietnamese_Serene_Man' : TTS_VOICE_ID);
   if (useProvider === 'local-piper') {
     return localPiperTextToSpeech(event, { text, voiceId: vid, progressTag });
   }
-  const useModel = model || (useProvider === 'minimax' ? 'speech-2.8-hd' : 'eleven_v3');
-  const { baseUrl } = loadTtsRuntime();
+  const ttsRuntime = loadTtsRuntime();
+  const useModel = model || ttsRuntime.model;
+  if (!useModel) throw new Error('TTS provider model is not configured. Select a text-to-speech provider profile.');
+  const { baseUrl } = ttsRuntime;
   const headers = getTtsHeaders(true);
   const requestKey = String(requestId || progressTag || `tts-${Date.now()}`).trim();
   activeTtsRequests.get(requestKey)?.abort();

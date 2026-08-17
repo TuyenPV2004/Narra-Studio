@@ -18,7 +18,12 @@ contextBridge.exposeInMainWorld('api', {
   providerSetActive: (p) => ipcRenderer.invoke('provider-set-active', p),
   providerGetStatus: (p) => ipcRenderer.invoke('provider-get-status', p),
   providerGetCredential: (p) => ipcRenderer.invoke('provider-get-credential', p),
-  providerClearCredential: (p) => ipcRenderer.invoke('provider-clear-credential', p),
+  aiProviderProfileList: () => ipcRenderer.invoke('ai-provider-profile-list'),
+  aiProviderProfileSave: (p) => ipcRenderer.invoke('ai-provider-profile-save', p),
+  aiProviderProfileDelete: (p) => ipcRenderer.invoke('ai-provider-profile-delete', p),
+  aiProviderProfileSetActive: (p) => ipcRenderer.invoke('ai-provider-profile-set-active', p),
+  aiProviderProfileTest: (p) => ipcRenderer.invoke('ai-provider-profile-test', p),
+  aiProviderProfileModels: (p) => ipcRenderer.invoke('ai-provider-profile-models', p),
   
   getCaptchaBridgeStatus: () => ipcRenderer.invoke('get-captcha-bridge-status'),
   testCaptchaExtension: () => ipcRenderer.invoke('test-captcha-extension'),
@@ -299,44 +304,6 @@ contextBridge.exposeInMainWorld('api', {
   prepareLocalTtsEngine: (p) => ipcRenderer.invoke('prepare-local-tts-engine', p),
   saveLipSyncSettings: (p) => ipcRenderer.invoke('save-lip-sync-settings', p),
   lipSyncVideo: (p) => ipcRenderer.invoke('lip-sync-video', p),
-  // Ollama Cloud — vision LLM used by AI auto-suggest features (e.g. Remove flickers preset detection)
-  getOllamaSettings: () => ipcRenderer.invoke('get-ollama-settings'),
-  saveOllamaSettings: (p) => ipcRenderer.invoke('save-ollama-settings', p),
-  // Avis media generation (image + async video) — Agent Avis
-  avisMediaInfo: () => ipcRenderer.invoke('avis-media-info'),
-  avisListModels: (opts) => ipcRenderer.invoke('avis-list-models', opts),
-  avisGetBalance: (opts) => ipcRenderer.invoke('avis-get-balance', opts),
-  avisGetUsage: (opts) => ipcRenderer.invoke('avis-get-usage', opts),
-  avisListGenerations: (opts) => ipcRenderer.invoke('avis-list-generations', opts),
-  avisGenerateImage: (p) => ipcRenderer.invoke('avis-generate-image', p),
-  avisCancelImageGeneration: (p) => ipcRenderer.invoke('avis-cancel-image-generation', p),
-  avisPollImage: (p) => ipcRenderer.invoke('avis-poll-image', p),
-  avisCreateVideo: (p) => ipcRenderer.invoke('avis-create-video', p),
-  avisPollVideo: (p) => ipcRenderer.invoke('avis-poll-video', p),
-  avisListAudioModels: (opts) => ipcRenderer.invoke('avis-list-audio-models', opts),
-  avisListAudioVoices: (opts) => ipcRenderer.invoke('avis-list-audio-voices', opts),
-  avisCreateAudio: (p) => ipcRenderer.invoke('avis-create-audio', p),
-  avisPollAudio: (p) => ipcRenderer.invoke('avis-poll-audio', p),
-  avisGetKycStatus: () => ipcRenderer.invoke('avis-get-kyc-status'),
-  avisCreateKycAsset: (p) => ipcRenderer.invoke('avis-create-kyc-asset', p),
-  avisGetKycAsset: (p) => ipcRenderer.invoke('avis-get-kyc-asset', p),
-  avisUploadReference: (p) => ipcRenderer.invoke('avis-upload-reference', p),
-  avisUploadVideoReference: (p) => ipcRenderer.invoke('avis-upload-video-reference', p),
-  cloudflareR2UploadMedia: (p) => ipcRenderer.invoke('cloudflare-r2-upload-media', p),
-  avisGenerateNoteText: (p) => ipcRenderer.invoke('avis-generate-note-text', p),
-  avisAnalyzeVideoStory: (p) => ipcRenderer.invoke('avis-analyze-video-story', p),
-  avisGenerateScriptStage: (p, cb) => {
-    if (typeof cb !== 'function') return ipcRenderer.invoke('avis-generate-script-stage', p);
-    const progressId = p && p.progressId;
-    const handler = (_event, payload) => {
-      if (!progressId || payload?.progressId === progressId) cb(payload);
-    };
-    ipcRenderer.on('avis-script-stage-progress', handler);
-    return ipcRenderer.invoke('avis-generate-script-stage', p)
-      .finally(() => ipcRenderer.removeListener('avis-script-stage-progress', handler));
-  },
-  avisCancelScriptStage: (p) => ipcRenderer.invoke('avis-cancel-script-stage', p),
-  downloadAvisVideo: (p) => ipcRenderer.invoke('download-avis-video', p),
   aiAgentChat: (p) => ipcRenderer.invoke('ai-agent-chat', p),
   aiAgentChatStream: (p, cb) => {
     const requestId = p && p.requestId;

@@ -295,26 +295,19 @@ export function WorkspacePanel({ providerId }: { providerId: ProviderId }) {
         result = await imageApi.generate({
           providerId,
           prompt: node.prompt,
-          model: providerId === "avis" ? "seedream-4-5" : "NARWHAL",
-          aspect:
-            providerId === "avis" ? "16:9" : "IMAGE_ASPECT_RATIO_LANDSCAPE",
+          model: "NARWHAL",
+          aspect: "IMAGE_ASPECT_RATIO_LANDSCAPE",
           resolution: "2k",
           seed: Math.floor(Math.random() * 9_999_999),
         });
       } else if (node.kind === "video") {
-        const model =
-          providerId === "avis"
-            ? (await videoApi.listAvisModels())[0]
-            : undefined;
-        if (providerId === "avis" && !model)
-          throw new Error("External AI chưa có model video khả dụng.");
         result = await videoApi.generate({
           providerId,
           prompt: node.prompt,
-          model: model?.id || "veo_3_1_t2v_fast_ultra",
+          model: "veo_3_1_t2v_fast_ultra",
           aspect: "landscape",
-          duration: model?.durations[0] || 8,
-          resolution: model?.resolutions[0] || "720p",
+          duration: 8,
+          resolution: "720p",
           generateAudio: false,
           mode: "text",
         });

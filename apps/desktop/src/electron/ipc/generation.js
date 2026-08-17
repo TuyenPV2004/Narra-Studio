@@ -22,8 +22,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     pathToFileURL,
     fileURLToPath,
     captchaBridge,
-    avisProvider,
-    cloudflareImagesProvider,
     runtime,
     getFfmpegBin,
     maybePromoteFilterComplexToScript,
@@ -75,7 +73,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     makeApiRequestViaWebview,
     setActiveWebviewSlot,
     getChromeRuntime,
-    getAvisMediaRuntime,
   } = dependencies;
 
 // ── Get Credits Balance ───────────────────────────────────────────────
@@ -83,9 +80,7 @@ ipcMain.handle('get-credits', async (_event, { slotId } = {}) => {
   const slot = getSlot(slotId ?? 0);
   if (!slot.bearerToken) return null;
   try {
-    const googleFlowApiKey = String(process.env.GOOGLE_FLOW_API_KEY || '').trim();
     const url = new URL('https://aisandbox-pa.googleapis.com/v1/credits');
-    if (googleFlowApiKey) url.searchParams.set('key', googleFlowApiKey);
     const resp = await fetch(url, {
       method: 'GET',
       headers: {
@@ -1248,118 +1243,6 @@ ipcMain.handle('queue-video-download', async (_, { mediaName, itemId, slotId }) 
 // Backward compat: download-video vẫn hoạt động synchronously nếu cần
 ipcMain.handle('download-video', async (_, { mediaName }) => {
   return _doDownloadVideo(mediaName);
-});
-
-// Download a completed Avis video from its R2 URL. R2 asset URLs are gated by
-// the Avis Bearer key, so the fetch must run here (main process) — the renderer
-// has no access to the secret. Saves into the configured video output folder,
-// dedups by URL, and returns a file:// path like _doDownloadVideo.
-ipcMain.handle('download-avis-video', async (_, { url, fileName } = {}) => {
-  if (!url || typeof url !== 'string') throw new Error('download-avis-video: missing url');
-  const runtime = getAvisMediaRuntime();
-  const saveDir = getVideoOutputDir();
-  if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir, { recursive: true });
-
-  // Dedup cache keyed by URL (shared map file with Flow downloads).
-  const lookupFile = path.join(saveDir, '.download-map.json');
-  let downloadMap = {};
-  try { downloadMap = JSON.parse(fs.readFileSync(lookupFile, 'utf-8')); } catch { }
-  if (downloadMap[url] && fs.existsSync(downloadMap[url])) {
-    console.log(`[AVIS-DL] Cache hit: ${downloadMap[url]}`);
-    return pathToFileURL(downloadMap[url]).toString();
-  }
-
-  const safeName = (fileName && String(fileName).trim()) || getNextFilename(saveDir, 'mp4');
-  const filename = /\.mp4$/i.test(safeName) ? safeName : `${safeName}.mp4`;
-  const filepath = path.join(saveDir, filename);
-  console.log(`[AVIS-DL] Downloading Avis video → ${filename}`);
-
-  // Presigned storage URLs (Cloudflare R2 / Volcengine TOS / S3) already carry
-  // their auth inside the query signature. Adding an `Authorization: Bearer`
-  // header makes those hosts reject the request with HTTP 400 ("only one auth
-  // mechanism allowed") — that was the merge-step download failure. Only attach
-  // the Avis key when the URL is on the Avis API host AND has no signature query;
-  // otherwise fetch clean. If the first attempt fails with an auth-ish status,
-  // flip the auth mode once so we survive whichever URL shape Avis returns.
-  const isPresigned = /[?&](x-amz-|x-tos-|x-goog-|sig=|signature=|expires=|se=|st=|sv=|token=)/i.test(url);
-  let apiHost = '';
-  try { apiHost = new URL(runtime.apiBase).host; } catch { }
-  let urlHost = '';
-  try { urlHost = new URL(url).host; } catch { }
-  const onAvisHost = !!apiHost && !!urlHost && (urlHost === apiHost || /(^|\.)avis\./i.test(urlHost));
-  const wantAuthFirst = !!runtime.apiKey && onAvisHost && !isPresigned;
-
-  const attempt = (useAuth) => new Promise((resolve, reject) => {
-    let fileStream = null;
-    let settled = false;
-    const finish = (err) => {
-      if (settled) return;
-      settled = true;
-      try { if (fileStream) fileStream.close(); } catch { }
-      if (err) {
-        try { if (fs.existsSync(filepath)) fs.unlinkSync(filepath); } catch { }
-        reject(err);
-      } else {
-        resolve();
-      }
-    };
-
-    const request = net.request({ url, method: 'GET' });
-    if (useAuth && runtime.apiKey) request.setHeader('Authorization', `Bearer ${runtime.apiKey}`);
-    request.setHeader('Accept', '*/*');
-
-    request.on('redirect', (_statusCode, _method, _redirectUrl) => {
-      request.followRedirect();
-    });
-
-    request.on('response', (response) => {
-      console.log(`[AVIS-DL] Response: ${response.statusCode} (auth=${useAuth}), content-type: ${response.headers['content-type']}`);
-      if (response.statusCode !== 200) {
-        const e = new Error(`HTTP ${response.statusCode}`);
-        e.statusCode = response.statusCode;
-        finish(e);
-        return;
-      }
-      fileStream = fs.createWriteStream(filepath);
-      let totalBytes = 0;
-      response.on('data', (chunk) => { totalBytes += chunk.length; fileStream.write(chunk); });
-      response.on('end', () => {
-        fileStream.end(() => {
-          console.log(`[AVIS-DL] Stream done: ${filepath} (${totalBytes} bytes)`);
-          finish(null);
-        });
-      });
-      response.on('error', finish);
-    });
-
-    request.on('error', (err) => {
-      console.error(`[AVIS-DL] net.request error:`, err.message);
-      finish(err);
-    });
-
-    const timer = setTimeout(() => finish(new Error('AI Provider download timeout 180s')), 180000);
-    request.on('response', () => clearTimeout(timer));
-
-    request.end();
-  });
-
-  try {
-    await attempt(wantAuthFirst);
-  } catch (err) {
-    // 400/401/403 → likely the wrong auth mode for this URL shape. Flip once.
-    if ([400, 401, 403].includes(err && err.statusCode)) {
-      console.log(`[AVIS-DL] HTTP ${err.statusCode} with auth=${wantAuthFirst} → retry with auth=${!wantAuthFirst}`);
-      await attempt(!wantAuthFirst);
-    } else {
-      throw err;
-    }
-  }
-
-  const size = fs.existsSync(filepath) ? fs.statSync(filepath).size : 0;
-  if (size === 0) throw new Error('Downloaded AI Provider video is empty');
-  console.log(`[AVIS-DL] ✅ Saved: ${filepath} (${size} bytes)`);
-  _saveDownloadMap(lookupFile, url, filepath);
-  return pathToFileURL(filepath).toString();
 });
 
 async function _processNextDownload() {

@@ -31,7 +31,7 @@ export function CapcutToolsPanel({
   const [busyAction, setBusyAction] = useState<string>();
   const [error, setError] = useState<string>();
   const [status, setStatus] = useState<string>();
-  const [ollamaReady, setOllamaReady] = useState<boolean>();
+  const [providerReady, setProviderReady] = useState<boolean>();
   const [speechText, setSpeechText] = useState("");
   const [voiceId, setVoiceId] = useState("vi_VN-vais1000-medium");
   const [audioSource, setAudioSource] = useState("");
@@ -41,12 +41,12 @@ export function CapcutToolsPanel({
   useEffect(() => {
     let current = true;
     void editorApi
-      .ollamaReady()
+      .aiProviderReady()
       .then((ready) => {
-        if (current) setOllamaReady(ready);
+        if (current) setProviderReady(ready);
       })
       .catch(() => {
-        if (current) setOllamaReady(false);
+        if (current) setProviderReady(false);
       });
     return () => {
       current = false;
@@ -149,16 +149,16 @@ export function CapcutToolsPanel({
             Khử nhấp nháy AI
           </h3>
           <p>
-            {ollamaReady === undefined
+            {providerReady === undefined
               ? "Đang kiểm tra cấu hình…"
-              : ollamaReady
-                ? "Ollama đã sẵn sàng."
-                : "Cần cấu hình Ollama trong Cài đặt."}
+              : providerReady
+                ? "Custom AI provider đã sẵn sàng."
+                : "Cần cấu hình custom AI provider trong Provider Account."}
           </p>
           <Button
             variant="secondary"
             disabled={
-              Boolean(busyAction) || !ollamaReady || clip.trackType === "audio"
+              Boolean(busyAction) || !providerReady || clip.trackType === "audio"
             }
             onClick={() => void analyzeDeflicker()}
           >

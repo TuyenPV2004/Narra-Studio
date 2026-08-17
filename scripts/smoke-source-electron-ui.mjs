@@ -241,7 +241,7 @@ try {
     await client.waitFor(`document.querySelectorAll('.source-video-post-actions .narra-button').length === 3`);
     interaction = {initialEmptyVisible, ...await client.evaluate(`({postActionCount: document.querySelectorAll('.source-video-post-actions .narra-button').length, postActionsEnabled: [...document.querySelectorAll('.source-video-post-actions .narra-button')].every((button) => !button.disabled)})`)};
   } else if (requestedPage === 'upload') {
-    interaction = await client.evaluate(`({libraryTabCount: document.querySelectorAll('.source-media-page .narra-tabs__tab').length, localSelected: [...document.querySelectorAll('.source-media-page .narra-tabs__tab')].some((button) => button.textContent?.includes('Cục bộ') && button.getAttribute('aria-selected') === 'true')})`);
+    interaction = await client.evaluate(`({libraryTabCount: document.querySelectorAll('.source-media-page .narra-tabs__tab').length, localSelected: [...document.querySelectorAll('.source-media-page button')].some((button) => button.textContent?.includes('Nhập ảnh'))})`);
   } else if (requestedPage === 'video-editor') {
     await client.evaluate(`window.api.saveVideoProject({id: 'smoke-video-editor', data: {name: 'Video editor smoke', description: 'Project parity', videoSrc: 'data:video/mp4;base64,AAAA', videoName: 'primary.mp4', trimStart: 0, trimEnd: 10, speed: 1, volume: 1, rotate: 0, flipH: false, flipV: false, subtitlePath: 'file:///C:/narra-smoke/subtitle.srt', subtitleName: 'subtitle.srt', bgmPath: 'file:///C:/narra-smoke/bgm.mp3', bgmName: 'bgm.mp3', bgmVolume: 0.35, fadeIn: 0.5, fadeOut: 1, delogoRegions: [{x: 10, y: 20, w: 100, h: 40, label: 'Logo'}], timelineClips: [{filePath: 'file:///C:/narra-smoke/a.mp4', name: 'A.mp4', duration: 5, startTime: 0, endTime: 5}, {filePath: 'file:///C:/narra-smoke/b.mp4', name: 'B.mp4', duration: 6, startTime: 0, endTime: 6}], timelineTransitions: [{type: 'fade', duration: 0.5}], legacyVideoEditorProbe: 'keep-video-editor'}})`);
     await client.evaluate(`window.dispatchEvent(new CustomEvent('genyu:navigate-page', {detail: {page: 'settings'}}))`);
@@ -453,7 +453,7 @@ const assertions = {
       && runtime.targetPage.historyVisible && runtime.interaction?.textLength === 11 && runtime.interaction?.maxLength === 120))
     && (requestedPage !== 'video-pro' || (runtime.targetPage.modeCount === 5 && runtime.targetPage.settingsCount === 4
       && runtime.interaction?.initialEmptyVisible && runtime.interaction?.postActionCount === 3 && runtime.interaction?.postActionsEnabled === true))
-    && (requestedPage !== 'upload' || (runtime.interaction?.libraryTabCount === 2 && runtime.interaction?.localSelected))
+    && (requestedPage !== 'upload' || (runtime.interaction?.libraryTabCount === 0 && runtime.interaction?.localSelected))
     && (requestedPage !== 'concat' || (runtime.interaction?.historyLoaded === 1 && runtime.interaction?.historyCleared === true))
     && (requestedPage !== 'video-editor' || (runtime.interaction?.projectSaved && runtime.interaction?.transitionSaved
       && runtime.interaction?.subtitlePreserved && runtime.interaction?.bgmPreserved && runtime.interaction?.watermarkPreserved

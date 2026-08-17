@@ -4,19 +4,62 @@ export interface AgentMessage extends Record<string, unknown> {
   content: string;
   role: "assistant" | "user";
 }
+
 export type ScriptStage =
   "confirm-camera" | "prepare-assets" | "synthesize-prompts";
+
 const record = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
     : {};
-const wait = (milliseconds: number) =>
-  new Promise((resolve) => setTimeout(resolve, milliseconds));
+
+const parseJson = (value: string): unknown => {
+  const fenced = value.match(/```(?:json)?\s*([\s\S]*?)```/i)?.[1] || value;
+  try {
+    return JSON.parse(fenced.trim());
+  } catch {
+    return { text: value.trim() };
+  }
+};
+const activeRequests = new Map<string, () => void>();
+
+const streamChat = async (
+  message: string,
+  history: AgentMessage[],
+  requestId: string,
+  onDelta: (content: string) => void,
+): Promise<string> => {
+  let content = "";
+  const stream = getElectronApi().aiAgentChatStream(
+    { requestId, message, history, hasPlan: false },
+    (payload) => {
+      const event = record(payload);
+      if (event.type === "delta" && typeof event.delta === "string") {
+        content += event.delta;
+        onDelta(content);
+      }
+      if (event.type === "done" && typeof event.reply === "string") {
+        content = event.reply;
+        onDelta(content);
+      }
+    },
+  );
+  activeRequests.set(requestId, stream.cancel);
+  try {
+    const result = record(await stream.promise);
+    const reply =
+      typeof result.reply === "string" ? result.reply.trim() : content.trim();
+    if (!reply) throw new Error("AI Agent không trả về nội dung.");
+    return reply;
+  } finally {
+    activeRequests.delete(requestId);
+  }
+};
+
+const genericPrompt = (instruction: string, context: unknown) =>
+  `${instruction}\n\nReturn concise JSON when structured output is requested. Context:\n${JSON.stringify(context)}`;
+
 export const agentApi = {
-  analyzeVideoStory: (source: string) =>
-    getElectronApi().avisAnalyzeVideoStory({ source }),
-  cancelScriptStage: (progressId: string) =>
-    getElectronApi().avisCancelScriptStage({ progressId }),
   async chat(message: string, history: AgentMessage[]): Promise<string> {
     const response = record(
       await getElectronApi().aiAgentChat({ message, history, hasPlan: false }),
@@ -25,33 +68,20 @@ export const agentApi = {
       throw new Error("AI Agent không trả về nội dung.");
     return response.reply.trim();
   },
+
   async chatStream(
     message: string,
     history: AgentMessage[],
     onDelta: (content: string) => void,
   ): Promise<string> {
-    const requestId = `agent-${Date.now()}-${crypto.randomUUID()}`;
-    let content = "";
-    const stream = getElectronApi().aiAgentChatStream(
-      { requestId, message, history, hasPlan: false },
-      (payload) => {
-        const event = record(payload);
-        if (event.type === "delta" && typeof event.delta === "string") {
-          content += event.delta;
-          onDelta(content);
-        }
-        if (event.type === "done" && typeof event.reply === "string") {
-          content = event.reply;
-          onDelta(content);
-        }
-      },
+    return streamChat(
+      message,
+      history,
+      `agent-${Date.now()}-${crypto.randomUUID()}`,
+      onDelta,
     );
-    const result = record(await stream.promise);
-    const reply =
-      typeof result.reply === "string" ? result.reply.trim() : content.trim();
-    if (!reply) throw new Error("AI Agent không trả về nội dung.");
-    return reply;
   },
+
   intent: (message: string, history: AgentMessage[] = []) =>
     getElectronApi().aiAgentIntent({
       message,
@@ -86,80 +116,75 @@ export const agentApi = {
     outputKind: "image" | "video",
     outputUrl: string,
   ) => getElectronApi().aiAgentReviewOutput({ prompt, outputKind, outputUrl }),
-  runScriptStage(
+
+  async runScriptStage(
     stage: ScriptStage,
     input: { project?: unknown; script?: string; shots?: unknown[] },
     progressId: string,
     onProgress: (payload: unknown) => void,
   ) {
-    return getElectronApi().avisGenerateScriptStage(
-      {
-        stage,
-        progressId,
-        ...(stage === "confirm-camera"
-          ? { script: input.script || "" }
-          : stage === "prepare-assets"
-            ? { project: input.project }
-            : {
-                project: input.project,
-                shots: input.shots || [],
-                synthesisMode: "intelligent",
-              }),
-      },
-      onProgress,
+    const reply = await streamChat(
+      genericPrompt(
+        `Perform the ${stage} stage for a video script. Preserve existing fields and return a JSON object with the updated project.`,
+        {
+          project: input.project,
+          script: input.script || "",
+          shots: input.shots || [],
+        },
+      ),
+      [],
+      progressId,
+      (content) =>
+        onProgress({
+          progressId,
+          shots: input.shots?.length || 0,
+          chars: content.length,
+        }),
     );
-  },
-  async generateNote(instruction: string): Promise<string> {
-    const response = record(
-      await getElectronApi().avisGenerateNoteText({
-        instruction,
-        references: [],
-      }),
-    );
-    if (typeof response.text !== "string" || !response.text.trim())
-      throw new Error("Cloud AI không trả nội dung ghi chú.");
-    return response.text.trim();
-  },
-  async generateAudio(text: string): Promise<{ jobId: string; src: string }> {
-    const voiceResponse = await getElectronApi().avisListAudioVoices({
-      language: "vi",
+    onProgress({
+      progressId,
+      shots: input.shots?.length || 0,
+      chars: reply.length,
     });
-    const responseRecord = record(voiceResponse);
-    const rawVoices = Array.isArray(voiceResponse)
-      ? voiceResponse
-      : Array.isArray(responseRecord.voices)
-        ? responseRecord.voices
-        : [];
-    const voice = rawVoices
-      .map(record)
-      .find((item) => typeof item.voiceType === "string");
-    if (!voice || typeof voice.voiceType !== "string")
-      throw new Error("Cloud AI chưa có giọng đọc phù hợp.");
-    let response = record(
-      await getElectronApi().avisCreateAudio({
-        product: "text-to-speech",
+    return { data: parseJson(reply), text: reply };
+  },
+
+  cancelScriptStage: async (progressId: string) => {
+    const stream = activeRequests.get(progressId);
+    if (!stream) return { cancelled: false };
+    stream();
+    activeRequests.delete(progressId);
+    return { cancelled: true };
+  },
+
+  analyzeVideoStory: async (_source: string) => {
+    throw new Error(
+      "Video Story cần pipeline media riêng và chưa được hỗ trợ bởi provider text generic.",
+    );
+  },
+
+  async generateNote(instruction: string): Promise<string> {
+    return (
+      await this.chat(
+        genericPrompt("Write a concise note.", { instruction }),
+        [],
+      )
+    ).trim();
+  },
+
+  async generateAudio(text: string): Promise<{ jobId: string; src: string }> {
+    const jobId = `local-piper-${Date.now()}-${crypto.randomUUID()}`;
+    const response = record(
+      await getElectronApi().textToSpeech({
         text,
-        voiceType: voice.voiceType,
-        format: "mp3",
-        enableLanguageDetector: true,
+        provider: "local-piper",
+        language: "vi",
+        progressTag: jobId,
       }),
     );
-    const generationId =
-      typeof response.generationId === "string" ? response.generationId : "";
-    if (!generationId)
-      throw new Error("Cloud AI không trả generationId audio.");
-    for (let attempt = 0; attempt < 120; attempt += 1) {
-      if (response.status === "done" && typeof response.audioUrl === "string")
-        return { jobId: generationId, src: response.audioUrl };
-      if (response.status === "error")
-        throw new Error(
-          typeof response.error === "string"
-            ? response.error
-            : "Cloud AI tạo audio thất bại.",
-        );
-      await wait(2_500);
-      response = record(await getElectronApi().avisPollAudio({ generationId }));
-    }
-    throw new Error("Hết thời gian chờ Cloud AI tạo audio.");
+    const src =
+      typeof response.audio_url === "string" ? response.audio_url : "";
+    if (!src) throw new Error("Local Piper không trả về file audio.");
+    return { jobId, src };
   },
 };

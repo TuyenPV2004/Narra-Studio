@@ -4,12 +4,10 @@ export interface ImageGenerationRequest {
   aspect: string;
   model: string;
   prompt: string;
-  providerId: "avis" | "veo3";
+  providerId: "veo3";
   referenceImage?: File;
-  requestId?: string;
   resolution?: string;
   seed: number;
-  watermark?: boolean;
 }
 export interface ImageModel {
   label: string;
@@ -106,84 +104,9 @@ const generateViaFlowPage = async (
 };
 
 export const imageApi = {
-  async listAvisModels(): Promise<ImageModel[]> {
-    const response = record(await getElectronApi().avisListModels());
-    return (Array.isArray(response.models) ? response.models : [])
-      .map(record)
-      .flatMap((model) => {
-        const output = Array.isArray(model.outputModalities)
-          ? model.outputModalities.map(String)
-          : [];
-        if (
-          typeof model.modelId !== "string" ||
-          model.isActive === false ||
-          !output.includes("image")
-        )
-          return [];
-        return [
-          {
-            value: model.modelId,
-            label: typeof model.name === "string" ? model.name : model.modelId,
-          },
-        ];
-      });
-  },
   async generate(
     request: ImageGenerationRequest,
   ): Promise<{ mediaId: string | null; src: string }> {
-    if (request.providerId === "avis") {
-      let images: string[] = [];
-      if (request.referenceImage) {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(request.referenceImage!);
-        });
-        const uploaded = record(
-          await getElectronApi().avisUploadReference({
-            dataUrl,
-            fileName: request.referenceImage.name,
-            mimeType: request.referenceImage.type || "image/png",
-          }),
-        );
-        if (typeof uploaded.url !== "string")
-          throw new Error("External AI không trả URL ảnh tham chiếu.");
-        images = [uploaded.url];
-      }
-      const size =
-        request.aspect === "9:16"
-          ? "1152x2048"
-          : request.aspect === "1:1"
-            ? "2048x2048"
-            : "2048x1152";
-      const response = record(
-        await getElectronApi().avisGenerateImage({
-          requestId:
-            request.requestId ||
-            `avis-image-${Date.now()}-${crypto.randomUUID()}`,
-          prompt: request.prompt,
-          model: request.model,
-          n: 1,
-          size,
-          watermark: request.watermark ?? false,
-          images,
-          responseFormat: "b64_json",
-        }),
-      );
-      const outputImages = Array.isArray(response.images)
-        ? response.images
-        : [];
-      const first = record(outputImages[0]);
-      const src =
-        typeof first.url === "string"
-          ? first.url
-          : typeof first.b64 === "string"
-            ? `data:image/png;base64,${first.b64}`
-            : "";
-      if (!src) throw new Error("External AI không trả về hình ảnh.");
-      return { mediaId: null, src };
-    }
     const bridge = record(await getElectronApi().getCaptchaBridgeStatus());
     if (bridge.connected !== true) return generateViaFlowPage(request);
     const slot = record(await getElectronApi().pickRandomSlot());
@@ -228,8 +151,6 @@ export const imageApi = {
     if (!src) throw new Error("VEO3 không trả về hình ảnh hợp lệ.");
     return { mediaId: typeof media.name === "string" ? media.name : null, src };
   },
-  cancelAvisGeneration: (requestId: string) =>
-    getElectronApi().avisCancelImageGeneration({ requestId }),
   async editVeoImage(
     request: ImageEditRequest,
   ): Promise<{ mediaId: string | null; src: string }> {

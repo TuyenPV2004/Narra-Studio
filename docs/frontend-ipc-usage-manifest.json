@@ -19,14 +19,14 @@
   "rendererRoot": "apps/desktop/src/renderer-source",
   "preloadFile": "apps/desktop/src/electron/preload.js",
   "summary": {
-    "usedMethods": 177,
-    "usedApiMethods": 177,
+    "usedMethods": 164,
+    "usedApiMethods": 164,
     "usedElectronApiMethods": 0,
-    "exposedPreloadMethods": 266,
+    "exposedPreloadMethods": 246,
     "missingFromPreload": 0,
     "missingFromPreloadDistinctMethodCount": 0,
     "missingFromPreloadCallSiteCount": 0,
-    "exposedButUnused": 89,
+    "exposedButUnused": 82,
     "dynamicImports": 0,
     "missingDynamicImports": 0
   },
@@ -34,7 +34,7 @@
     {
       "global": "api",
       "method": "aiAgentChat",
-      "businessArea": "AI Agent / Avis",
+      "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
@@ -49,7 +49,7 @@
     {
       "global": "api",
       "method": "aiAgentChatStream",
-      "businessArea": "AI Agent / Avis",
+      "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
@@ -65,7 +65,7 @@
     {
       "global": "api",
       "method": "aiAgentDeepAnalyze",
-      "businessArea": "AI Agent / Avis",
+      "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
@@ -80,7 +80,7 @@
     {
       "global": "api",
       "method": "aiAgentIntent",
-      "businessArea": "AI Agent / Avis",
+      "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
@@ -95,7 +95,7 @@
     {
       "global": "api",
       "method": "aiAgentPolishWorkflow",
-      "businessArea": "AI Agent / Avis",
+      "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
@@ -110,7 +110,7 @@
     {
       "global": "api",
       "method": "aiAgentReviewOutput",
-      "businessArea": "AI Agent / Avis",
+      "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
@@ -125,7 +125,7 @@
     {
       "global": "api",
       "method": "aiAgentWorkflow",
-      "businessArea": "AI Agent / Avis",
+      "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
@@ -169,6 +169,94 @@
     },
     {
       "global": "api",
+      "method": "aiProviderProfileDelete",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileList",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileModels",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileSave",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileSetActive",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileTest",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
       "method": "aiSuggestDeflicker",
       "businessArea": "Other frontend runtime",
       "callCount": 1,
@@ -190,250 +278,6 @@
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/editor.ts",
         "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisAnalyzeVideoStory",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisCancelImageGeneration",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisCancelScriptStage",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisCreateAudio",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisCreateVideo",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisGenerateImage",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisGenerateNoteText",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisGenerateScriptStage",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p",
-          "cb"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisGetBalance",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 2,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/dashboard.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "opts"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisGetUsage",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/dashboard.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "opts"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisListAudioVoices",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "opts"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisListGenerations",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "opts"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisListModels",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 2,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "opts"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisPollAudio",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisPollVideo",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "avisUploadReference",
-      "businessArea": "AI Agent / Avis",
-      "callCount": 2,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -670,21 +514,6 @@
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "downloadAvisVideo",
-      "businessArea": "Media / Generation",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -998,19 +827,6 @@
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": []
-      }
-    },
-    {
-      "global": "api",
-      "method": "getOllamaSettings",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1541,21 +1357,6 @@
     },
     {
       "global": "api",
-      "method": "providerClearCredential",
-      "businessArea": "Provider",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
       "method": "providerGetActive",
       "businessArea": "Provider",
       "callCount": 1,
@@ -1601,7 +1402,7 @@
       "global": "api",
       "method": "providerSetActive",
       "businessArea": "Provider",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
       ],
@@ -1723,26 +1524,11 @@
       "global": "api",
       "method": "saveImageLocally",
       "businessArea": "Media / Generation",
-      "callCount": 6,
+      "callCount": 5,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/image.ts",
         "apps/desktop/src/renderer-source/services/electron-api/media.ts",
         "apps/desktop/src/renderer-source/services/electron-api/video.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "saveOllamaSettings",
-      "businessArea": "Desktop / Local utility",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2401,8 +2187,9 @@
       "global": "api",
       "method": "textToSpeech",
       "businessArea": "Other frontend runtime",
-      "callCount": 1,
+      "callCount": 2,
       "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/agent.ts",
         "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
       ],
       "preload": {
@@ -2655,15 +2442,7 @@
     "aiTranscribeAudio",
     "aiTranscribeCancel",
     "autoEnterProject",
-    "avisCreateKycAsset",
-    "avisGetKycAsset",
-    "avisGetKycStatus",
-    "avisListAudioModels",
-    "avisMediaInfo",
-    "avisPollImage",
-    "avisUploadVideoReference",
     "captureRegion",
-    "cloudflareR2UploadMedia",
     "debugSlotClick",
     "debugStartEndDom",
     "debugUploadClick",

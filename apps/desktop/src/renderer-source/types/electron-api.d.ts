@@ -1,4 +1,4 @@
-export type ProviderId = "avis" | "veo3";
+export type ProviderId = "veo3";
 
 export interface ProviderSelectionPayload {
   providerId: ProviderId;
@@ -14,7 +14,26 @@ export interface NarraElectronApi {
   providerSetActive: (payload: ProviderSelectionPayload) => Promise<unknown>;
   providerGetStatus: (payload: ProviderPayload) => Promise<unknown>;
   providerGetCredential: (payload: ProviderPayload) => Promise<unknown>;
-  providerClearCredential: (payload: ProviderPayload) => Promise<unknown>;
+  aiProviderProfileList: () => Promise<unknown>;
+  aiProviderProfileSave: (payload: {
+    id?: string;
+    name: string;
+    baseUrl: string;
+    apiKey?: string;
+    model?: string;
+  }) => Promise<unknown>;
+  aiProviderProfileDelete: (payload: { id: string }) => Promise<unknown>;
+  aiProviderProfileSetActive: (payload: { id: string }) => Promise<unknown>;
+  aiProviderProfileTest: (payload: {
+    id?: string;
+    baseUrl?: string;
+    apiKey?: string;
+  }) => Promise<unknown>;
+  aiProviderProfileModels: (payload: {
+    id?: string;
+    baseUrl?: string;
+    apiKey?: string;
+  }) => Promise<unknown>;
   getCaptchaBridgeStatus: () => Promise<unknown>;
   testCaptchaExtension: () => Promise<unknown>;
   openExtensionFolder: () => Promise<unknown>;
@@ -40,10 +59,6 @@ export interface NarraElectronApi {
     timeoutMs: number;
     requestId?: string;
   }) => Promise<unknown>;
-  avisGenerateImage: (payload: Record<string, unknown>) => Promise<unknown>;
-  avisCancelImageGeneration: (payload: {
-    requestId: string;
-  }) => Promise<unknown>;
   saveImageLocally: (payload: {
     src: string;
     fileName: string;
@@ -68,10 +83,6 @@ export interface NarraElectronApi {
     };
   }) => Promise<unknown>;
   resolveVideoUrl: (payload: Record<string, unknown>) => Promise<unknown>;
-  avisListModels: (options?: Record<string, unknown>) => Promise<unknown>;
-  avisListGenerations: (payload: Record<string, unknown>) => Promise<unknown>;
-  avisCreateVideo: (payload: Record<string, unknown>) => Promise<unknown>;
-  avisPollVideo: (payload: { jobId: string }) => Promise<unknown>;
   generateVideo: (payload: Record<string, unknown>) => Promise<unknown>;
   generateVideoStartImage: (
     payload: Record<string, unknown>,
@@ -89,10 +100,6 @@ export interface NarraElectronApi {
   pollVideoStatus: (payload: Record<string, unknown>) => Promise<unknown>;
   queueVideoDownload: (payload: Record<string, unknown>) => Promise<unknown>;
   downloadVideo: (payload: { mediaName: string }) => Promise<unknown>;
-  downloadAvisVideo: (payload: {
-    url: string;
-    fileName: string;
-  }) => Promise<unknown>;
   generatePinholeGif: (payload: { mediaId: string }) => Promise<unknown>;
   upscaleVideo: (payload: Record<string, unknown>) => Promise<unknown>;
   listImageFiles: () => Promise<unknown>;
@@ -133,7 +140,6 @@ export interface NarraElectronApi {
   textToSpeech: (payload: Record<string, unknown>) => Promise<unknown>;
   textToSpeechCancel: (payload: { progressTag: string }) => Promise<unknown>;
   lipSyncVideo: (payload: Record<string, unknown>) => Promise<unknown>;
-  getOllamaSettings: () => Promise<unknown>;
   aiSuggestDeflicker: (payload: Record<string, unknown>) => Promise<unknown>;
   saveFile: (payload: Record<string, unknown>) => Promise<unknown>;
   selectMediaFiles: () => Promise<unknown>;
@@ -148,8 +154,6 @@ export interface NarraElectronApi {
   projectsDelete: (id: string) => Promise<unknown>;
   projectsRename: (id: string, name: string) => Promise<unknown>;
   projectsDuplicate: (id: string, newName: string) => Promise<unknown>;
-  avisUploadReference: (payload: Record<string, unknown>) => Promise<unknown>;
-  saveOllamaSettings: (payload: Record<string, unknown>) => Promise<unknown>;
   openIncognitoLogin: (payload: { slotId: number }) => Promise<unknown>;
   logoutSlot: (payload: { slotId: number }) => Promise<unknown>;
   syncSlotSession: (payload: { slotId: number }) => Promise<unknown>;
@@ -160,24 +164,9 @@ export interface NarraElectronApi {
   onSlotLoggedOut: (callback: (payload: unknown) => void) => () => void;
   onAutoEnteredProject: (callback: () => void) => () => void;
   getDashboardStats: () => Promise<unknown>;
-  avisGetBalance: (options?: Record<string, unknown>) => Promise<unknown>;
   getCredits: (payload?: { slotId: number }) => Promise<unknown>;
   createFlowProject: (payload?: Record<string, unknown>) => Promise<unknown>;
   onFlowProjectChanged: (callback: (payload: unknown) => void) => () => void;
-  avisGetUsage: (payload: {
-    offset: number;
-    limit: number;
-  }) => Promise<unknown>;
-  avisListAudioVoices: (payload?: Record<string, unknown>) => Promise<unknown>;
-  avisCreateAudio: (payload: Record<string, unknown>) => Promise<unknown>;
-  avisPollAudio: (payload: { generationId: string }) => Promise<unknown>;
-  avisGenerateNoteText: (payload: Record<string, unknown>) => Promise<unknown>;
-  avisAnalyzeVideoStory: (payload: Record<string, unknown>) => Promise<unknown>;
-  avisGenerateScriptStage: (
-    payload: Record<string, unknown>,
-    callback?: (payload: unknown) => void,
-  ) => Promise<unknown>;
-  avisCancelScriptStage: (payload: { progressId: string }) => Promise<unknown>;
   aiAgentChat: (payload: Record<string, unknown>) => Promise<unknown>;
   aiAgentChatStream: (
     payload: Record<string, unknown>,

@@ -8,13 +8,9 @@ const record = (value: unknown): Record<string, unknown> =>
 
 export const providerApi = {
   async getBalance(providerId: ProviderId): Promise<number | undefined> {
-    const response = record(
-      providerId === "avis"
-        ? await getElectronApi().avisGetBalance()
-        : await getElectronApi().getCredits(),
-    );
-    const value =
-      providerId === "avis" ? response.creditBalance : response.credits;
+    void providerId;
+    const response = record(await getElectronApi().getCredits());
+    const value = response.credits;
     return typeof value === "number" ? value : undefined;
   },
   getActive(): Promise<unknown> {
@@ -28,18 +24,5 @@ export const providerApi = {
   },
   getCredential(providerId: ProviderId): Promise<unknown> {
     return getElectronApi().providerGetCredential({ providerId });
-  },
-  clearCredential(providerId: ProviderId): Promise<unknown> {
-    return getElectronApi().providerClearCredential({ providerId });
-  },
-  async configureAvis(apiKey: string): Promise<void> {
-    await getElectronApi().saveOllamaSettings({
-      provider: "avis",
-      avisApiKey: apiKey,
-    });
-    await getElectronApi().providerSetActive({
-      providerId: "avis",
-      activate: true,
-    });
   },
 };

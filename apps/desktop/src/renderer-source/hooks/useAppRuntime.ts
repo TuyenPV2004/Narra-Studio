@@ -39,8 +39,7 @@ const configuredProviderPages = new Set<SourcePageId>([
   "ai-agent",
 ]);
 
-const isProviderId = (value: unknown): value is ProviderId =>
-  value === "avis" || value === "veo3";
+const isProviderId = (value: unknown): value is ProviderId => value === "veo3";
 const isAllowedPage = (value: unknown): value is SourcePageId =>
   typeof value === "string" && allowedPageIds.has(value);
 const readBoolean = (value: unknown, key: string): boolean =>
@@ -151,10 +150,6 @@ export function useAppRuntime() {
           !providerPages.has(nextPage)
         )
           nextPage = "captcha-setup";
-        if (runtime.providerId === "avis" && nextPage === "image")
-          nextPage = "image-ultra";
-        if (runtime.providerId === "avis" && nextPage === "video-standard")
-          nextPage = "video-pro";
         setCurrentPage(nextPage);
       } catch (runtimeError) {
         if (!cancelled)
@@ -194,9 +189,6 @@ export function useAppRuntime() {
     (requestedPage: SourcePageId, nextImageMode?: ImageMode) => {
       let page = requestedPage;
       if (nextImageMode) setImageMode(nextImageMode);
-      if (activeProvider === "avis" && page === "image") page = "image-ultra";
-      if (activeProvider === "avis" && page === "video-standard")
-        page = "video-pro";
       if (page !== "provider-hub" && (!sessionConfirmed || !runtimeActive))
         page = "provider-hub";
       else if (!providerStatus.configured && configuredProviderPages.has(page))

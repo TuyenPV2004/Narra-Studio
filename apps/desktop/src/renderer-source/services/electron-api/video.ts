@@ -178,91 +178,9 @@ export const videoApi = {
     }
     return `https://labs.google/fx/api/trpc/media.getMediaUrlRedirect?name=${encodeURIComponent(completedName)}`;
   },
-  async listAvisModels(): Promise<VideoModel[]> {
-    const response = record(await getElectronApi().avisListModels());
-    const models = Array.isArray(response.models)
-      ? response.models.map(record)
-      : [];
-    return models.flatMap((model) => {
-      const capabilities = record(record(model.capabilities).video);
-      if (
-        !capabilities ||
-        typeof model.modelId !== "string" ||
-        model.isActive === false
-      )
-        return [];
-      const params = record(capabilities.params);
-      const duration = record(params.duration);
-      const resolution = record(params.resolution);
-      const durations = Array.isArray(duration.steps)
-        ? duration.steps
-            .map(Number)
-            .filter((value) => Number.isFinite(value) && value > 0)
-        : [5];
-      const resolutions = Array.isArray(resolution.values)
-        ? resolution.values.map(String)
-        : ["720p"];
-      return [
-        {
-          id: model.modelId,
-          label: typeof model.name === "string" ? model.name : model.modelId,
-          durations,
-          resolutions,
-        },
-      ];
-    });
-  },
   async generate(
     request: VideoGenerationRequest,
   ): Promise<VideoGenerationResult> {
-    if (request.providerId === "avis") {
-      const images: string[] = [];
-      for (const file of [request.startImage, request.endImage].filter(
-        (item): item is File => Boolean(item),
-      )) {
-        const dataUrl = await new Promise<string>((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(String(reader.result));
-          reader.onerror = () => reject(reader.error);
-          reader.readAsDataURL(file);
-        });
-        const uploaded = record(
-          await getElectronApi().avisUploadReference({
-            dataUrl,
-            fileName: file.name,
-            mimeType: file.type || "image/png",
-          }),
-        );
-        if (typeof uploaded.url === "string") images.push(uploaded.url);
-      }
-      const response = record(
-        await getElectronApi().avisCreateVideo({
-          prompt: request.prompt,
-          model: request.model,
-          seconds: request.duration,
-          resolution: request.resolution,
-          ratio: request.aspect === "portrait" ? "9:16" : "16:9",
-          generateAudio: request.generateAudio,
-          watermark: false,
-          images,
-        }),
-      );
-      const jobId = typeof response.jobId === "string" ? response.jobId : "";
-      if (!jobId) throw new Error("External AI không trả về jobId video.");
-      for (let attempt = 0; attempt < 120; attempt += 1) {
-        await wait(10_000);
-        const polled = record(await getElectronApi().avisPollVideo({ jobId }));
-        if (polled.status === "error")
-          throw new Error(
-            typeof polled.error === "string"
-              ? polled.error
-              : "External AI tạo video thất bại.",
-          );
-        if (polled.status === "done" && typeof polled.url === "string")
-          return { jobId, src: polled.url };
-      }
-      throw new Error("Hết thời gian chờ External AI tạo video.");
-    }
     const bridge = record(await getElectronApi().getCaptchaBridgeStatus());
     if (bridge.connected !== true)
       throw new Error("CAPTCHA bridge chưa kết nối.");

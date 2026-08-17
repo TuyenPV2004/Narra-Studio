@@ -46,7 +46,7 @@ for (const match of preloadSource.matchAll(/^\s{2}([A-Za-z_$][\w$]*)\s*:\s*\(([^
   exposedMethods.set(match[1], match[2].split(',').map((parameter) => parameter.trim()).filter(Boolean));
 }
 const classifyBusinessArea = (method) => {
-  if (/^(?:aiAgent|avis)/u.test(method)) return 'AI Agent / Avis';
+  if (/^aiAgent/u.test(method)) return 'AI Agent';
   if (/^(?:provider|cloudflare)/u.test(method)) return 'Provider';
   if (/(?:Captcha|Extension)/u.test(method)) return 'CAPTCHA / Extension';
   if (/^(?:workspace|projects|team|createAIAgentStoryProject)/u.test(method)) return 'Workspace';

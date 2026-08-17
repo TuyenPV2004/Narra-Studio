@@ -2,7 +2,7 @@ import { AppShell } from "@/app/AppShell";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { useAppRuntime } from "@/hooks/useAppRuntime";
-import { ProviderHubPage } from "@/pages/ProviderHub/ProviderHubPage";
+import { ProviderSelectionPage } from "@/pages/ProviderHub/ProviderSelectionPage";
 import { SettingsPage } from "@/pages/Settings/SettingsPage";
 import { CaptchaSetupPage } from "@/pages/CaptchaSetup/CaptchaSetupPage";
 import { ImageGeneratorPage } from "@/pages/Image/ImageGeneratorPage";
@@ -12,7 +12,7 @@ import { VideoGeneratorPage } from "@/pages/Video/VideoGeneratorPage";
 import { MediaLibraryPage } from "@/pages/MediaLibrary/MediaLibraryPage";
 import { VideoEditorPage } from "@/pages/VideoEditor/VideoEditorPage";
 import { SceneMergePage } from "@/pages/SceneMerge/SceneMergePage";
-import { ProviderAccountPage } from "@/pages/ProviderAccount/ProviderAccountPage";
+import { ProviderConnectionsPage } from "@/pages/ProviderAccount/ProviderConnectionsPage";
 import { GoogleFlowPage } from "@/pages/GoogleFlow/GoogleFlowPage";
 import { DashboardPage } from "@/pages/Dashboard/DashboardPage";
 import { GuidePage } from "@/pages/Guide/GuidePage";
@@ -33,7 +33,7 @@ function SourceApplication() {
   const runtime = useAppRuntime();
   if (runtime.currentPage === "provider-hub") {
     return (
-      <ProviderHubPage
+      <ProviderSelectionPage
         error={runtime.error}
         loading={runtime.loading}
         onActivate={runtime.activateProvider}
@@ -73,7 +73,7 @@ function SourceApplication() {
       ) : runtime.currentPage === "concat" ? (
         <SceneMergePage />
       ) : runtime.currentPage === "provider-account" ? (
-        <ProviderAccountPage providerId={runtime.activeProvider} />
+        <ProviderConnectionsPage providerId={runtime.activeProvider} />
       ) : runtime.currentPage === "webview" ? (
         <GoogleFlowPage />
       ) : runtime.currentPage === "dashboard" ? (

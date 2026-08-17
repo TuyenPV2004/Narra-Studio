@@ -37,9 +37,7 @@ const defaultFlowModel = flowModels[0]!;
 export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
   const [prompt, setPrompt] = useState("");
   const [mode, setMode] = useState<VideoMode>("text");
-  const [models, setModels] = useState<VideoModel[]>(
-    providerId === "veo3" ? flowModels : [],
-  );
+  const models = flowModels;
   const [modelId, setModelId] = useState(defaultFlowModel.id);
   const [duration, setDuration] = useState(8);
   const [resolution, setResolution] = useState("720p");
@@ -49,7 +47,6 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
   const [endImage, setEndImage] = useState<File>();
   const [editVideo, setEditVideo] = useState<File>();
   const [characterImages, setCharacterImages] = useState<File[]>([]);
-  const [loadingModels, setLoadingModels] = useState(false);
   const [postAction, setPostAction] = useState<string>();
   const selectedModel = useMemo(
     () => models.find((item) => item.id === modelId) || models[0],
@@ -58,21 +55,6 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
   const queue = useVideoQueue(videoApi.generate);
   const running = queue.tasks.some((task) => task.status === "processing");
 
-  useEffect(() => {
-    if (providerId === "veo3") {
-      setModels(flowModels);
-      setModelId(defaultFlowModel.id);
-      return;
-    }
-    setLoadingModels(true);
-    void videoApi
-      .listAvisModels()
-      .then((items) => {
-        setModels(items);
-        setModelId(items[0]?.id || "");
-      })
-      .finally(() => setLoadingModels(false));
-  }, [providerId]);
   useEffect(() => {
     setDuration(selectedModel?.durations[0] || 5);
     setResolution(selectedModel?.resolutions[0] || "720p");
@@ -169,25 +151,14 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
           <Film size={22} />
           <div>
             <h1 id="video-title">Tạo video</h1>
-            <p>
-              {providerId === "avis"
-                ? "External AI video với catalog model động."
-                : "Google Flow video qua phiên tài khoản hiện tại."}
-            </p>
+            <p>Google Flow video qua phiên tài khoản hiện tại.</p>
           </div>
         </header>
         <section className="source-control-card">
           <h2>Chế độ</h2>
           <div className="source-segmented">
-            {(providerId === "veo3"
-              ? ([
-                  "text",
-                  "image",
-                  "startend",
-                  "charsync",
-                  "editvideo",
-                ] as const)
-              : (["text", "image", "startend"] as const)
+            {(
+              ["text", "image", "startend", "charsync", "editvideo"] as const
             ).map((value) => (
               <button
                 type="button"
@@ -277,7 +248,6 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
             Model
             <select
               value={modelId}
-              disabled={loadingModels}
               onChange={(event) => setModelId(event.target.value)}
             >
               {models.map((model) => (

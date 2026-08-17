@@ -3,13 +3,11 @@ import {
   Image as ImageIcon,
   Plus,
   Sparkles,
-  Square,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { imageApi } from "@/services/electron-api";
-import type { ImageModel } from "@/services/electron-api/image";
 import type { ProviderId } from "@/types/electron-api";
 
 type TaskStatus = "cancelled" | "error" | "processing" | "queued" | "success";
@@ -25,44 +23,15 @@ const veoModels = [
   { value: "GEM_PIX_2", label: "Banana Pro" },
   { value: "IMAGEN_3_5", label: "Imagen 4" },
 ];
-const avisFallbackModels: ImageModel[] = [
-  { value: "seedream-4-5", label: "Seedream 4.5" },
-  { value: "dola-seedream-5-0-pro", label: "Dola Seedream 5.0 Pro" },
-  { value: "gpt-image-2", label: "GPT Image 2" },
-];
-
 export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
-  const [avisModels, setAvisModels] =
-    useState<ImageModel[]>(avisFallbackModels);
-  const models = providerId === "avis" ? avisModels : veoModels;
+  void providerId;
+  const models = veoModels;
   const [prompts, setPrompts] = useState<string[]>([""]);
-  const [model, setModel] = useState(
-    providerId === "avis" ? "seedream-4-5" : "NARWHAL",
-  );
-  const [aspect, setAspect] = useState(
-    providerId === "avis" ? "16:9" : "IMAGE_ASPECT_RATIO_LANDSCAPE",
-  );
+  const [model, setModel] = useState("NARWHAL");
+  const [aspect, setAspect] = useState("IMAGE_ASPECT_RATIO_LANDSCAPE");
   const [quantity, setQuantity] = useState(1);
   const [tasks, setTasks] = useState<ImageTask[]>([]);
   const [running, setRunning] = useState(false);
-  const activeRequestId = useRef<string | undefined>(undefined);
-  const cancelRequested = useRef(false);
-  useEffect(() => {
-    setModel(providerId === "avis" ? "seedream-4-5" : "NARWHAL");
-    setAspect(providerId === "avis" ? "16:9" : "IMAGE_ASPECT_RATIO_LANDSCAPE");
-  }, [providerId]);
-  useEffect(() => {
-    if (providerId === "avis")
-      void imageApi
-        .listAvisModels()
-        .then((items) => {
-          if (items.length) {
-            setAvisModels(items);
-            setModel(items[0]!.value);
-          }
-        })
-        .catch(() => undefined);
-  }, [providerId]);
 
   const run = useCallback(async () => {
     const usable = prompts.map((prompt) => prompt.trim()).filter(Boolean);
@@ -77,30 +46,21 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
     setTasks((current) => [...queued, ...current]);
     setPrompts([""]);
     setRunning(true);
-    cancelRequested.current = false;
     for (const queuedTask of queued) {
-      if (cancelRequested.current) break;
       setTasks((current) =>
         current.map((task) =>
           task.id === queuedTask.id ? { ...task, status: "processing" } : task,
         ),
       );
       try {
-        const requestId =
-          providerId === "avis"
-            ? `avis-image-${Date.now()}-${crypto.randomUUID()}`
-            : undefined;
-        activeRequestId.current = requestId;
         const result = await imageApi.generate({
           aspect,
           model,
           prompt: queuedTask.prompt,
           providerId,
           resolution: "2k",
-          ...(requestId ? { requestId } : {}),
           seed: Math.floor(Math.random() * 9_999_999),
         });
-        if (cancelRequested.current) continue;
         await imageApi.save(result.src).catch(() => "");
         setTasks((current) =>
           current.map((task) =>
@@ -115,45 +75,16 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
             task.id === queuedTask.id
               ? {
                   ...task,
-                  ...(cancelRequested.current
-                    ? {}
-                    : {
-                        error:
-                          error instanceof Error
-                            ? error.message
-                            : String(error),
-                      }),
-                  status: cancelRequested.current ? "cancelled" : "error",
+                  error: error instanceof Error ? error.message : String(error),
+                  status: "error",
                 }
               : task,
           ),
         );
-      } finally {
-        activeRequestId.current = undefined;
       }
     }
-    if (cancelRequested.current)
-      setTasks((current) =>
-        current.map((task) =>
-          task.status === "queued" || task.status === "processing"
-            ? { ...task, status: "cancelled" }
-            : task,
-        ),
-      );
     setRunning(false);
   }, [aspect, model, prompts, providerId, quantity, running]);
-  const cancel = async () => {
-    cancelRequested.current = true;
-    const requestId = activeRequestId.current;
-    if (requestId) await imageApi.cancelAvisGeneration(requestId);
-    setTasks((current) =>
-      current.map((task) =>
-        task.status === "queued" || task.status === "processing"
-          ? { ...task, status: "cancelled" }
-          : task,
-      ),
-    );
-  };
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.key === "Enter") {
@@ -175,11 +106,7 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
           <ImageIcon size={22} />
           <div>
             <h1 id="image-title">Tạo hình ảnh</h1>
-            <p>
-              {providerId === "avis"
-                ? "Tạo ảnh bằng External AI."
-                : "Tạo ảnh qua Google VEO3 và CAPTCHA bridge."}
-            </p>
+            <p>Tạo ảnh qua Google VEO3 và CAPTCHA bridge.</p>
           </div>
         </header>
         <section className="source-control-card">
@@ -249,14 +176,11 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
               value={aspect}
               onChange={(event) => setAspect(event.target.value)}
             >
-              {(providerId === "avis"
-                ? ["16:9", "9:16", "1:1"]
-                : [
-                    "IMAGE_ASPECT_RATIO_LANDSCAPE",
-                    "IMAGE_ASPECT_RATIO_PORTRAIT",
-                    "IMAGE_ASPECT_RATIO_SQUARE",
-                  ]
-              ).map((value) => (
+              {[
+                "IMAGE_ASPECT_RATIO_LANDSCAPE",
+                "IMAGE_ASPECT_RATIO_PORTRAIT",
+                "IMAGE_ASPECT_RATIO_SQUARE",
+              ].map((value) => (
                 <option key={value} value={value}>
                   {value.includes("LANDSCAPE")
                     ? "16:9"
@@ -290,12 +214,6 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
           <Sparkles size={17} />
           {running ? "Đang xử lý..." : "Tạo hình ảnh"}
         </Button>
-        {running && providerId === "avis" && (
-          <Button variant="secondary" onClick={() => void cancel()}>
-            <Square size={15} fill="currentColor" />
-            Dừng hàng đợi
-          </Button>
-        )}
         <small>Ctrl+Enter để thêm vào hàng đợi</small>
       </div>
       <section

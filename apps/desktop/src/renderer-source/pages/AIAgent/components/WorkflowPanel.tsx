@@ -125,13 +125,6 @@ export function WorkflowPanel({
     setRunning("workflow");
     setError(undefined);
     try {
-      let avisVideoModel:
-        Awaited<ReturnType<typeof videoApi.listAvisModels>>[number] | undefined;
-      if (
-        providerId === "avis" &&
-        runItems.some((item) => item.kind === "video")
-      )
-        avisVideoModel = (await videoApi.listAvisModels())[0];
       for (const item of runItems) {
         setRunItems((items) =>
           items.map((entry) =>
@@ -146,21 +139,18 @@ export function WorkflowPanel({
               ? await imageApi.generate({
                   providerId,
                   prompt: item.prompt,
-                  model: providerId === "avis" ? "seedream-4-5" : "NARWHAL",
-                  aspect:
-                    providerId === "avis"
-                      ? "16:9"
-                      : "IMAGE_ASPECT_RATIO_LANDSCAPE",
+                  model: "NARWHAL",
+                  aspect: "IMAGE_ASPECT_RATIO_LANDSCAPE",
                   resolution: "2k",
                   seed: Math.floor(Math.random() * 9_999_999),
                 })
               : await videoApi.generate({
                   providerId,
                   prompt: item.prompt,
-                  model: avisVideoModel?.id || "veo_3_1_t2v_fast_ultra",
+                  model: "veo_3_1_t2v_fast_ultra",
                   aspect: "landscape",
-                  duration: avisVideoModel?.durations[0] || 8,
-                  resolution: avisVideoModel?.resolutions[0] || "720p",
+                  duration: 8,
+                  resolution: "720p",
                   generateAudio: false,
                   mode: "text",
                 });

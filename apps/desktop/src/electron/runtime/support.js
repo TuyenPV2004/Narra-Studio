@@ -20,8 +20,6 @@ module.exports = function createSupportRuntime(dependencies) {
     pathToFileURL,
     fileURLToPath,
     captchaBridge,
-    avisProvider,
-    cloudflareImagesProvider,
   } = dependencies;
 
 // ── FFmpeg binary resolver (ffmpeg-static bundled) ─────────────────────

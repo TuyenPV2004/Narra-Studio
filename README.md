@@ -6,7 +6,7 @@ Narra Studio là ứng dụng Electron chạy local để tự động hóa tạ
 
 - Google Flow: đăng nhập bằng cửa sổ trình duyệt, nhiều account slot, tạo ảnh/video, upload reference, theo dõi task và tải kết quả.
 - CAPTCHA bridge, session isolation và lớp hỗ trợ anti-detect cần cho automation.
-- AI Agent, Avis, xử lý media, FFmpeg, ONNX và workspace/canvas local.
+- AI Agent với các profile OpenAI-compatible do người dùng cấu hình, xử lý media, FFmpeg, ONNX và workspace/canvas local.
 - Cấu hình nhạy cảm đọc từ `.env`; không lưu mật khẩu Google, cookie hoặc mã 2FA trong repository.
 
 ## Thành phần đã loại bỏ

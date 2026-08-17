@@ -39,9 +39,7 @@ export function DashboardPage({ providerId }: { providerId: ProviderId }) {
     >
       <header>
         <div>
-          <small>
-            TỔNG QUAN {providerId === "avis" ? "EXTERNAL AI" : "GOOGLE VEO3"}
-          </small>
+          <small>TỔNG QUAN GOOGLE VEO3</small>
           <h1 id="dashboard-title">
             <Gauge size={22} />
             Bảng điều khiển
@@ -78,18 +76,6 @@ export function DashboardPage({ providerId }: { providerId: ProviderId }) {
           <span>Dung lượng</span>
           <strong>{(storage / 1024 / 1024).toFixed(1)} MB</strong>
         </article>
-        {providerId === "avis" && (
-          <article>
-            <Gauge size={20} />
-            <span>Số dư</span>
-            <strong>
-              {summary.balance === undefined
-                ? "—"
-                : summary.balance.toLocaleString()}
-            </strong>
-            <small>{summary.recentActivity} hoạt động gần đây</small>
-          </article>
-        )}
       </div>
     </section>
   );
