@@ -62,6 +62,9 @@ export function useCaptchaSetup() {
     try {
       const next = parseStatus(await captchaApi.getBridgeStatus());
       setStatus(next);
+      window.dispatchEvent(
+        new CustomEvent("genyu:captcha-status-changed", { detail: next }),
+      );
       return next;
     } catch (runtimeError) {
       setError(

@@ -1,3 +1,4 @@
+import * as RadixTabs from "@radix-ui/react-tabs";
 import type { ReactNode } from "react";
 
 export interface TabOption<T extends string> {
@@ -20,20 +21,24 @@ export function Tabs<T extends string>({
   value,
 }: TabsProps<T>) {
   return (
-    <div className="narra-tabs" role="tablist" aria-label={ariaLabel}>
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="tab"
-          aria-selected={option.value === value}
-          className="narra-tabs__tab"
-          onClick={() => onChange(option.value)}
-        >
-          {option.icon}
-          <span>{option.label}</span>
-        </button>
-      ))}
-    </div>
+    <RadixTabs.Root
+      value={value}
+      onValueChange={(val) => onChange(val as T)}
+      className="narra-tabs"
+      aria-label={ariaLabel}
+    >
+      <RadixTabs.List className="narra-tabs__list" aria-label={ariaLabel}>
+        {options.map((option) => (
+          <RadixTabs.Trigger
+            key={option.value}
+            value={option.value}
+            className="narra-tabs__tab"
+          >
+            {option.icon}
+            <span>{option.label}</span>
+          </RadixTabs.Trigger>
+        ))}
+      </RadixTabs.List>
+    </RadixTabs.Root>
   );
 }

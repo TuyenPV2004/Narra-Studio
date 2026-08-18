@@ -168,6 +168,53 @@ export function useAppRuntime() {
   }, []);
 
   useEffect(() => {
+    let active = true;
+    const syncStatus = async () => {
+      try {
+        const status = await providerApi.getStatus(activeProvider);
+        const bridge =
+          activeProvider === "veo3"
+            ? await captchaApi.getBridgeStatus().catch(() => null)
+            : null;
+        if (!active) return;
+        const nextStatus = {
+          configured: readBoolean(status, "configured"),
+          ready: readBoolean(status, "ready"),
+        };
+        const nextCaptchaReady =
+          activeProvider !== "veo3" || readBoolean(bridge, "setupReady");
+        setProviderStatus(nextStatus);
+        setCaptchaReady(nextCaptchaReady);
+        if (nextStatus.configured) {
+          setSessionConfirmed(true);
+          setRuntimeActive(true);
+        }
+      } catch {
+        // silent sync
+      }
+    };
+    const interval = window.setInterval(syncStatus, 3000);
+    const handleVisibility = () => {
+      if (document.visibilityState === "visible") void syncStatus();
+    };
+    const handleCaptchaChange = () => void syncStatus();
+    document.addEventListener("visibilitychange", handleVisibility);
+    window.addEventListener(
+      "genyu:captcha-status-changed",
+      handleCaptchaChange,
+    );
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibility);
+      window.removeEventListener(
+        "genyu:captcha-status-changed",
+        handleCaptchaChange,
+      );
+    };
+  }, [activeProvider]);
+
+  useEffect(() => {
     if (!loading) persistNavigation(currentPage, activeProvider);
   }, [activeProvider, currentPage, loading, persistNavigation]);
 
@@ -189,7 +236,11 @@ export function useAppRuntime() {
     (requestedPage: SourcePageId, nextImageMode?: ImageMode) => {
       let page = requestedPage;
       if (nextImageMode) setImageMode(nextImageMode);
-      if (page !== "provider-hub" && (!sessionConfirmed || !runtimeActive))
+      if (
+        page !== "provider-hub" &&
+        !providerStatus.configured &&
+        (!sessionConfirmed || !runtimeActive)
+      )
         page = "provider-hub";
       else if (!providerStatus.configured && configuredProviderPages.has(page))
         page = activeProvider === "veo3" ? "webview" : "settings";

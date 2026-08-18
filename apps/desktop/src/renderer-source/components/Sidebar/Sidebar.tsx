@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { PanelLeftClose, PanelLeftOpen, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 import { navigationItemsForProvider, type ImageMode } from "@/app/navigation";
 import { useLocale } from "@/i18n/LocaleProvider";
@@ -42,28 +42,34 @@ export function Sidebar({
       aria-label={messages.shell.sidebarLabel}
     >
       <div className="source-sidebar__brand" aria-label="Narra Studio">
-        <span className="source-sidebar__mark" aria-hidden="true">
-          <Sparkles size={18} />
-        </span>
-        <span className="source-sidebar__brand-copy">Narra</span>
+        <div className="source-sidebar__brand-main">
+          <span className="source-sidebar__mark" aria-hidden="true">
+            <Sparkles size={18} />
+          </span>
+          <span className="source-sidebar__brand-copy">Narra</span>
+        </div>
+        <button
+          type="button"
+          className="source-sidebar__collapse"
+          onClick={() => setCollapsed((value) => !value)}
+          aria-label={
+            collapsed
+              ? messages.shell.expandSidebar
+              : messages.shell.collapseSidebar
+          }
+          title={
+            collapsed
+              ? messages.shell.expandSidebar
+              : messages.shell.collapseSidebar
+          }
+        >
+          {collapsed ? (
+            <PanelLeftOpen size={18} />
+          ) : (
+            <PanelLeftClose size={18} />
+          )}
+        </button>
       </div>
-      <button
-        type="button"
-        className="source-sidebar__collapse"
-        onClick={() => setCollapsed((value) => !value)}
-        aria-label={
-          collapsed
-            ? messages.shell.expandSidebar
-            : messages.shell.collapseSidebar
-        }
-        title={
-          collapsed
-            ? messages.shell.expandSidebar
-            : messages.shell.collapseSidebar
-        }
-      >
-        {collapsed ? <ChevronRight size={17} /> : <ChevronLeft size={17} />}
-      </button>
       <nav
         className="source-sidebar__nav"
         aria-label={messages.shell.navigationLabel}

@@ -2,6 +2,7 @@ import { AppShell } from "@/app/AppShell";
 import { ErrorBoundary } from "@/app/ErrorBoundary";
 import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { useAppRuntime } from "@/hooks/useAppRuntime";
+import { Toaster } from "@/components/ui/Toast";
 import { ProviderSelectionPage } from "@/pages/ProviderHub/ProviderSelectionPage";
 import { SettingsPage } from "@/pages/Settings/SettingsPage";
 import { CaptchaSetupPage } from "@/pages/CaptchaSetup/CaptchaSetupPage";
@@ -24,6 +25,7 @@ export function App() {
     <ErrorBoundary>
       <LocaleProvider>
         <SourceApplication />
+        <Toaster />
       </LocaleProvider>
     </ErrorBoundary>
   );
