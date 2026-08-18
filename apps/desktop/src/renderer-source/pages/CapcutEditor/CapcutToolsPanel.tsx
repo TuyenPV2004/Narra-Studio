@@ -158,7 +158,9 @@ export function CapcutToolsPanel({
           <Button
             variant="secondary"
             disabled={
-              Boolean(busyAction) || !providerReady || clip.trackType === "audio"
+              Boolean(busyAction) ||
+              !providerReady ||
+              clip.trackType === "audio"
             }
             onClick={() => void analyzeDeflicker()}
           >

@@ -6,6 +6,7 @@ import {
   aiProviderApi,
   type AiProviderModel,
   type AiProviderCapability,
+  type AiProviderProtocol,
   type AiProviderProfile,
 } from "@/services/electron-api/ai-providers";
 
@@ -16,6 +17,19 @@ const capabilityLabels: Record<AiProviderCapability, string> = {
   "lip-sync": "Lip-sync",
 };
 
+const protocolLabels: Record<AiProviderProtocol, string> = {
+  "openai-compatible": "OpenAI-compatible (Text/Vision)",
+  "narra-tts-v1": "TTS-compatible v1",
+  "sync-v2": "Sync-compatible v2",
+};
+
+const protocolCapabilities: Record<AiProviderProtocol, AiProviderCapability[]> =
+  {
+    "openai-compatible": ["text", "vision"],
+    "narra-tts-v1": ["text-to-speech"],
+    "sync-v2": ["lip-sync"],
+  };
+
 const emptyDraft = {
   id: "",
   name: "",
@@ -23,12 +37,15 @@ const emptyDraft = {
   apiKey: "",
   model: "",
   capabilities: ["text", "vision"] as AiProviderCapability[],
+  protocol: "openai-compatible" as AiProviderProtocol,
 };
 
 export function AiProviderProfilesPanel() {
   const [profiles, setProfiles] = useState<AiProviderProfile[]>([]);
   const [activeId, setActiveId] = useState("");
-  const [activeByCapability, setActiveByCapability] = useState<Partial<Record<AiProviderCapability, string>>>({});
+  const [activeByCapability, setActiveByCapability] = useState<
+    Partial<Record<AiProviderCapability, string>>
+  >({});
   const [draft, setDraft] = useState(emptyDraft);
   const [models, setModels] = useState<AiProviderModel[]>([]);
   const [busy, setBusy] = useState(false);
@@ -66,6 +83,7 @@ export function AiProviderProfilesPanel() {
       apiKey: "",
       model: profile.model,
       capabilities: profile.capabilities,
+      protocol: profile.protocol,
     });
     setModels(
       profile.model ? [{ id: profile.model, name: profile.model }] : [],
@@ -131,6 +149,7 @@ export function AiProviderProfilesPanel() {
       !draft.name.trim() ||
       !draft.baseUrl.trim() ||
       !draft.model.trim() ||
+      draft.capabilities.length === 0 ||
       (!draft.id && !draft.apiKey.trim())
     )
       return;
@@ -143,6 +162,7 @@ export function AiProviderProfilesPanel() {
         baseUrl: draft.baseUrl.trim(),
         model: draft.model.trim(),
         capabilities: draft.capabilities,
+        protocol: draft.protocol,
         ...(draft.apiKey.trim() ? { apiKey: draft.apiKey.trim() } : {}),
       });
       setDraft(emptyDraft);
@@ -158,7 +178,10 @@ export function AiProviderProfilesPanel() {
     }
   };
 
-  const activate = async (id: string, capability: AiProviderCapability = "text") => {
+  const activate = async (
+    id: string,
+    capability: AiProviderCapability = "text",
+  ) => {
     setBusy(true);
     setFeedback(undefined);
     try {
@@ -231,8 +254,11 @@ export function AiProviderProfilesPanel() {
               <div>
                 <strong>{profile.name}</strong>
                 <code>{profile.baseUrl}</code>
+                <small>{protocolLabels[profile.protocol]}</small>
                 <small className="source-ai-providers__capabilities">
-                  {profile.capabilities.map((capability) => capabilityLabels[capability]).join(" · ")}
+                  {profile.capabilities
+                    .map((capability) => capabilityLabels[capability])
+                    .join(" · ")}
                 </small>
                 <span>{profile.model || "Chưa chọn model"}</span>
                 <small>
@@ -259,7 +285,9 @@ export function AiProviderProfilesPanel() {
                     <Button
                       key={capability}
                       variant="ghost"
-                      disabled={busy || activeByCapability[capability] === profile.id}
+                      disabled={
+                        busy || activeByCapability[capability] === profile.id
+                      }
                       onClick={() => void activate(profile.id, capability)}
                     >
                       {activeByCapability[capability] === profile.id
@@ -318,7 +346,7 @@ export function AiProviderProfilesPanel() {
                   name: event.target.value,
                 }))
               }
-          placeholder="Ví dụ: OpenAI, Anthropic-compatible, LiteLLM"
+              placeholder="Ví dụ: OpenAI, Anthropic-compatible, LiteLLM"
             />
           </label>
           <label>
@@ -334,6 +362,35 @@ export function AiProviderProfilesPanel() {
               }
               placeholder="https://provider.example/v1"
             />
+          </label>
+          <label>
+            Loại kết nối
+            <select
+              value={draft.protocol}
+              onChange={(event) => {
+                const protocol = event.target.value as AiProviderProtocol;
+                setDraft((current) => ({
+                  ...current,
+                  protocol,
+                  capabilities: protocolCapabilities[protocol],
+                }));
+              }}
+            >
+              {(Object.keys(protocolLabels) as AiProviderProtocol[]).map(
+                (protocol) => (
+                  <option key={protocol} value={protocol}>
+                    {protocolLabels[protocol]}
+                  </option>
+                ),
+              )}
+            </select>
+            <small>
+              {draft.protocol === "openai-compatible"
+                ? "Dùng /models và /chat/completions cho Text/Vision."
+                : draft.protocol === "narra-tts-v1"
+                  ? "Dùng contract /v1/text-to-speech cho TTS."
+                  : "Dùng contract /v2/generate và polling cho Lip-sync."}
+            </small>
           </label>
           <label>
             API key {draft.id && <small>Để trống để giữ key hiện tại</small>}
@@ -353,14 +410,22 @@ export function AiProviderProfilesPanel() {
           <div className="source-ai-providers__test-actions">
             <Button
               variant="secondary"
-              disabled={busy || !draft.baseUrl.trim()}
+              disabled={
+                busy ||
+                !draft.baseUrl.trim() ||
+                draft.protocol !== "openai-compatible"
+              }
               onClick={() => void test()}
             >
               <PlugZap size={15} /> Kiểm tra kết nối
             </Button>
             <Button
               variant="secondary"
-              disabled={busy || !draft.baseUrl.trim()}
+              disabled={
+                busy ||
+                !draft.baseUrl.trim() ||
+                draft.protocol !== "openai-compatible"
+              }
               onClick={() => void discover()}
             >
               Tải danh sách model
@@ -399,23 +464,30 @@ export function AiProviderProfilesPanel() {
           </label>
           <fieldset className="source-ai-providers__capability-options">
             <legend>Capabilities</legend>
-            {(Object.keys(capabilityLabels) as AiProviderCapability[]).map((capability) => (
-              <label key={capability}>
-                <input
-                  type="checkbox"
-                  checked={draft.capabilities.includes(capability)}
-                  onChange={(event) =>
-                    setDraft((current) => ({
-                      ...current,
-                      capabilities: event.target.checked
-                        ? [...new Set([...current.capabilities, capability])]
-                        : current.capabilities.filter((value) => value !== capability),
-                    }))
-                  }
-                />
-                {capabilityLabels[capability]}
-              </label>
-            ))}
+            {(Object.keys(capabilityLabels) as AiProviderCapability[]).map(
+              (capability) => (
+                <label key={capability}>
+                  <input
+                    type="checkbox"
+                    disabled={
+                      !protocolCapabilities[draft.protocol].includes(capability)
+                    }
+                    checked={draft.capabilities.includes(capability)}
+                    onChange={(event) =>
+                      setDraft((current) => ({
+                        ...current,
+                        capabilities: event.target.checked
+                          ? [...new Set([...current.capabilities, capability])]
+                          : current.capabilities.filter(
+                              (value) => value !== capability,
+                            ),
+                      }))
+                    }
+                  />
+                  {capabilityLabels[capability]}
+                </label>
+              ),
+            )}
           </fieldset>
           <Button
             type="submit"
@@ -424,6 +496,7 @@ export function AiProviderProfilesPanel() {
               !draft.name.trim() ||
               !draft.baseUrl.trim() ||
               !draft.model.trim() ||
+              draft.capabilities.length === 0 ||
               (!draft.id && !draft.apiKey.trim())
             }
           >

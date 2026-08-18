@@ -79,13 +79,8 @@ module.exports = function registerAiIpc(dependencies) {
 
 // ── AI Lip sync video render (local MuseTalk default + Sync.so fallback) ──
 function getLipSyncApiKey() {
-  const s = loadSettings();
   const profile = openAiProvider?.getActiveRuntime?.('lip-sync');
-  return (
-    profile?.apiKey ||
-    s.lipSyncApiKey ||
-    ''
-  ).trim();
+  return String(profile?.apiKey || '').trim();
 }
 
 function getLipSyncRuntime() {
@@ -93,7 +88,6 @@ function getLipSyncRuntime() {
 }
 
 function getLipSyncSettings() {
-  const s = loadSettings();
   const key = getLipSyncApiKey();
   const profile = getLipSyncRuntime();
   // Provider is now always Sync.so cloud — local Wav2Lip/MuseTalk has been
@@ -101,11 +95,11 @@ function getLipSyncSettings() {
   // versions so users on a fresh build don't see "Local engine not installed"
   // when local mode no longer exists.
   return {
-    provider: 'sync.so',
-    apiBase: profile?.apiBase || (s.lipSyncApiBase || '').replace(/\/+$/, ''),
-    model: profile?.visionModel || s.lipSyncModel || '',
+    provider: profile?.protocol || 'sync-v2',
+    apiBase: profile?.apiBase || '',
+    model: profile?.visionModel || '',
     apiKeySet: !!key,
-    apiKeyPreview: key ? `${key.slice(0, 4)}...${key.slice(-4)}` : '',
+    apiKeyPreview: key ? `••••••${key.slice(-4)}` : '',
     local: getLocalLipSyncStatusSync(),
   };
 }
@@ -506,13 +500,8 @@ ipcMain.handle('prepare-local-tts-engine', async (event, params = {}) => {
 });
 
 ipcMain.handle('save-lip-sync-settings', async (_, params = {}) => {
-  const patch = {};
-  if (typeof params.apiKey === 'string' && params.apiKey.trim()) patch.lipSyncApiKey = params.apiKey.trim();
-  if (typeof params.apiBase === 'string' && params.apiBase.trim()) patch.lipSyncApiBase = params.apiBase.trim().replace(/\/+$/, '');
-  if (typeof params.model === 'string' && params.model.trim()) patch.lipSyncModel = params.model.trim();
-  if (typeof params.provider === 'string' && params.provider.trim()) patch.lipSyncProvider = params.provider.trim();
-  if (Object.keys(patch).length > 0) saveSettings(patch);
-  return getLipSyncSettings();
+  void params;
+  throw new Error('Configure lip-sync through Provider Account custom profiles.');
 });
 
 async function getAgentTextRuntimeSettings() {
@@ -528,8 +517,8 @@ async function getAgentTextRuntimeSettings() {
 }
 
 async function getVisionProviderRuntime() {
-  const settings = openAiProvider?.getActiveRuntime?.('vision') || await getAgentTextRuntimeSettings();
-  if (!settings.apiKey) {
+  const settings = openAiProvider?.getActiveRuntime?.('vision');
+  if (!settings?.apiKey) {
     throw new Error('AI provider is not configured. Add Base URL, API key and model in Provider Account.');
   }
   if (settings.format !== 'openai') {

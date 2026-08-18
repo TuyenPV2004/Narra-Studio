@@ -36,7 +36,7 @@ assert.match(captcha, /aria-live=/);
 assert.match(canvasGraph, /<audio controls/);
 assert.match(mediaTools, /Audio trim start/);
 assert.match(providerConnections, /AiProviderProfilesPanel/);
-for (const token of ['Base URL', 'API key', 'Kiểm tra kết nối', 'Tải danh sách model', 'Lưu provider']) {
+for (const token of ['Base URL', 'API key', 'Kiểm tra kết nối', 'Tải danh sách model', 'Lưu provider', 'Capabilities', 'Loại kết nối', 'Text-to-speech', 'Lip-sync']) {
   assert.match(aiProviders, new RegExp(token));
 }
 

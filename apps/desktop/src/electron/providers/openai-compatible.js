@@ -6,6 +6,11 @@ const PROFILE_LIMIT = 20;
 const MODEL_LIMIT = 500;
 const REQUEST_TIMEOUT_MS = 15000;
 const CAPABILITIES = ['text', 'vision', 'text-to-speech', 'lip-sync'];
+const PROTOCOL_CAPABILITIES = {
+  'openai-compatible': ['text', 'vision'],
+  'narra-tts-v1': ['text-to-speech'],
+  'sync-v2': ['lip-sync'],
+};
 
 function redactSecret(value, secret) {
   const text = String(value || '');
@@ -128,6 +133,7 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
       name: profile.name,
       baseUrl: profile.baseUrl,
       model: profile.model || '',
+      protocol: PROTOCOL_CAPABILITIES[profile.protocol] ? profile.protocol : 'openai-compatible',
       capabilities: Array.isArray(profile.capabilities) && profile.capabilities.length
         ? profile.capabilities.filter(value => CAPABILITIES.includes(value))
         : ['text', 'vision'],
@@ -179,9 +185,11 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
       const profiles = loadProfiles().map(publicProfile);
       const activeByCapability = {};
       for (const capability of CAPABILITIES) {
-        const key = capability === 'text' || capability === 'vision'
+        const key = capability === 'text'
           ? settings.activeAiProviderProfileId
-          : settings[`active${capability === 'text-to-speech' ? 'Tts' : 'LipSync'}ProviderProfileId`];
+          : capability === 'vision'
+            ? settings.activeVisionProviderProfileId || settings.activeAiProviderProfileId
+            : settings[`active${capability === 'text-to-speech' ? 'Tts' : 'LipSync'}ProviderProfileId`];
         const active = profiles.find(profile => profile.id === key && profile.capabilities.includes(capability));
         activeByCapability[capability] = active?.id || '';
       }
@@ -197,9 +205,15 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
       if (!name) throw new Error('Provider name is required.');
       const baseUrl = normalizeBaseUrl(payload.baseUrl || previous?.baseUrl);
       const model = String(payload.model || previous?.model || '').trim().slice(0, 200);
-      const capabilities = Array.isArray(payload.capabilities)
-        ? [...new Set(payload.capabilities.filter(value => CAPABILITIES.includes(value)))]
-        : (previous?.capabilities || ['text', 'vision']);
+      if (!model) throw new Error('Provider model is required.');
+      const protocol = PROTOCOL_CAPABILITIES[payload.protocol]
+        ? payload.protocol
+        : (previous?.protocol || 'openai-compatible');
+      const allowedCapabilities = PROTOCOL_CAPABILITIES[protocol];
+      const capabilityInput = Array.isArray(payload.capabilities)
+        ? payload.capabilities
+        : (previous?.capabilities || allowedCapabilities);
+      const capabilities = [...new Set(capabilityInput.filter(value => allowedCapabilities.includes(value)))];
       if (!capabilities.length) throw new Error('Select at least one provider capability.');
       const key = String(payload.apiKey || '').trim();
       const profile = {
@@ -207,6 +221,7 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
         name,
         baseUrl,
         model,
+        protocol,
         capabilities,
         apiKeyEncrypted: key ? encryptKey(key) : previous?.apiKeyEncrypted || '',
       };
@@ -225,9 +240,11 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
       const id = normalizeProfileId(idValue);
       const profiles = loadProfiles().filter(profile => profile.id !== id);
       const settings = loadSettings();
+      const nextTextProfile = profiles.find(profile => (profile.capabilities || ['text', 'vision']).includes('text'));
       saveSettings({
         aiProviderProfiles: profiles,
-        activeAiProviderProfileId: settings.activeAiProviderProfileId === id ? profiles[0]?.id || '' : settings.activeAiProviderProfileId,
+        activeAiProviderProfileId: settings.activeAiProviderProfileId === id ? nextTextProfile?.id || '' : settings.activeAiProviderProfileId,
+        activeVisionProviderProfileId: settings.activeVisionProviderProfileId === id ? '' : settings.activeVisionProviderProfileId,
         activeTtsProviderProfileId: settings.activeTtsProviderProfileId === id ? '' : settings.activeTtsProviderProfileId,
         activeLipSyncProviderProfileId: settings.activeLipSyncProviderProfileId === id ? '' : settings.activeLipSyncProviderProfileId,
       });
@@ -240,9 +257,11 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
       if (!profile || !(profile.capabilities || ['text', 'vision']).includes(capability)) {
         throw new Error('AI provider does not support this capability.');
       }
-      const key = capability === 'text' || capability === 'vision'
+      const key = capability === 'text'
         ? 'activeAiProviderProfileId'
-        : `active${capability === 'text-to-speech' ? 'Tts' : 'LipSync'}ProviderProfileId`;
+        : capability === 'vision'
+          ? 'activeVisionProviderProfileId'
+          : `active${capability === 'text-to-speech' ? 'Tts' : 'LipSync'}ProviderProfileId`;
       saveSettings({ [key]: id, aiProvider: 'openai-compatible' });
       return publicProfile(profile);
     },
@@ -254,9 +273,11 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
     getActiveRuntime(capability = 'text') {
       const settings = loadSettings();
       const profiles = loadProfiles();
-      const key = capability === 'text' || capability === 'vision'
+      const key = capability === 'text'
         ? settings.activeAiProviderProfileId
-        : settings[`active${capability === 'text-to-speech' ? 'Tts' : 'LipSync'}ProviderProfileId`];
+        : capability === 'vision'
+          ? settings.activeVisionProviderProfileId || settings.activeAiProviderProfileId
+          : settings[`active${capability === 'text-to-speech' ? 'Tts' : 'LipSync'}ProviderProfileId`];
       const profile = profiles.find(item => item.id === key && (item.capabilities || ['text', 'vision']).includes(capability));
       if (!profile) return null;
       const apiKey = decryptKey(profile);
@@ -275,6 +296,7 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
         source: `openai-compatible:${profile.id}`,
         format: 'openai',
         capability,
+        protocol: profile.protocol || 'openai-compatible',
       };
     },
   };

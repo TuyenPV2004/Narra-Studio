@@ -23,7 +23,10 @@ export interface NarraElectronApi {
     model?: string;
   }) => Promise<unknown>;
   aiProviderProfileDelete: (payload: { id: string }) => Promise<unknown>;
-  aiProviderProfileSetActive: (payload: { id: string }) => Promise<unknown>;
+  aiProviderProfileSetActive: (payload: {
+    id: string;
+    capability?: string;
+  }) => Promise<unknown>;
   aiProviderProfileTest: (payload: {
     id?: string;
     baseUrl?: string;

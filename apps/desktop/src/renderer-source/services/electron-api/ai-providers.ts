@@ -7,10 +7,10 @@ export interface AiProviderModel {
 }
 
 export type AiProviderCapability =
-  | "text"
-  | "vision"
-  | "text-to-speech"
-  | "lip-sync";
+  "text" | "vision" | "text-to-speech" | "lip-sync";
+
+export type AiProviderProtocol =
+  "openai-compatible" | "narra-tts-v1" | "sync-v2";
 
 export interface AiProviderProfile {
   apiKeyPreview: string;
@@ -20,6 +20,7 @@ export interface AiProviderProfile {
   model: string;
   name: string;
   capabilities: AiProviderCapability[];
+  protocol: AiProviderProtocol;
 }
 
 export interface AiProviderDraft {
@@ -29,6 +30,7 @@ export interface AiProviderDraft {
   model?: string;
   name: string;
   capabilities?: AiProviderCapability[];
+  protocol?: AiProviderProtocol;
 }
 
 export interface AiProviderConnection {
@@ -64,6 +66,10 @@ const profile = (value: unknown): AiProviderProfile | null => {
             value === "lip-sync",
         )
       : ["text", "vision"],
+    protocol:
+      item.protocol === "narra-tts-v1" || item.protocol === "sync-v2"
+        ? item.protocol
+        : "openai-compatible",
     hasApiKey: item.hasApiKey === true,
     apiKeyPreview:
       typeof item.apiKeyPreview === "string" ? item.apiKeyPreview : "",
@@ -80,8 +86,11 @@ export const aiProviderApi = {
     return {
       activeId: typeof response.activeId === "string" ? response.activeId : "",
       activeByCapability:
-        typeof response.activeByCapability === "object" && response.activeByCapability !== null
-          ? (response.activeByCapability as Partial<Record<AiProviderCapability, string>>)
+        typeof response.activeByCapability === "object" &&
+        response.activeByCapability !== null
+          ? (response.activeByCapability as Partial<
+              Record<AiProviderCapability, string>
+            >)
           : {},
       profiles: Array.isArray(response.profiles)
         ? response.profiles.flatMap((item) => {
@@ -97,6 +106,13 @@ export const aiProviderApi = {
     );
     if (!response) throw new Error("Provider trả về cấu hình không hợp lệ.");
     return response;
+  },
+  async active(
+    capability: AiProviderCapability,
+  ): Promise<AiProviderProfile | null> {
+    const value = await this.list();
+    const id = value.activeByCapability[capability];
+    return value.profiles.find((profile) => profile.id === id) || null;
   },
   remove: (id: string) => getElectronApi().aiProviderProfileDelete({ id }),
   setActive: (id: string, capability: AiProviderCapability = "text") =>

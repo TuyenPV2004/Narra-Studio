@@ -1,4 +1,5 @@
 import { getElectronApi } from "@/services/electron-api/client";
+import { aiProviderApi } from "@/services/electron-api/ai-providers";
 
 export interface AgentMessage extends Record<string, unknown> {
   content: string;
@@ -174,10 +175,11 @@ export const agentApi = {
 
   async generateAudio(text: string): Promise<{ jobId: string; src: string }> {
     const jobId = `local-piper-${Date.now()}-${crypto.randomUUID()}`;
+    const ttsProvider = await aiProviderApi.active("text-to-speech");
     const response = record(
       await getElectronApi().textToSpeech({
         text,
-        provider: "local-piper",
+        provider: ttsProvider ? "custom-provider" : "local-piper",
         language: "vi",
         progressTag: jobId,
       }),

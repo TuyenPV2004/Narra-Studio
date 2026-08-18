@@ -10,7 +10,7 @@ Narra Studio là ứng dụng Electron single-user. Renderer chính được bui
 - Nhiều tài khoản bằng Electron partition tách biệt; cookie không được chia sẻ giữa các slot.
 - CAPTCHA bridge và lớp anti-detect phục vụ phiên automation do người dùng khởi tạo.
 - Tạo ảnh/video, upload reference, polling, download media và lịch sử kết quả.
-- AI Agent text qua các profile OpenAI-compatible do người dùng cấu hình; Google Flow vẫn là provider media riêng. Các provider voice/lip-sync local/tuỳ chọn giữ nguyên.
+- AI Agent Text/Vision, TTS và lip-sync dùng custom provider profile mã hóa, được chọn theo capability/protocol; Google Flow vẫn là provider media riêng.
 - Workspace/canvas lưu JSON và media trong Electron `userData`, không dùng team server.
 - FFmpeg, ONNX, tách audio, chỉnh sửa video và các công cụ media local.
 
@@ -26,7 +26,7 @@ Narra Studio là ứng dụng Electron single-user. Renderer chính được bui
 - `.env` không được commit.
 - Không đặt mật khẩu Google, cookie, bearer token hoặc mã 2FA trong `.env`.
 - Session Google được Electron lưu cục bộ trong partition tương ứng.
-- API key của các custom AI provider profile, voice/lip-sync và Google Flow credits là tùy chọn, thuộc quyền sở hữu người dùng; key AI được lưu bằng mã hóa hệ điều hành.
+- API key của custom provider profile thuộc quyền sở hữu người dùng và được lưu bằng mã hóa hệ điều hành; `.env` không còn chứa credential provider.
 
 ## Source và build
 

@@ -24,4 +24,4 @@ pnpm build
 pnpm package:win
 ```
 
-Sao chép `.env.example` thành `.env` và chỉ điền provider thực sự sử dụng. Xem [kiến trúc runtime Narra local](docs/Kien_truc_Runtime_Narra_Local.md) để biết ranh giới local/remote.
+Sao chép `.env.example` thành `.env` chỉ khi cần tinh chỉnh local inference runtime. Credential provider được cấu hình trong Provider Account và lưu bằng mã hóa hệ điều hành. Xem [kiến trúc runtime Narra local](docs/Kien_truc_Runtime_Narra_Local.md) để biết ranh giới local/remote.

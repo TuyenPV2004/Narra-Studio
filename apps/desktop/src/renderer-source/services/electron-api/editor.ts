@@ -554,8 +554,15 @@ export const editorApi = {
     return output;
   },
   async aiProviderReady(): Promise<boolean> {
-    const { profiles } = await aiProviderApi.list();
-    return profiles.some((profile) => profile.hasApiKey && Boolean(profile.model));
+    const { activeByCapability, profiles } = await aiProviderApi.list();
+    const activeId = activeByCapability.vision;
+    return profiles.some(
+      (profile) =>
+        profile.id === activeId &&
+        profile.hasApiKey &&
+        Boolean(profile.model) &&
+        profile.capabilities.includes("vision"),
+    );
   },
   async suggestDeflicker(clip: EditorClip): Promise<EditorDeflickerSuggestion> {
     const value = object(
@@ -579,14 +586,14 @@ export const editorApi = {
     };
   },
   async textToSpeech(text: string, voiceId: string): Promise<string> {
+    const ttsProvider = await aiProviderApi.active("text-to-speech");
     const value = object(
       await getElectronApi().textToSpeech({
         text,
         voiceId,
         stability: 50,
         language: "vi",
-        provider: "local-piper",
-        model: "piper",
+        provider: ttsProvider ? "custom-provider" : "local-piper",
         progressTag: "sourceCapcutLipVoice",
       }),
     );

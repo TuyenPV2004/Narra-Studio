@@ -131,7 +131,7 @@ const loadTtsRuntime = () => {
 };
 const getTtsHeaders = (json = false) => {
   const { apiKey } = loadTtsRuntime();
-  if (!apiKey) throw new Error('TTS chưa cấu hình API key. Thêm key vào .secrets/tts.json.');
+  if (!apiKey) throw new Error('TTS provider chưa được cấu hình. Hãy chọn custom provider có capability Text-to-speech.');
   return json
     ? { 'Content-Type': 'application/json', 'xi-api-key': apiKey }
     : { 'xi-api-key': apiKey };
