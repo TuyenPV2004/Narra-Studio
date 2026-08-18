@@ -40,13 +40,29 @@
       try {
         enterprise.ready(async () => {
           try {
-            finish(resolve, await enterprise.execute(siteKey, {action}));
-          } catch {
-            finish(reject, new Error('Token request failed'));
+            const requestedAction = action || 'IMAGE_GENERATION';
+            try {
+              const result = await enterprise.execute(siteKey, { action: requestedAction });
+              if (result && typeof result === 'string' && result.length > 20) {
+                finish(resolve, result);
+                return;
+              }
+            } catch (initialErr) {
+              if (requestedAction !== 'IMAGE_GENERATION') {
+                const fallbackResult = await enterprise.execute(siteKey, { action: 'IMAGE_GENERATION' });
+                if (fallbackResult && typeof fallbackResult === 'string' && fallbackResult.length > 20) {
+                  finish(resolve, fallbackResult);
+                  return;
+                }
+              }
+              throw initialErr;
+            }
+          } catch (err) {
+            finish(reject, new Error(err?.message || 'Token request failed'));
           }
         });
-      } catch {
-        finish(reject, new Error('Token request failed'));
+      } catch (err) {
+        finish(reject, new Error(err?.message || 'Token request failed'));
       }
     });
 

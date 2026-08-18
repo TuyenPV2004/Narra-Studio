@@ -719,8 +719,7 @@ async function _doApiRequestViaWebviewOnce(url, body, slotId, captchaAction) {
       }
     }
     if (!captchaToken) {
-      const hint = 'Extension Chrome không tạo được token. Mở popup extension trong Chrome để kiểm tra: tab labs.google còn mở không? Status có "connected" không?';
-      throw new Error(extErr ? (extErr.message + ' — ' + hint) : hint);
+      console.warn('[CAPTCHA] Extension token request failed, falling back to other strategies:', extErr?.message || 'Token request failed');
     }
   }
 

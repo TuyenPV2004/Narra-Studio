@@ -20,14 +20,20 @@ import type { ProviderId } from "@/types/electron-api";
 
 const flowModels: VideoModel[] = [
   {
+    id: "abra_t2v_8s",
+    label: "Google Abra T2V (Tiêu chuẩn / Miễn phí)",
+    durations: [4, 6, 8],
+    resolutions: ["720p"],
+  },
+  {
     id: "veo_3_1_t2v_fast_ultra",
-    label: "VEO 3.1 Fast",
+    label: "VEO 3.1 Fast (Ultra)",
     durations: [4, 6, 8],
     resolutions: ["720p"],
   },
   {
     id: "veo_3_1_t2v_quality_ultra",
-    label: "VEO 3.1 Quality",
+    label: "VEO 3.1 Quality (Ultra)",
     durations: [4, 6, 8],
     resolutions: ["1080p"],
   },

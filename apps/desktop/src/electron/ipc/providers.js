@@ -4,6 +4,7 @@ const registry = require('../providers/registry');
 
 module.exports = function registerProviderIpc(dependencies) {
   const {
+    app,
     ipcMain,
     loadSettings,
     saveSettings,
@@ -28,10 +29,20 @@ module.exports = function registerProviderIpc(dependencies) {
   };
 
   const startVeo3Runtime = () => {
-    setupRequestInterception?.();
     try { captchaBridge?.start?.(); } catch (error) {
       console.warn('[PROVIDER][VEO3] CAPTCHA bridge start failed:', error?.message || error);
     }
+    if (app && typeof app.isReady === 'function' && !app.isReady()) {
+      app.whenReady().then(() => {
+        setupRequestInterception?.();
+        if (veo3CookieRefreshTimer) clearInterval(veo3CookieRefreshTimer);
+        if (veo3InitialCookieRefreshTimer) clearTimeout(veo3InitialCookieRefreshTimer);
+        veo3InitialCookieRefreshTimer = setTimeout(() => refreshCapturedCookies?.(), 5000);
+        veo3CookieRefreshTimer = setInterval(() => refreshCapturedCookies?.(), 30 * 60 * 1000);
+      });
+      return;
+    }
+    setupRequestInterception?.();
     if (veo3CookieRefreshTimer) clearInterval(veo3CookieRefreshTimer);
     if (veo3InitialCookieRefreshTimer) clearTimeout(veo3InitialCookieRefreshTimer);
     veo3InitialCookieRefreshTimer = setTimeout(() => refreshCapturedCookies?.(), 5000);
@@ -72,6 +83,11 @@ module.exports = function registerProviderIpc(dependencies) {
     registry.normalizeProviderId(providerId);
     return { configured: false, value: '' };
   });
+
+  const initialActive = registry.normalizeProviderId(loadSettings().activeProvider);
+  if (initialActive === 'veo3') {
+    startVeo3Runtime();
+  }
 
   return registry;
 };

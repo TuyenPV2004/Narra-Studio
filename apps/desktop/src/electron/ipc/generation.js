@@ -414,9 +414,9 @@ ipcMain.handle('generate-video', async (_, { prompt, captchaToken, videoModelKey
   const ctx = {
     projectId,
     tool: 'PINHOLE',
-    userPaygateTier: 'PAYGATE_TIER_TWO',
     sessionId,
     recaptchaContext: { token: captchaToken, applicationType: 'RECAPTCHA_APPLICATION_TYPE_WEB' },
+    ...(slot.userPaygateTier ? { userPaygateTier: slot.userPaygateTier } : {}),
   };
 
   const body = {
@@ -426,13 +426,13 @@ ipcMain.handle('generate-video', async (_, { prompt, captchaToken, videoModelKey
       aspectRatio: aspectRatio || 'VIDEO_ASPECT_RATIO_LANDSCAPE',
       seed: seed || Math.floor(Math.random() * 1000000),
       textInput: { structuredPrompt: { parts: [{ text: prompt }] } },
-      videoModelKey: videoModelKey || 'veo_3_1_t2v_lite_low_priority',
+      videoModelKey: (!videoModelKey || videoModelKey === 'veo_3_1_t2v_lite_low_priority') ? 'abra_t2v_8s' : videoModelKey,
       metadata: {},
     }],
     useV2ModelConfig: true,
   };
 
-  console.log(`[SLOT-${slot.id}][API] Async video generate with model: ${videoModelKey}`);
+  console.log(`[SLOT-${slot.id}][API] Async video generate with model: ${videoModelKey || 'abra_t2v_8s'}`);
   const url = 'https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoText';
   return makeApiRequestViaWebview(url, body, slot.id, 'VIDEO_GENERATION');
 });
@@ -448,9 +448,9 @@ ipcMain.handle('generate-video-text', async (_, { prompt, captchaToken, videoMod
   const ctx = {
     projectId,
     tool: 'PINHOLE',
-    userPaygateTier: 'PAYGATE_TIER_TWO',
     sessionId,
     recaptchaContext: { token: captchaToken, applicationType: 'RECAPTCHA_APPLICATION_TYPE_WEB' },
+    ...(slot.userPaygateTier ? { userPaygateTier: slot.userPaygateTier } : {}),
   };
 
   const body = {
@@ -460,7 +460,7 @@ ipcMain.handle('generate-video-text', async (_, { prompt, captchaToken, videoMod
       aspectRatio: aspectRatio || 'VIDEO_ASPECT_RATIO_LANDSCAPE',
       seed: seed || Math.floor(Math.random() * 1000000),
       textInput: { structuredPrompt: { parts: [{ text: prompt }] } },
-      videoModelKey: videoModelKey || 'veo_3_1_t2v_lite_low_priority',
+      videoModelKey: (!videoModelKey || videoModelKey === 'veo_3_1_t2v_lite_low_priority') ? 'abra_t2v_8s' : videoModelKey,
       metadata: {},
     }],
     useV2ModelConfig: true,
@@ -480,8 +480,9 @@ ipcMain.handle('generate-video-start-image', async (_, { prompt, captchaToken, v
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
   const ctx = {
-    projectId, tool: 'PINHOLE', userPaygateTier: 'PAYGATE_TIER_TWO', sessionId,
+    projectId, tool: 'PINHOLE', sessionId,
     recaptchaContext: { token: captchaToken, applicationType: 'RECAPTCHA_APPLICATION_TYPE_WEB' },
+    ...(slot.userPaygateTier ? { userPaygateTier: slot.userPaygateTier } : {}),
   };
 
   const body = {
@@ -512,8 +513,9 @@ ipcMain.handle('generate-video-start-end-image', async (_, { prompt, captchaToke
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
   const ctx = {
-    projectId, tool: 'PINHOLE', userPaygateTier: 'PAYGATE_TIER_TWO', sessionId,
+    projectId, tool: 'PINHOLE', sessionId,
     recaptchaContext: { token: captchaToken, applicationType: 'RECAPTCHA_APPLICATION_TYPE_WEB' },
+    ...(slot.userPaygateTier ? { userPaygateTier: slot.userPaygateTier } : {}),
   };
 
   const body = {
@@ -545,8 +547,9 @@ ipcMain.handle('generate-video-reference-images', async (_, { prompt, captchaTok
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
   const ctx = {
-    projectId, tool: 'PINHOLE', userPaygateTier: 'PAYGATE_TIER_TWO', sessionId,
+    projectId, tool: 'PINHOLE', sessionId,
     recaptchaContext: { token: captchaToken, applicationType: 'RECAPTCHA_APPLICATION_TYPE_WEB' },
+    ...(slot.userPaygateTier ? { userPaygateTier: slot.userPaygateTier } : {}),
   };
 
   const referenceImages = (referenceMediaIds || []).map(mediaId => ({
@@ -650,7 +653,13 @@ ipcMain.handle('generate-flow-voice-preview', async (_, {
   slotId = 0,
 } = {}) => {
   const slot = getSlot(slotId);
-  const projectId = slot.projectId || capturedAuth.projectId || DEFAULTS.projectId;
+  const bridgeStatus = typeof captchaBridge?.getExtensionStatus === 'function' ? captchaBridge.getExtensionStatus() : {};
+  let extProjectId = null;
+  if (bridgeStatus.labsTabUrl) {
+    const match = String(bridgeStatus.labsTabUrl).match(/project\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) extProjectId = match[1];
+  }
+  const projectId = extProjectId || slot.projectId || capturedAuth.projectId || DEFAULTS.projectId;
   if (!slot.bearerToken) throw new Error('Chưa có Bearer token!');
 
   const safeDialog = String(dialog || '').trim().slice(0, 120);
@@ -687,7 +696,7 @@ ipcMain.handle('generate-flow-voice-preview', async (_, {
     'https://aisandbox-pa.googleapis.com/v1/flow:batchGenerateAudio',
     body,
     slot.id,
-    'AUDIO_GENERATION',
+    'IMAGE_GENERATION',
   );
   const data = response && response.data ? response.data : response;
   const media = data && Array.isArray(data.media) ? data.media[0] : null;

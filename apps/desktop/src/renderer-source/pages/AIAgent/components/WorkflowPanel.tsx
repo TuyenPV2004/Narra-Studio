@@ -147,7 +147,7 @@ export function WorkflowPanel({
               : await videoApi.generate({
                   providerId,
                   prompt: item.prompt,
-                  model: "veo_3_1_t2v_fast_ultra",
+                  model: "abra_t2v_8s",
                   aspect: "landscape",
                   duration: 8,
                   resolution: "720p",
