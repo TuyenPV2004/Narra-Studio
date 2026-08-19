@@ -817,9 +817,26 @@ ipcMain.handle('generate-via-page', async (_, { prompt, type, quality, aspect, v
           console.log('[PAGE-GEN] Sub-tab (' + subTabTarget + '):', JSON.stringify(subTabResult));
           await new Promise(r => setTimeout(r, 200));
 
-          // 0c: Click aspect ratio tab (9:16 or 16:9)
+          // 0c: Click aspect ratio tab (16:9, 9:16, 1:1, 4:3, 3:4)
           await new Promise(r => setTimeout(r, 200));
-          const aspectTarget = genAspect === 'portrait' ? '9:16' : '16:9';
+          const aspectMap = {
+            'portrait': '9:16',
+            'landscape': '16:9',
+            'square': '1:1',
+            'IMAGE_ASPECT_RATIO_LANDSCAPE': '16:9',
+            'IMAGE_ASPECT_RATIO_PORTRAIT': '9:16',
+            'IMAGE_ASPECT_RATIO_SQUARE': '1:1',
+            'IMAGE_ASPECT_RATIO_LANDSCAPE_FOUR_THREE': '4:3',
+            'IMAGE_ASPECT_RATIO_PORTRAIT_THREE_FOUR': '3:4',
+            'IMAGE_ASPECT_RATIO_FOUR_THREE': '4:3',
+            'IMAGE_ASPECT_RATIO_THREE_FOUR': '3:4',
+            '16:9': '16:9',
+            '9:16': '9:16',
+            '1:1': '1:1',
+            '4:3': '4:3',
+            '3:4': '3:4',
+          };
+          const aspectTarget = aspectMap[genAspect] || '16:9';
           const aspectResult = await wv.executeJavaScript(`
         (function() {
           var tabs = Array.from(document.querySelectorAll('button[role="tab"]'));

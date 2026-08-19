@@ -48,11 +48,14 @@ const draw = (
   }
 };
 
+const MAX_CANVAS_DIMENSION = 4096;
+
 export function ImageAnnotationCanvas({
   canvasRef,
   color,
   fileUrl,
   onCountChange,
+  onImageLoaded,
   tool,
   width,
 }: {
@@ -60,6 +63,7 @@ export function ImageAnnotationCanvas({
   color: string;
   fileUrl: string;
   onCountChange: (count: number) => void;
+  onImageLoaded?: () => void;
   tool: AnnotationTool;
   width: number;
 }) {
@@ -71,16 +75,35 @@ export function ImageAnnotationCanvas({
     image.onload = () => {
       const canvas = canvasRef.current;
       if (!canvas) return;
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
+      let targetWidth = image.naturalWidth || 800;
+      let targetHeight = image.naturalHeight || 600;
+      if (
+        targetWidth > MAX_CANVAS_DIMENSION ||
+        targetHeight > MAX_CANVAS_DIMENSION
+      ) {
+        if (targetWidth >= targetHeight) {
+          targetHeight = Math.round(
+            (targetHeight * MAX_CANVAS_DIMENSION) / targetWidth,
+          );
+          targetWidth = MAX_CANVAS_DIMENSION;
+        } else {
+          targetWidth = Math.round(
+            (targetWidth * MAX_CANVAS_DIMENSION) / targetHeight,
+          );
+          targetHeight = MAX_CANVAS_DIMENSION;
+        }
+      }
+      canvas.width = targetWidth;
+      canvas.height = targetHeight;
       imageRef.current = image;
       draw(canvas, image, []);
+      onImageLoaded?.();
     };
     image.src = fileUrl;
     return () => {
       image.onload = null;
     };
-  }, [canvasRef, fileUrl]);
+  }, [canvasRef, fileUrl, onImageLoaded]);
   useEffect(() => {
     const canvas = canvasRef.current;
     if (canvas && imageRef.current)

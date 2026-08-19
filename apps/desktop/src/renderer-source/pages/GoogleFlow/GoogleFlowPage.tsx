@@ -148,184 +148,305 @@ export function GoogleFlowPage() {
       )}
 
       <div className="source-flow-grid">
-        {slots.map((slot) => (
-          <article
-            key={slot.id}
-            className="source-flow-slot-card"
-            data-connected={slot.status === "connected"}
-          >
-            {/* Top row: Slot Badge on Left, Project ID & Logout on Right */}
-            <div className="source-flow-slot-card__top">
-              <span className="source-flow-slot-tag">Slot {slot.id + 1}</span>
-              <div className="source-flow-slot-card__top-right">
-                {slot.projectId && (
-                  <button
-                    type="button"
-                    className="source-flow-slot-project"
-                    title={
-                      copiedId === slot.projectId
-                        ? "Đã sao chép vào bộ nhớ tạm!"
-                        : `Project ID: ${slot.projectId} (Nhấn để sao chép)`
-                    }
-                    aria-label={`Sao chép Project ID Slot ${slot.id + 1}`}
-                    onClick={() => void copyProjectId(slot.projectId!)}
-                  >
-                    <span className="source-flow-slot-project__label">
-                      Project:
-                    </span>
-                    <code>
-                      {slot.projectId.length > 13
-                        ? `${slot.projectId.slice(0, 8)}…${slot.projectId.slice(-4)}`
-                        : slot.projectId}
-                    </code>
-                    {copiedId === slot.projectId ? (
-                      <Check
-                        size={12}
-                        className="source-flow-slot-project__copied-icon"
-                        aria-hidden="true"
-                      />
-                    ) : (
-                      <Copy
-                        size={12}
-                        className="source-flow-slot-project__copy-icon"
-                        aria-hidden="true"
-                      />
-                    )}
-                  </button>
-                )}
-                {slot.status === "connected" && (
-                  <button
-                    type="button"
-                    className="source-flow-slot-logout"
-                    title="Đăng xuất khỏi slot này"
-                    aria-label="Đăng xuất"
-                    onClick={() => {
-                      if (
-                        window.confirm(
-                          `Xác nhận đăng xuất Slot ${slot.id + 1}?`,
+        {slots.map((slot) => {
+          const isConnected = slot.status === "connected";
+          const isAuthenticated = slot.status === "authenticated";
+          const isRestoring = slot.status === "restoring";
+          const isExpired = slot.status === "expired";
+          const isError = slot.status === "error";
+
+          let statusTitle = "Chưa đăng nhập";
+          let statusSubtitle = "Nhấn Đăng nhập để kết nối";
+          let dotLabel = "Chưa kết nối";
+
+          const fallbackName = slot.email
+            ? slot.email.split("@")[0] || "Tài khoản Google"
+            : "Tài khoản Google";
+
+          if (isConnected) {
+            statusTitle = slot.displayName || fallbackName;
+            statusSubtitle = slot.email || "Đã kết nối (Sẵn sàng tạo media)";
+            dotLabel = "Đã kết nối";
+          } else if (isAuthenticated) {
+            statusTitle = slot.displayName || fallbackName;
+            statusSubtitle = slot.email
+              ? `${slot.email} (Đã khôi phục phiên)`
+              : "Đã khôi phục phiên Google";
+            dotLabel = "Đã khôi phục phiên";
+          } else if (isRestoring) {
+            statusTitle = slot.displayName || "Đang kiểm tra...";
+            statusSubtitle = "Đang khôi phục phiên...";
+            dotLabel = "Đang khôi phục";
+          } else if (isExpired) {
+            statusTitle = slot.displayName || fallbackName;
+            statusSubtitle = "Phiên đã hết hạn — Vui lòng đăng nhập lại";
+            dotLabel = "Phiên hết hạn";
+          } else if (isError) {
+            statusTitle = slot.displayName || fallbackName;
+            statusSubtitle = "Lỗi kết nối — Hãy thử lại";
+            dotLabel = "Lỗi kết nối";
+          }
+
+          return (
+            <article
+              key={slot.id}
+              className="source-flow-slot-card"
+              data-status={slot.status}
+              data-connected={isConnected}
+            >
+              {/* Top row: Slot Badge on Left, Project ID & Logout on Right */}
+              <div className="source-flow-slot-card__top">
+                <span className="source-flow-slot-tag">Slot {slot.id + 1}</span>
+                <div className="source-flow-slot-card__top-right">
+                  {slot.projectId && (
+                    <button
+                      type="button"
+                      className="source-flow-slot-project"
+                      title={
+                        copiedId === slot.projectId
+                          ? "Đã sao chép vào bộ nhớ tạm!"
+                          : `Project ID: ${slot.projectId} (Nhấn để sao chép)`
+                      }
+                      aria-label={`Sao chép Project ID Slot ${slot.id + 1}`}
+                      onClick={() => void copyProjectId(slot.projectId!)}
+                    >
+                      <span className="source-flow-slot-project__label">
+                        Project:
+                      </span>
+                      <code>
+                        {slot.projectId.length > 13
+                          ? `${slot.projectId.slice(0, 8)}…${slot.projectId.slice(-4)}`
+                          : slot.projectId}
+                      </code>
+                      {copiedId === slot.projectId ? (
+                        <Check
+                          size={12}
+                          className="source-flow-slot-project__copied-icon"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <Copy
+                          size={12}
+                          className="source-flow-slot-project__copy-icon"
+                          aria-hidden="true"
+                        />
+                      )}
+                    </button>
+                  )}
+                  {(isConnected || isAuthenticated || isExpired) && (
+                    <button
+                      type="button"
+                      className="source-flow-slot-logout"
+                      title="Đăng xuất khỏi slot này"
+                      aria-label={`Đăng xuất Slot ${slot.id + 1}`}
+                      onClick={() => {
+                        if (
+                          window.confirm(
+                            `Xác nhận đăng xuất Slot ${slot.id + 1}?`,
+                          )
                         )
-                      )
-                        void action(slot.id, "logout", () =>
-                          flowApi.logout(slot.id),
-                        );
-                    }}
-                  >
-                    <LogOut size={16} aria-hidden="true" />
-                  </button>
-                )}
+                          void action(slot.id, "logout", () =>
+                            flowApi.logout(slot.id),
+                          );
+                      }}
+                    >
+                      <LogOut size={16} aria-hidden="true" />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
 
-            {/* Profile row: Round Avatar + Status Dot + Name/Email */}
-            <div className="source-flow-slot-user">
-              <div className="source-flow-avatar-wrap">
-                {slot.avatar ? (
-                  <img
-                    src={slot.avatar}
-                    alt={slot.displayName || slot.email || "Avatar"}
-                    className="source-flow-avatar__img"
-                  />
-                ) : (
-                  <div className="source-flow-avatar__fallback">
-                    {slot.displayName ? (
-                      slot.displayName.charAt(0).toUpperCase()
-                    ) : slot.email ? (
-                      slot.email.charAt(0).toUpperCase()
-                    ) : (
-                      <User size={20} />
-                    )}
-                  </div>
-                )}
-                <span
-                  className="source-flow-avatar__status-dot"
-                  data-connected={slot.status === "connected"}
-                  title={
-                    slot.status === "connected" ? "Đã kết nối" : "Chưa kết nối"
-                  }
-                />
-              </div>
-              <div className="source-flow-user-info">
-                <strong>
-                  {slot.displayName ||
-                    (slot.email
-                      ? slot.email.split("@")[0]
-                      : slot.status === "connected"
-                        ? "Tài khoản Google"
-                        : "Chưa đăng nhập")}
-                </strong>
-                {slot.email ? (
-                  <small title={slot.email}>{slot.email}</small>
-                ) : slot.status === "connected" ? (
-                  <small>Đã kết nối phiên Google</small>
-                ) : (
-                  <small>Nhấn Đăng nhập để kết nối</small>
-                )}
-              </div>
-            </div>
-
-            {/* Actions row */}
-            <div className="source-flow-slot-actions">
-              {slot.status === "connected" ? (
-                <>
-                  <Button
-                    variant="primary"
-                    className="source-flow-btn-open"
-                    disabled={activeAction?.slotId === slot.id}
-                    aria-label={`Mở phiên Slot ${slot.id + 1}`}
-                    onClick={() =>
-                      void action(slot.id, "switch", () =>
-                        flowApi.switchSlot(slot.id),
-                      )
-                    }
-                  >
-                    <RotateCw size={15} />
-                    Mở phiên
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className="source-flow-btn-sync"
-                    disabled={syncingId === slot.id}
-                    onClick={() => void handleSync(slot.id)}
-                  >
-                    <RefreshCw
-                      size={15}
-                      className={syncingId === slot.id ? "is-spinning" : ""}
+              {/* Profile row: Round Avatar + Status Dot + Name/Email */}
+              <div className="source-flow-slot-user">
+                <div className="source-flow-avatar-wrap">
+                  {slot.avatar ? (
+                    <img
+                      src={slot.avatar}
+                      alt={slot.displayName || slot.email || "Avatar"}
+                      className="source-flow-avatar__img"
                     />
-                    Đồng bộ
-                  </Button>
-                  {!slot.projectId && (
+                  ) : (
+                    <div className="source-flow-avatar__fallback">
+                      {slot.displayName ? (
+                        slot.displayName.charAt(0).toUpperCase()
+                      ) : slot.email ? (
+                        slot.email.charAt(0).toUpperCase()
+                      ) : (
+                        <User size={20} />
+                      )}
+                    </div>
+                  )}
+                  <span
+                    className="source-flow-avatar__status-dot"
+                    data-status={slot.status}
+                    data-connected={isConnected}
+                    title={dotLabel}
+                  />
+                </div>
+                <div className="source-flow-user-info">
+                  <strong>{statusTitle}</strong>
+                  <small title={slot.email || statusSubtitle}>
+                    {statusSubtitle}
+                  </small>
+                </div>
+              </div>
+
+              {/* Actions row */}
+              <div className="source-flow-slot-actions">
+                {isConnected && (
+                  <>
                     <Button
-                      variant="secondary"
-                      className="source-flow-btn-create-project"
+                      variant="primary"
+                      className="source-flow-btn-open"
                       disabled={activeAction?.slotId === slot.id}
+                      aria-label={`Mở phiên Slot ${slot.id + 1}`}
                       onClick={() =>
-                        void action(slot.id, "create", async () => {
-                          await flowApi.switchSlot(slot.id);
-                          return flowApi.createProject();
-                        })
+                        void action(slot.id, "switch", () =>
+                          flowApi.switchSlot(slot.id),
+                        )
                       }
                     >
-                      <FolderPlus size={15} />
-                      Tạo project
+                      <RotateCw size={15} />
+                      Mở phiên
                     </Button>
-                  )}
-                </>
-              ) : (
-                <Button
-                  variant="primary"
-                  className="source-flow-btn-login"
-                  disabled={activeAction?.slotId === slot.id}
-                  onClick={() =>
-                    void action(slot.id, "login", () => flowApi.login(slot.id))
-                  }
-                >
-                  <LogIn size={15} />
-                  Đăng nhập
-                </Button>
-              )}
-            </div>
-          </article>
-        ))}
+                    <Button
+                      variant="secondary"
+                      className="source-flow-btn-sync"
+                      disabled={syncingId === slot.id}
+                      onClick={() => void handleSync(slot.id)}
+                    >
+                      <RefreshCw
+                        size={15}
+                        className={syncingId === slot.id ? "is-spinning" : ""}
+                      />
+                      Đồng bộ
+                    </Button>
+                    {!slot.projectId && (
+                      <Button
+                        variant="secondary"
+                        className="source-flow-btn-create-project"
+                        disabled={activeAction?.slotId === slot.id}
+                        onClick={() =>
+                          void action(slot.id, "create", async () => {
+                            await flowApi.switchSlot(slot.id);
+                            return flowApi.createProject();
+                          })
+                        }
+                      >
+                        <FolderPlus size={15} />
+                        Tạo project
+                      </Button>
+                    )}
+                  </>
+                )}
+
+                {isAuthenticated && (
+                  <>
+                    <Button
+                      variant="primary"
+                      className="source-flow-btn-open"
+                      disabled={activeAction?.slotId === slot.id}
+                      aria-label={`Mở phiên Slot ${slot.id + 1}`}
+                      onClick={() =>
+                        void action(slot.id, "switch", () =>
+                          flowApi.switchSlot(slot.id),
+                        )
+                      }
+                    >
+                      <RotateCw size={15} />
+                      Mở phiên
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      className="source-flow-btn-sync"
+                      disabled={syncingId === slot.id}
+                      onClick={() => void handleSync(slot.id)}
+                    >
+                      <RefreshCw
+                        size={15}
+                        className={syncingId === slot.id ? "is-spinning" : ""}
+                      />
+                      Đồng bộ
+                    </Button>
+                  </>
+                )}
+
+                {isRestoring && (
+                  <Button
+                    variant="secondary"
+                    className="source-flow-btn-restoring"
+                    disabled
+                  >
+                    <RefreshCw size={15} className="is-spinning" />
+                    Đang khôi phục...
+                  </Button>
+                )}
+
+                {isExpired && (
+                  <Button
+                    variant="primary"
+                    className="source-flow-btn-relogin"
+                    disabled={activeAction?.slotId === slot.id}
+                    onClick={() =>
+                      void action(slot.id, "login", () =>
+                        flowApi.login(slot.id),
+                      )
+                    }
+                  >
+                    <LogIn size={15} />
+                    Đăng nhập lại
+                  </Button>
+                )}
+
+                {isError && (
+                  <>
+                    <Button
+                      variant="secondary"
+                      className="source-flow-btn-sync"
+                      disabled={syncingId === slot.id}
+                      onClick={() => void handleSync(slot.id)}
+                    >
+                      <RefreshCw
+                        size={15}
+                        className={syncingId === slot.id ? "is-spinning" : ""}
+                      />
+                      Thử lại
+                    </Button>
+                    <Button
+                      variant="primary"
+                      className="source-flow-btn-open"
+                      disabled={activeAction?.slotId === slot.id}
+                      onClick={() =>
+                        void action(slot.id, "switch", () =>
+                          flowApi.switchSlot(slot.id),
+                        )
+                      }
+                    >
+                      <RotateCw size={15} />
+                      Mở phiên
+                    </Button>
+                  </>
+                )}
+
+                {slot.status === "empty" && (
+                  <Button
+                    variant="primary"
+                    className="source-flow-btn-login"
+                    disabled={activeAction?.slotId === slot.id}
+                    onClick={() =>
+                      void action(slot.id, "login", () =>
+                        flowApi.login(slot.id),
+                      )
+                    }
+                  >
+                    <LogIn size={15} />
+                    Đăng nhập
+                  </Button>
+                )}
+              </div>
+            </article>
+          );
+        })}
       </div>
     </section>
   );

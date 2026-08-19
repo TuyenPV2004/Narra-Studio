@@ -113,6 +113,28 @@ ipcMain.handle('get-credits', async (_event, { slotId } = {}) => {
 // ── License Management ────────────────────────────────────────────────
 // ── Machine fingerprint ──────────────────────────────────────────────
 
+function normalizeImageAspect(aspect) {
+  if (!aspect) return 'IMAGE_ASPECT_RATIO_LANDSCAPE';
+  const map = {
+    '16:9': 'IMAGE_ASPECT_RATIO_LANDSCAPE',
+    '9:16': 'IMAGE_ASPECT_RATIO_PORTRAIT',
+    '1:1': 'IMAGE_ASPECT_RATIO_SQUARE',
+    '4:3': 'IMAGE_ASPECT_RATIO_LANDSCAPE_FOUR_THREE',
+    '3:4': 'IMAGE_ASPECT_RATIO_PORTRAIT_THREE_FOUR',
+    'landscape': 'IMAGE_ASPECT_RATIO_LANDSCAPE',
+    'portrait': 'IMAGE_ASPECT_RATIO_PORTRAIT',
+    'square': 'IMAGE_ASPECT_RATIO_SQUARE',
+    'IMAGE_ASPECT_RATIO_LANDSCAPE': 'IMAGE_ASPECT_RATIO_LANDSCAPE',
+    'IMAGE_ASPECT_RATIO_PORTRAIT': 'IMAGE_ASPECT_RATIO_PORTRAIT',
+    'IMAGE_ASPECT_RATIO_SQUARE': 'IMAGE_ASPECT_RATIO_SQUARE',
+    'IMAGE_ASPECT_RATIO_FOUR_THREE': 'IMAGE_ASPECT_RATIO_LANDSCAPE_FOUR_THREE',
+    'IMAGE_ASPECT_RATIO_THREE_FOUR': 'IMAGE_ASPECT_RATIO_PORTRAIT_THREE_FOUR',
+    'IMAGE_ASPECT_RATIO_LANDSCAPE_FOUR_THREE': 'IMAGE_ASPECT_RATIO_LANDSCAPE_FOUR_THREE',
+    'IMAGE_ASPECT_RATIO_PORTRAIT_THREE_FOUR': 'IMAGE_ASPECT_RATIO_PORTRAIT_THREE_FOUR',
+  };
+  return map[aspect] || aspect;
+}
+
 ipcMain.handle('generate-image', async (_, { prompt, captchaToken, model, aspectRatio, seed, projectId: pid, bearerToken: manualBt, count, referenceImageName, referenceImageNames, slotId }) => {
   const slot = getSlot(slotId);
 
@@ -125,6 +147,7 @@ ipcMain.handle('generate-image', async (_, { prompt, captchaToken, model, aspect
     throw new Error('Chưa có Bearer token! Vui lòng:\n1. Vào tab WebView → tương tác với Flow (tạo project, generate ảnh)\n2. Hoặc vào Cài đặt → nhập Bearer token thủ công');
   }
 
+  const normalizedAspect = normalizeImageAspect(aspectRatio);
   const imageCount = Math.min(Math.max(count || 1, 1), 4);
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
@@ -149,7 +172,7 @@ ipcMain.handle('generate-image', async (_, { prompt, captchaToken, model, aspect
     requests.push({
       clientContext: placeholderCtx,
       imageModelName: model || 'GEM_PIX_2',
-      imageAspectRatio: aspectRatio || 'IMAGE_ASPECT_RATIO_LANDSCAPE',
+      imageAspectRatio: normalizedAspect,
       structuredPrompt: { parts: [{ text: prompt }] },
       seed: seed ? (seed + i) : Math.floor(Math.random() * 1000000),
       imageInputs,
@@ -164,7 +187,7 @@ ipcMain.handle('generate-image', async (_, { prompt, captchaToken, model, aspect
   };
 
   const url = `https://aisandbox-pa.googleapis.com/v1/projects/${projectId}/flowMedia:batchGenerateImages`;
-  console.log(`[SLOT-${slot.id}][API] Batch generate ${imageCount} image(s)`);
+  console.log(`[SLOT-${slot.id}][API] Batch generate ${imageCount} image(s) [aspect=${normalizedAspect}, model=${model || 'GEM_PIX_2'}]`);
 
   const realCtx = {
     recaptchaContext: { token: captchaToken || '', applicationType: 'RECAPTCHA_APPLICATION_TYPE_WEB' },
@@ -177,13 +200,38 @@ ipcMain.handle('generate-image', async (_, { prompt, captchaToken, model, aspect
   return makeApiRequestViaWebview(url, body, slot.id);
 });
 
+// ── Validation Helpers ───────────────────────────────────────────────
+function isValidImageBuffer(buffer) {
+  if (!buffer || buffer.length < 4) return false;
+  // PNG: 89 50 4E 47
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return true;
+  // JPEG: FF D8 FF
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return true;
+  // GIF: 47 49 46 38
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) return true;
+  // WEBP: 52 49 46 46 ... 57 45 42 50
+  if (buffer.length >= 12 &&
+      buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+      buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+    return true;
+  }
+  return false;
+}
+
+const ALLOWED_IMAGE_MIME_TYPES = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif']);
+const ALLOWED_IMAGE_EXTS = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif']);
+const MAX_IMAGE_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
+const MAX_IMAGE_BASE64_LENGTH = 35 * 1024 * 1024; // ~35MB Base64 string (~25MB binary)
+
 // ── Edit Image (AI edit with base image) ─────────────────────────────
 
-ipcMain.handle('edit-image', async (_, { prompt, captchaToken, baseMediaId, model, aspectRatio, seed }) => {
-  const projectId = capturedAuth.projectId || DEFAULTS.projectId;
-  if (!capturedAuth.bearerToken) {
-    throw new Error('Chưa có Bearer token!');
+ipcMain.handle('edit-image', async (_, { prompt, captchaToken, baseMediaId, model, aspectRatio, seed, slotId = 0 }) => {
+  const slot = getSlot(slotId);
+  const bearerToken = slot?.bearerToken || capturedAuth.bearerToken;
+  if (!bearerToken) {
+    throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
   }
+  const projectId = slot?.projectId || capturedAuth.projectId || DEFAULTS.projectId;
 
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
@@ -200,24 +248,26 @@ ipcMain.handle('edit-image', async (_, { prompt, captchaToken, baseMediaId, mode
     requests: [{
       clientContext: ctx,
       imageModelName: model || 'GEM_PIX_2',
-      imageAspectRatio: aspectRatio || 'IMAGE_ASPECT_RATIO_LANDSCAPE',
+      imageAspectRatio: normalizeImageAspect(aspectRatio),
       structuredPrompt: { parts: [{ text: prompt }] },
       seed: seed || Math.floor(Math.random() * 1000000),
       imageInputs: [{ imageInputType: 'IMAGE_INPUT_TYPE_BASE_IMAGE', name: baseMediaId }],
     }],
   };
 
-  console.log(`[API] Edit image with base: ${baseMediaId}, prompt: "${prompt}"`);
+  console.log(`[SLOT-${slotId}][API] Edit image with base: ${baseMediaId}, prompt: "${prompt}", aspect: ${normalizeImageAspect(aspectRatio)}`);
   const url = `https://aisandbox-pa.googleapis.com/v1/projects/${projectId}/flowMedia:batchGenerateImages`;
-  return makeApiRequestViaWebview(url, body);
+  return makeApiRequestViaWebview(url, body, slotId);
 });
 
 // ── Upscale Image (1K / 2K / 4K) ─────────────────────────────────────
-ipcMain.handle('upscale-image', async (_, { mediaId, captchaToken, targetResolution }) => {
-  if (!capturedAuth.bearerToken) {
-    throw new Error('Chưa có Bearer token!');
+ipcMain.handle('upscale-image', async (_, { mediaId, captchaToken, targetResolution, slotId = 0 }) => {
+  const slot = getSlot(slotId);
+  const bearerToken = slot?.bearerToken || capturedAuth.bearerToken;
+  if (!bearerToken) {
+    throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
   }
-  const projectId = capturedAuth.projectId || DEFAULTS.projectId;
+  const projectId = slot?.projectId || capturedAuth.projectId || DEFAULTS.projectId;
   const sessionId = `;${Date.now()}`;
 
   const body = {
@@ -232,9 +282,9 @@ ipcMain.handle('upscale-image', async (_, { mediaId, captchaToken, targetResolut
     },
   };
 
-  console.log(`[API] Upscale image mediaId=${mediaId} resolution=${targetResolution}`);
+  console.log(`[SLOT-${slotId}][API] Upscale image mediaId=${mediaId} resolution=${targetResolution}`);
   const url = 'https://aisandbox-pa.googleapis.com/v1/flow/upsampleImage';
-  return makeApiRequestViaWebview(url, body);
+  return makeApiRequestViaWebview(url, body, slotId);
 });
 
 // ── Generate Pinhole GIF (270p animated GIF from video) ───────────────
@@ -287,9 +337,11 @@ ipcMain.handle('upscale-video', async (_, { mediaId, captchaToken, resolution, a
 
 
 // ── Transform Image (Crop, etc) ───────────────────────────────────────
-ipcMain.handle('transform-image', async (_, { mediaId, cropCoordinates }) => {
-  if (!capturedAuth.bearerToken) {
-    throw new Error('Chưa có Bearer token!');
+ipcMain.handle('transform-image', async (_, { mediaId, cropCoordinates, slotId = 0 }) => {
+  const slot = getSlot(slotId);
+  const bearerToken = slot?.bearerToken || capturedAuth.bearerToken;
+  if (!bearerToken) {
+    throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
   }
 
   const body = {
@@ -299,38 +351,67 @@ ipcMain.handle('transform-image', async (_, { mediaId, cropCoordinates }) => {
     transformationType: "TRANSFORMATION_TYPE_CROP"
   };
 
-  console.log(`[API] Transforming image: ${mediaId}`);
+  console.log(`[SLOT-${slotId}][API] Transforming image: ${mediaId}`);
   const url = 'https://aisandbox-pa.googleapis.com/v1/flow:transformImage';
-  return makeApiRequest(url, body);
+  return makeApiRequest(url, body, slotId);
 });
 
 // ── Upload Image ──────────────────────────────────────────────────────
-ipcMain.handle('upload-image', async (_, { imageBytes, fileName, mimeType }) => {
-  if (!capturedAuth.bearerToken) throw new Error('Chưa có Bearer token!');
-  const projectId = capturedAuth.projectId || DEFAULTS.projectId;
+ipcMain.handle('upload-image', async (_, { imageBytes, fileName, mimeType, slotId = 0 }) => {
+  if (!imageBytes || typeof imageBytes !== 'string') {
+    throw new Error('Dữ liệu ảnh không hợp lệ.');
+  }
+  if (imageBytes.length > MAX_IMAGE_BASE64_LENGTH) {
+    throw new Error('Dung lượng base64 vượt quá 35MB (tối đa 25MB decoded).');
+  }
+
+  const effectiveMime = (mimeType || 'image/jpeg').toLowerCase();
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(effectiveMime)) {
+    throw new Error(`Định dạng MIME không được hỗ trợ: ${mimeType}. Chỉ chấp nhận PNG, JPEG, WebP, GIF.`);
+  }
+
+  const buffer = Buffer.from(imageBytes, 'base64');
+  if (buffer.length > MAX_IMAGE_FILE_SIZE_BYTES) {
+    throw new Error(`Kích thước ảnh sau giải mã vượt quá 25MB (${(buffer.length / 1024 / 1024).toFixed(1)}MB).`);
+  }
+  if (!isValidImageBuffer(buffer)) {
+    throw new Error('Dữ liệu không phải là hình ảnh hợp lệ (magic bytes không khớp).');
+  }
+
+  const slot = getSlot(slotId);
+  const bearerToken = slot?.bearerToken || capturedAuth.bearerToken;
+  if (!bearerToken) throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
+  const projectId = slot?.projectId || capturedAuth.projectId || DEFAULTS.projectId;
+
+  const safeFileName = path.basename(fileName || 'image.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
 
   const body = {
     clientContext: {
       projectId,
       tool: 'PINHOLE',
     },
-    fileName: fileName || 'image.jpg',
+    fileName: safeFileName,
     imageBytes,
     isHidden: false,
     isUserUploaded: true,
-    mimeType: mimeType || 'image/jpeg',
+    mimeType: effectiveMime,
   };
 
-  console.log(`[API] Upload image: ${fileName} (${(imageBytes.length * 0.75 / 1024).toFixed(0)}KB)`);
+  console.log(`[SLOT-${slotId}][API] Upload image: ${safeFileName} (${(buffer.length / 1024).toFixed(0)}KB)`);
   const url = 'https://aisandbox-pa.googleapis.com/v1/flow/uploadImage';
-  return makeApiRequest(url, body);
+  return makeApiRequest(url, body, slotId);
 });
 
 // ── Upload Image from file path (avoid renderer memory) ───────────────
 ipcMain.handle('upload-image-from-path', async (_, { filePath, fileName, mimeType, slotId = 0 }) => {
+  if (!filePath || typeof filePath !== 'string') {
+    throw new Error('Đường dẫn file không hợp lệ.');
+  }
+
   const slot = getSlot(slotId);
-  if (!slot?.bearerToken) throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
-  const projectId = slot.projectId || capturedAuth.projectId || DEFAULTS.projectId;
+  const bearerToken = slot?.bearerToken || capturedAuth.bearerToken;
+  if (!bearerToken) throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
+  const projectId = slot?.projectId || capturedAuth.projectId || DEFAULTS.projectId;
 
   // Resolve file:// URL → absolute path (fix Windows C:\C:\ double drive + %20 encoding)
   const { fileURLToPath } = require('url');
@@ -340,15 +421,12 @@ ipcMain.handle('upload-image-from-path', async (_, { filePath, fileName, mimeTyp
       resolvedPath = fileURLToPath(resolvedPath);
     }
   } catch (urlErr) {
-    // fallback: manual strip
     resolvedPath = resolvedPath.replace(/^file:[/\\]{2,3}/, '');
     resolvedPath = decodeURIComponent(resolvedPath);
-    // On Windows, path may start with /C:/ → strip leading slash
     if (process.platform === 'win32' && /^\/[A-Za-z]:/.test(resolvedPath)) {
       resolvedPath = resolvedPath.slice(1);
     }
   }
-  // Also decode any remaining %20 etc from non-file:// paths
   if (resolvedPath.includes('%')) {
     try { resolvedPath = decodeURIComponent(resolvedPath); } catch {}
   }
@@ -358,20 +436,49 @@ ipcMain.handle('upload-image-from-path', async (_, { filePath, fileName, mimeTyp
     throw new Error(`File không tồn tại: ${normalizedPath}\n(Path gốc: ${filePath})\nHãy chọn lại ảnh.`);
   }
 
-  // Read file in main process
-  const buffer = fs.readFileSync(normalizedPath);
+  let realPath;
+  try {
+    realPath = fs.realpathSync(normalizedPath);
+  } catch {
+    realPath = normalizedPath;
+  }
+
+  const stats = fs.statSync(realPath);
+  if (!stats.isFile()) {
+    throw new Error(`Đường dẫn không phải là một file hợp lệ: ${realPath}`);
+  }
+  if (stats.size > MAX_IMAGE_FILE_SIZE_BYTES) {
+    throw new Error(`Kích thước file (${(stats.size / 1024 / 1024).toFixed(1)}MB) vượt quá giới hạn 25MB.`);
+  }
+
+  const ext = path.extname(realPath).toLowerCase();
+  if (ext && !ALLOWED_IMAGE_EXTS.has(ext)) {
+    throw new Error(`Định dạng file không được hỗ trợ (${ext}). Chỉ chấp nhận .jpg, .jpeg, .png, .webp, .gif.`);
+  }
+
+  const effectiveMime = (mimeType || (ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : ext === '.gif' ? 'image/gif' : 'image/jpeg')).toLowerCase();
+  if (!ALLOWED_IMAGE_MIME_TYPES.has(effectiveMime)) {
+    throw new Error(`Định dạng MIME không được hỗ trợ: ${mimeType}`);
+  }
+
+  // Read file in main process and verify magic bytes
+  const buffer = fs.readFileSync(realPath);
+  if (!isValidImageBuffer(buffer)) {
+    throw new Error('Nội dung file không phải định dạng hình ảnh hợp lệ (magic bytes không khớp).');
+  }
   const base64 = buffer.toString('base64');
+  const safeFileName = path.basename(fileName || realPath).replace(/[^a-zA-Z0-9._-]/g, '_');
 
   const body = {
     clientContext: { projectId, tool: 'PINHOLE' },
-    fileName: fileName || path.basename(filePath),
+    fileName: safeFileName,
     imageBytes: base64,
     isHidden: false,
     isUserUploaded: true,
-    mimeType: mimeType || 'image/jpeg',
+    mimeType: effectiveMime,
   };
 
-  console.log(`[SLOT-${slotId}][API] Upload image from path: ${fileName} (${(buffer.length / 1024).toFixed(0)}KB)`);
+  console.log(`[SLOT-${slotId}][API] Upload image from path: ${safeFileName} (${(buffer.length / 1024).toFixed(0)}KB)`);
   const url = 'https://aisandbox-pa.googleapis.com/v1/flow/uploadImage';
   return makeApiRequest(url, body, slotId);
 });
@@ -1181,40 +1288,94 @@ ipcMain.handle('download-media-to-temp', async (_, { mediaName, slotId = 0 }) =>
   return { path: tmpPath, size: buffer.length };
 });
 
-// ── Resolve Video URL (follow redirect using Electron session) ────────
-ipcMain.handle('resolve-video-url', async (_, { url }) => {
+// ── Resolve Video / Media URL (follow redirect using Electron session with SSRF protection) ────────
+ipcMain.handle('resolve-video-url', async (_, { url, slotId = 0 } = {}) => {
   const { net } = require('electron');
+
+  if (typeof url !== 'string' || !url.trim()) {
+    throw new Error('URL không hợp lệ.');
+  }
+
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error('Định dạng URL không hợp lệ.');
+  }
+
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Chỉ chấp nhận giao thức HTTPS an toàn.');
+  }
+
+  const isAllowedHost = (hostname) => {
+    if (!hostname || typeof hostname !== 'string') return false;
+    const lower = hostname.toLowerCase();
+    return (
+      lower === 'labs.google' ||
+      lower === 'flow-content.google' ||
+      lower === 'aisandbox-pa.googleapis.com' ||
+      lower === 'storage.googleapis.com' ||
+      lower.endsWith('.google') ||
+      lower.endsWith('.labs.google') ||
+      lower.endsWith('.googleusercontent.com') ||
+      lower.endsWith('.googleapis.com') ||
+      lower.endsWith('.ggpht.com')
+    );
+  };
+
+  if (!isAllowedHost(parsed.hostname)) {
+    throw new Error(`Host không được phép truy cập: ${parsed.hostname}`);
+  }
+
+  const targetPartition = `persist:slot-${slotId ?? 0}`;
   return new Promise((resolve, reject) => {
     const req = net.request({
       url,
       method: 'GET',
-      partition: SESSION_PARTITION,
+      partition: targetPartition,
       redirect: 'manual',
     });
 
     req.on('redirect', (status, method, redirectUrl) => {
-      console.log(`[VIDEO] Redirect ${status} → ${redirectUrl.substring(0, 100)}...`);
-      resolve(redirectUrl);
+      console.log(`[MEDIA-SLOT-${slotId}] Redirect ${status} → ${redirectUrl.substring(0, 100)}...`);
+      try {
+        const redirParsed = new URL(redirectUrl);
+        if (redirParsed.protocol !== 'https:') {
+          return reject(new Error('Redirect protocol không an toàn.'));
+        }
+        if (!isAllowedHost(redirParsed.hostname)) {
+          return reject(new Error(`Redirect host không được phép: ${redirParsed.hostname}`));
+        }
+        resolve(redirectUrl);
+      } catch (err) {
+        reject(err);
+      }
     });
 
     req.on('response', (response) => {
-      // If no redirect, check location header
       const loc = response.headers['location'];
       if (loc) {
         const locUrl = Array.isArray(loc) ? loc[0] : loc;
-        console.log(`[VIDEO] Location header → ${locUrl.substring(0, 100)}...`);
-        resolve(locUrl);
+        try {
+          const locParsed = new URL(locUrl, url);
+          if (!isAllowedHost(locParsed.hostname)) {
+            return reject(new Error(`Location host không được phép: ${locParsed.hostname}`));
+          }
+          console.log(`[MEDIA-SLOT-${slotId}] Location header → ${locParsed.toString().substring(0, 100)}...`);
+          resolve(locParsed.toString());
+        } catch {
+          resolve(locUrl);
+        }
       } else {
-        // No redirect — use original URL
-        console.log('[VIDEO] No redirect, using original URL');
+        console.log(`[MEDIA-SLOT-${slotId}] No redirect, using original URL`);
         resolve(url);
       }
-      response.on('data', () => { }); // drain
+      response.on('data', () => { });
       response.on('end', () => { });
     });
 
     req.on('error', (err) => {
-      console.error('[VIDEO] Resolve error:', err);
+      console.error(`[MEDIA-SLOT-${slotId}] Resolve error:`, err);
       reject(err);
     });
 

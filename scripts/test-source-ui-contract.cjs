@@ -142,6 +142,9 @@ assert.match(mediaLibrary, /source-media-filters/);
 assert.match(mediaApi, /normalizeMediaItem/);
 assert.match(mediaApi, /localPath:/);
 assert.match(projectsIpc, /validateMediaDeleteTarget/);
+assert.match(flowApi, /hasSession:/);
+assert.match(flow, /data-status=\{slot\.status\}/);
+
 
 
 const sourceFiles = [];

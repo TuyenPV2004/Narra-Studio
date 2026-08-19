@@ -5,13 +5,60 @@ export interface ImageGenerationRequest {
   model: string;
   prompt: string;
   providerId: "veo3";
-  referenceImage?: File;
-  resolution?: string;
+  referenceImage?: File | undefined;
+  referenceImages?: File[] | undefined;
+  resolution?: string | undefined;
   seed: number;
 }
 export interface ImageModel {
   label: string;
   value: string;
+}
+
+export const DEFAULT_IMAGE_MODELS: Record<string, ImageModel[]> = {
+  veo3: [
+    { value: "NARWHAL", label: "Nano Banana 2 (Mặc định)" },
+    { value: "GEM_PIX_2", label: "Nano Banana Pro" },
+    { value: "HARBOR_SEAL", label: "Nano Banana 2 Lite" },
+  ],
+};
+
+export function formatImageError(error: unknown): string {
+  if (!error) return "Đã xảy ra lỗi không xác định.";
+  const msg = error instanceof Error ? error.message : String(error);
+  if (
+    msg.includes("Bearer") ||
+    msg.includes("401") ||
+    msg.includes("auth") ||
+    msg.includes("token")
+  ) {
+    return "Tài khoản chưa đăng nhập hoặc phiên làm việc đã hết hạn. Vui lòng đăng nhập lại Google Flow.";
+  }
+  if (msg.includes("CAPTCHA") || msg.includes("bridge")) {
+    return "CAPTCHA bridge chưa sẵn sàng hoặc chưa giải xong. Vui lòng kiểm tra extension CAPTCHA.";
+  }
+  if (
+    msg.includes("quota") ||
+    msg.includes("429") ||
+    msg.includes("Rate limit")
+  ) {
+    return "Tài khoản đã hết hạn mức (quota) hoặc bị giới hạn tần suất tạo ảnh. Vui lòng thử lại sau.";
+  }
+  if (
+    msg.includes("network") ||
+    msg.includes("ETIMEDOUT") ||
+    msg.includes("ENOTFOUND") ||
+    msg.includes("fetch failed")
+  ) {
+    return "Lỗi kết nối mạng đến Google Flow. Vui lòng kiểm tra lại đường truyền internet.";
+  }
+  if (msg.includes("Download") || msg.includes("save")) {
+    return "Tạo ảnh thành công nhưng không thể lưu vào thư viện local.";
+  }
+  if (msg.includes("không hợp lệ") || msg.includes("không hỗ trợ")) {
+    return msg;
+  }
+  return msg;
 }
 export interface ImageEditRequest {
   dataUrl: string;
@@ -66,13 +113,20 @@ const generateViaFlowPage = async (
   await getElectronApi()
     .selectAspectOnWebview({ aspect: request.aspect })
     .catch(() => undefined);
-  const referenceFilePaths = request.referenceImage
-    ? [getElectronApi().getFilePath(request.referenceImage)]
-    : [];
+  const refFiles =
+    request.referenceImages && request.referenceImages.length > 0
+      ? request.referenceImages
+      : request.referenceImage
+        ? [request.referenceImage]
+        : [];
+  const referenceFilePaths = refFiles.map((file) =>
+    getElectronApi().getFilePath(file),
+  );
   const submitted = data(
     await getElectronApi().generateViaPage({
       prompt: request.prompt,
       type: "image",
+      aspect: request.aspect,
       referenceFilePaths,
       referenceImageUrls: [],
     }),
@@ -105,28 +159,45 @@ const generateViaFlowPage = async (
 
 export const imageApi = {
   async generate(
-    request: ImageGenerationRequest,
-  ): Promise<{ mediaId: string | null; src: string }> {
+    request: ImageGenerationRequest & { slotId?: number },
+  ): Promise<{ mediaId: string | null; slotId: number; src: string }> {
     const bridge = record(await getElectronApi().getCaptchaBridgeStatus());
-    if (bridge.connected !== true) return generateViaFlowPage(request);
+    if (bridge.connected !== true) {
+      const pageResult = await generateViaFlowPage(request);
+      return { ...pageResult, slotId: request.slotId ?? 0 };
+    }
     const slot = record(await getElectronApi().pickRandomSlot());
-    const slotId = typeof slot.slotId === "number" ? slot.slotId : 0;
-    let referenceImageName: string | null = null;
-    if (request.referenceImage) {
-      const filePath = getElectronApi().getFilePath(request.referenceImage);
+    const slotId =
+      typeof request.slotId === "number"
+        ? request.slotId
+        : typeof slot.slotId === "number"
+          ? slot.slotId
+          : 0;
+    const refFiles =
+      request.referenceImages && request.referenceImages.length > 0
+        ? request.referenceImages
+        : request.referenceImage
+          ? [request.referenceImage]
+          : [];
+    const referenceImageNames: string[] = [];
+    for (const refFile of refFiles) {
+      const filePath = getElectronApi().getFilePath(refFile);
       const uploaded = record(
         await getElectronApi().uploadImageFromPath({
           filePath,
-          fileName: request.referenceImage.name,
-          mimeType: request.referenceImage.type || "image/png",
+          fileName: refFile.name,
+          mimeType: refFile.type || "image/png",
           slotId,
         }),
       );
       const uploadedMedia = record(record(uploaded.data).media);
       if (typeof uploadedMedia.name !== "string")
-        throw new Error("Không thể tải ảnh tham chiếu lên Google Flow.");
-      referenceImageName = uploadedMedia.name;
+        throw new Error(
+          `Không thể tải ảnh tham chiếu "${refFile.name}" lên Google Flow.`,
+        );
+      referenceImageNames.push(uploadedMedia.name);
     }
+    const referenceImageName = referenceImageNames[0] || null;
     const response = data(
       await getElectronApi().generateImage({
         prompt: request.prompt,
@@ -136,9 +207,7 @@ export const imageApi = {
         seed: request.seed,
         count: 1,
         referenceImageName,
-        ...(referenceImageName
-          ? { referenceImageNames: [referenceImageName] }
-          : {}),
+        ...(referenceImageNames.length > 0 ? { referenceImageNames } : {}),
         slotId,
       }),
     );
@@ -149,14 +218,25 @@ export const imageApi = {
     const generated = record(image.generatedImage);
     const src = typeof generated.fifeUrl === "string" ? generated.fifeUrl : "";
     if (!src) throw new Error("VEO3 không trả về hình ảnh hợp lệ.");
-    return { mediaId: typeof media.name === "string" ? media.name : null, src };
+    return {
+      mediaId: typeof media.name === "string" ? media.name : null,
+      slotId,
+      src,
+    };
   },
   async editVeoImage(
-    request: ImageEditRequest,
-  ): Promise<{ mediaId: string | null; src: string }> {
+    request: ImageEditRequest & { slotId?: number },
+  ): Promise<{ mediaId: string | null; slotId: number; src: string }> {
     const bridge = record(await getElectronApi().getCaptchaBridgeStatus());
     if (bridge.connected !== true)
       throw new Error("CAPTCHA bridge chưa kết nối.");
+    const slot = record(await getElectronApi().pickRandomSlot());
+    const slotId =
+      typeof request.slotId === "number"
+        ? request.slotId
+        : typeof slot.slotId === "number"
+          ? slot.slotId
+          : 0;
     const imageBytes = request.dataUrl.split(",")[1];
     if (!imageBytes) throw new Error("Dữ liệu ảnh chỉnh sửa không hợp lệ.");
     const upload = record(
@@ -164,6 +244,7 @@ export const imageApi = {
         imageBytes,
         fileName: `edit-${Date.now()}.jpg`,
         mimeType: "image/jpeg",
+        slotId,
       }),
     );
     const uploadData = record(upload.data);
@@ -181,6 +262,7 @@ export const imageApi = {
         prompt: request.prompt,
         captchaToken: `EXTENSION_PLACEHOLDER_${Date.now()}`,
         baseMediaId,
+        slotId,
       }),
     );
     const responseData = record(response.data);
@@ -193,25 +275,32 @@ export const imageApi = {
     if (!src && mediaId) {
       const resolved = await getElectronApi().resolveVideoUrl({
         url: `https://labs.google/fx/api/trpc/media.getMediaUrlRedirect?name=${mediaId}`,
+        slotId,
       });
       if (typeof resolved === "string") src = resolved;
     }
     if (!src) throw new Error("Google Flow không trả ảnh chỉnh sửa hợp lệ.");
-    return { mediaId, src };
+    return { mediaId, slotId, src };
   },
-  async save(src: string) {
+  async save(src: string, slotId = 0) {
     const result = await getElectronApi().saveImageLocally({
       src,
       fileName: `img-${Date.now()}.png`,
+      slotId,
     });
     return typeof result === "string" ? result : "";
   },
   async crop(
     mediaId: string,
     cropCoordinates: ImageCropCoordinates,
-  ): Promise<{ mediaId: string; src: string }> {
+    slotId = 0,
+  ): Promise<{ mediaId: string; slotId: number; src: string }> {
     const response = record(
-      await getElectronApi().transformImage({ mediaId, cropCoordinates }),
+      await getElectronApi().transformImage({
+        mediaId,
+        cropCoordinates,
+        slotId,
+      }),
     );
     const responseData = record(response.data);
     const mediaValue = responseData.media;
@@ -232,24 +321,32 @@ export const imageApi = {
             : mediaId;
     const resolved = await getElectronApi().resolveVideoUrl({
       url: `https://labs.google/fx/api/trpc/media.getMediaUrlRedirect?name=${transformedMediaId}`,
+      slotId,
     });
     if (typeof resolved !== "string" || !resolved)
       throw new Error("Google Flow không trả URL ảnh đã crop.");
     const saved = await getElectronApi().saveImageLocally({
       src: resolved,
       fileName: `crop-${Date.now()}.png`,
+      slotId,
     });
     return {
       mediaId: transformedMediaId,
+      slotId,
       src: typeof saved === "string" && saved ? saved : resolved,
     };
   },
-  async upscale(mediaId: string, resolution: "2K" | "4K"): Promise<string> {
+  async upscale(
+    mediaId: string,
+    resolution: "2K" | "4K",
+    slotId = 0,
+  ): Promise<string> {
     const response = record(
       await getElectronApi().upscaleImage({
         mediaId,
         captchaToken: `EXTENSION_PLACEHOLDER_${Date.now()}`,
         targetResolution: `UPSAMPLE_IMAGE_RESOLUTION_${resolution}`,
+        slotId,
       }),
     );
     const encodedImage = record(response.data).encodedImage;
@@ -259,7 +356,18 @@ export const imageApi = {
     await getElectronApi().saveImageLocally({
       src,
       fileName: `upscaled-${resolution}-${Date.now()}.jpg`,
+      slotId,
     });
     return src;
+  },
+  getModels(providerId: string = "veo3"): ImageModel[] {
+    return DEFAULT_IMAGE_MODELS[providerId] || DEFAULT_IMAGE_MODELS.veo3 || [];
+  },
+  async resolveMediaUrl(mediaId: string, slotId = 0): Promise<string> {
+    const resolved = await getElectronApi().resolveVideoUrl({
+      url: `https://labs.google/fx/api/trpc/media.getMediaUrlRedirect?name=${mediaId}`,
+      slotId,
+    });
+    return typeof resolved === "string" ? resolved : "";
   },
 };

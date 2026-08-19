@@ -28,6 +28,9 @@ module.exports = function registerFlowSessionIpc(dependencies) {
     pickRandomSlot,
     refreshCapturedCookies,
     fetchSlotSession,
+    restoreSlotSession,
+    restoreAllSlotSessions,
+    getIsRestoringSessions,
     findFlowWebview,
     setActiveWebviewSlot,
   } = dependencies;
@@ -49,6 +52,39 @@ ipcMain.handle('get-auth-info', () => {
     projectId: activeSlot.projectId,
     lastCaptured: activeSlot.lastCaptured,
   };
+});
+
+// ── IPC: Get all slots status with silent hydration & hasSession ──────
+ipcMain.handle('get-all-slots', async () => {
+  for (const slot of accountSlots) {
+    if (slot.status === 'empty' && typeof restoreSlotSession === 'function') {
+      try {
+        const ses = session.fromPartition(slot.partition);
+        const [googleCookies, labsCookies] = await Promise.all([
+          ses.cookies.get({ domain: '.google.com' }).catch(() => []),
+          ses.cookies.get({ domain: 'labs.google' }).catch(() => []),
+        ]);
+        if (googleCookies.length > 0 || labsCookies.length > 0) {
+          await restoreSlotSession(slot.id).catch(() => {});
+        }
+      } catch {}
+    } else if (slot.status === 'connected' && !slot.email) {
+      fetchSlotSession(slot.id).catch(() => {});
+    }
+  }
+
+  return accountSlots.map(slot => ({
+    id: slot.id,
+    status: slot.status,
+    hasBearerToken: !!slot.bearerToken,
+    hasSession: slot.status === 'authenticated' || slot.status === 'connected',
+    projectId: slot.projectId || null,
+    lastCaptured: slot.lastCaptured || null,
+    partition: slot.partition,
+    email: slot.email || null,
+    displayName: slot.displayName || null,
+    avatar: slot.avatar || null,
+  }));
 });
 
 ipcMain.handle('create-flow-project', async (_, { slotId = 0 } = {}) => {
@@ -100,15 +136,17 @@ ipcMain.handle('create-flow-project', async (_, { slotId = 0 } = {}) => {
           return true;
         })()
       `, true).catch(() => false);
-      if (!clicked) await new Promise(resolve => setTimeout(resolve, 600));
+      if (!clicked) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
 
     let projectId = '';
-    for (let attempt = 0; attempt < 60; attempt += 1) {
+    for (let attempt = 0; attempt < 40; attempt += 1) {
       const currentUrl = typeof wv.getURL === 'function' ? wv.getURL() : '';
-      const candidate = currentUrl.match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1] || '';
-      if (candidate && candidate !== previousProjectId) {
-        projectId = candidate;
+      const matched = currentUrl.match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1];
+      if (matched && matched !== previousProjectId) {
+        projectId = matched;
         break;
       }
       await new Promise(resolve => setTimeout(resolve, 500));
@@ -396,25 +434,7 @@ ipcMain.handle('sync-session', async () => {
   }
 });
 
-// ── IPC: Get all slots status ─────────────────────────────────────────
-ipcMain.handle('get-all-slots', () => {
-  accountSlots.forEach(slot => {
-    if (slot.status === 'connected' && !slot.email) {
-      fetchSlotSession(slot.id).catch(() => {});
-    }
-  });
-  return accountSlots.map(slot => ({
-    id: slot.id,
-    status: slot.status,
-    hasBearerToken: !!slot.bearerToken,
-    projectId: slot.projectId,
-    lastCaptured: slot.lastCaptured,
-    partition: slot.partition,
-    email: slot.email || null,
-    displayName: slot.displayName || null,
-    avatar: slot.avatar || null,
-  }));
-});
+
 
 // ── IPC: Logout a specific slot ───────────────────────────────────────
 // Xóa toàn bộ cookies + storage của partition → lần sau reload sẽ không auto-login
@@ -486,14 +506,12 @@ ipcMain.handle('switch-webview-slot', async (_, { slotId = 0 } = {}) => {
   return { slotId, partition: slot.partition };
 });
 
-// ── IPC: Open real Chromium incognito window for login ──────────────
-// Dùng partition tạm (non-persist) → ẩn danh thật, login xong copy cookies sang slot chính (persist)
+// ── IPC: Open isolated Google login window for slot ─────────────────
+// Sử dụng trực tiếp persistent partition của slot (persist:slot-${slotId})
+// Chromium tự lưu toàn bộ Cookies, NextAuth token, LocalStorage và IndexedDB xuống đĩa.
 ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
-
-  // Partition tạm — non-persist = ẩn danh thật (tự xóa khi đóng window)
-  const incogPartition = `incognito-${slotId}-${Date.now()}`;
-  const ses = session.fromPartition(incogPartition);
+  const ses = session.fromPartition(slot.partition);
 
   // Clean UA — remove Electron/app name
   const chromeVersion = process.versions.chrome || '130.0.0.0';
@@ -522,9 +540,10 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
   const loginWin = new BrowserWindow({
     width: 1100,
     height: 800,
-    title: `Đăng nhập Google (Ẩn danh) — Slot ${slotId + 1}`,
+    title: `Đăng nhập Google — Slot ${slotId + 1}`,
     backgroundColor: '#202124',
     webPreferences: {
+      partition: slot.partition,
       session: ses,
       contextIsolation: true,
       nodeIntegration: false,
@@ -534,41 +553,6 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
   });
 
   loginWin.setMenuBarVisibility(false);
-
-  // Hàm copy cookies từ session ẩn danh → slot chính (persist)
-  async function copyCookiesToSlot() {
-    try {
-      const slotSes = session.fromPartition(slot.partition);
-      // Xóa cookies cũ của slot trước
-      const oldCookies = await slotSes.cookies.get({}).catch(() => []);
-      await Promise.all((oldCookies || []).map(c => {
-        const url = `${c.secure ? 'https' : 'http'}://${c.domain.replace(/^\./, '')}${c.path || '/'}`;
-        return slotSes.cookies.remove(url, c.name).catch(() => {});
-      }));
-      // Copy cookies mới từ incognito session
-      const newCookies = await ses.cookies.get({}).catch(() => []);
-      let copied = 0;
-      for (const c of (newCookies || [])) {
-        try {
-          await slotSes.cookies.set({
-            url: `${c.secure ? 'https' : 'http'}://${c.domain.replace(/^\./, '')}${c.path || '/'}`,
-            name: c.name,
-            value: c.value,
-            domain: c.domain,
-            path: c.path,
-            secure: c.secure,
-            httpOnly: c.httpOnly,
-            sameSite: c.sameSite || 'unspecified',
-            expirationDate: c.expirationDate,
-          });
-          copied++;
-        } catch {}
-      }
-      console.log(`[SLOT-${slotId}][INCOGNITO] Copied ${copied}/${newCookies.length} cookies to ${slot.partition}`);
-    } catch (err) {
-      console.error(`[SLOT-${slotId}][INCOGNITO] Cookie copy failed:`, err.message);
-    }
-  }
 
   // Intercept auth token từ cửa sổ login
   ses.webRequest.onBeforeSendHeaders(
@@ -585,26 +569,23 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
         slot.lastCaptured = new Date().toISOString();
         slot.status = 'connected';
         slot.userAgent = cleanUA;
-        console.log(`[SLOT-${slotId}][INCOGNITO] ✅ Bearer token captured!`);
+        console.log(`[SLOT-${slotId}][LOGIN] ✅ Bearer token captured!`);
 
-        // Copy cookies từ incognito → slot chính (persist)
-        copyCookiesToSlot().then(() => {
-          refreshCapturedCookies(slotId);
-        });
+        refreshCapturedCookies(slotId);
 
         // Fetch session info (email, avatar)
         setTimeout(() => {
           fetchSlotSession(slotId).then(s => {
-            if (s) {
-              if (s.email) slot.email = s.email;
-              if (s.name) slot.displayName = s.name;
-              if (s.avatar) slot.avatar = s.avatar;
+            if (s && s.user) {
+              if (s.user.email) slot.email = s.user.email;
+              if (s.user.name) slot.displayName = s.user.name;
+              if (s.user.avatar) slot.avatar = s.user.avatar;
               if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
-                runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...s });
+                runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...s.user });
               }
             }
           }).catch(() => {});
-        }, 2000);
+        }, 1000);
 
         // Notify UI
         if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
@@ -654,12 +635,11 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
 
   loginWin.on('closed', () => {
     clearInterval(checkInterval);
-    // Cleanup: xóa session tạm
-    ses.clearStorageData().catch(() => {});
-    console.log(`[SLOT-${slotId}][INCOGNITO] Login window closed, temp session cleaned`);
+    refreshCapturedCookies(slotId);
+    console.log(`[SLOT-${slotId}][LOGIN] Login window closed, session persisted in ${slot.partition}`);
   });
 
-  console.log(`[SLOT-${slotId}][INCOGNITO] Opened incognito login (partition: ${incogPartition})`);
+  console.log(`[SLOT-${slotId}][LOGIN] Opened login window for ${slot.partition}`);
   return { success: true, slotId };
 });
 
@@ -677,30 +657,36 @@ ipcMain.handle('pick-random-slot', () => {
 ipcMain.handle('sync-slot-session', async (_, { slotId = 0 } = {}) => {
   try {
     const slot = getSlot(slotId);
-    await refreshCapturedCookies(slotId);
-    await fetchSlotSession(slotId).catch(() => {});
+    if (typeof restoreSlotSession === 'function') {
+      await restoreSlotSession(slotId);
+    } else {
+      await refreshCapturedCookies(slotId);
+      await fetchSlotSession(slotId).catch(() => {});
+    }
 
-    // Trigger fetch qua webview sinh đúng partition (slot 0 dùng flowWebview chính)
-    const wv = findFlowWebview();
-    if (wv && slotId === 0) {
+    // Trigger fetch qua webview nếu có webview đang hoạt động
+    const wv = findFlowWebview(slotId);
+    if (wv) {
       await wv.executeJavaScript(`
         fetch('https://labs.google/fx/api/trpc/user.getCredits', { credentials: 'include' }).catch(()=>{});
       `).catch(() => { });
-      await new Promise(r => setTimeout(r, 1500));
+      await new Promise(r => setTimeout(r, 1200));
     }
 
-    const cookieCount = slot.cookies.split(';').filter(Boolean).length;
-    console.log(`[SLOT-${slotId}][SYNC] Session synced: cookies=${cookieCount}, token=${!!slot.bearerToken}, email=${slot.email}`);
+    const cookieCount = (slot.cookies || '').split(';').filter(Boolean).length;
+    console.log(`[SLOT-${slotId}][SYNC] Session synced: status=${slot.status}, cookies=${cookieCount}, token=${!!slot.bearerToken}, email=${slot.email}`);
     return {
       success: true,
       slotId,
+      status: slot.status,
       hasBearerToken: !!slot.bearerToken,
+      hasSession: slot.status === 'authenticated' || slot.status === 'connected',
       cookieCount,
-      projectId: slot.projectId,
+      projectId: slot.projectId || null,
       email: slot.email || null,
       displayName: slot.displayName || null,
       avatar: slot.avatar || null,
-      lastCaptured: slot.lastCaptured,
+      lastCaptured: slot.lastCaptured || null,
     };
   } catch (err) {
     console.error(`[SLOT-${slotId}][SYNC] Failed:`, err.message);

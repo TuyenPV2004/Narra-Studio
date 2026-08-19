@@ -1,13 +1,17 @@
 import { getElectronApi } from "@/services/electron-api/client";
 
+export type FlowSlotStatus =
+  "empty" | "restoring" | "authenticated" | "connected" | "expired" | "error";
+
 export interface FlowSlot {
   avatar?: string;
   displayName?: string;
   email?: string;
   hasBearerToken: boolean;
+  hasSession?: boolean;
   id: number;
   projectId?: string;
-  status: string;
+  status: FlowSlotStatus;
 }
 export interface FlowActionResult {
   success?: boolean;
@@ -39,12 +43,16 @@ export const flowApi = {
       throw new Error("Phản hồi danh sách slot không hợp lệ.");
     return response.map(record).flatMap((slot) => {
       const id = typeof slot.id === "number" ? slot.id : NaN;
+      const status = (
+        typeof slot.status === "string" ? slot.status : "empty"
+      ) as FlowSlotStatus;
       return Number.isInteger(id) && id >= 0
         ? [
             {
               id,
-              status: typeof slot.status === "string" ? slot.status : "empty",
+              status,
               hasBearerToken: slot.hasBearerToken === true,
+              hasSession: slot.hasSession === true,
               ...(typeof slot.avatar === "string"
                 ? { avatar: slot.avatar }
                 : {}),

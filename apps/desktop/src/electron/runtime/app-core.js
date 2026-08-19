@@ -138,6 +138,13 @@ function pickRandomSlot() {
   return available[0];
 }
 
+const {
+  AUTH_COOKIE_NAMES,
+  hasAuthenticationCookie,
+  classifySessionFetchResult,
+  evaluateSlotStatus,
+} = require('./flowSessionPolicy');
+
 async function refreshCapturedCookies(slotId = 0) {
   const slot = getSlot(slotId);
   try {
@@ -154,12 +161,12 @@ async function refreshCapturedCookies(slotId = 0) {
   }
 }
 
-// Fetch session info (name, email, avatar) from Google OAuth & labs.google/session endpoint
+// Fetch session info with structured classification (authenticated, unauthenticated, transient-error, server-error, network-error)
 async function fetchSlotSession(slotId) {
   const slot = getSlot(slotId);
-  if (!slot) return null;
+  if (!slot) return { ok: false, kind: 'unauthenticated' };
 
-  // 1. Google OAuth UserInfo API via Bearer token (fastest & most reliable)
+  // 1. Google OAuth UserInfo API via Bearer token (fastest & most reliable if token active)
   if (slot.bearerToken) {
     try {
       const token = slot.bearerToken.replace(/^(Bearer\s+)+/i, 'Bearer ');
@@ -170,7 +177,7 @@ async function fetchSlotSession(slotId) {
         },
       });
       if (userinfoResp.ok) {
-        const data = await userinfoResp.json();
+        const data = await userinfoResp.json().catch(() => null);
         if (data && (data.email || data.name)) {
           const user = {
             email: data.email || null,
@@ -184,8 +191,12 @@ async function fetchSlotSession(slotId) {
           if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
             runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...user });
           }
-          return user;
+          return { ok: true, kind: 'authenticated', user, status: 200 };
         }
+      } else if (userinfoResp.status === 401 || userinfoResp.status === 403) {
+        // Bearer token expired in RAM — invalidate it but DO NOT exit early; fall through to test persistent cookie session!
+        console.warn(`[SLOT-${slotId}][PROFILE] Stale Bearer token returned ${userinfoResp.status}, resetting token in memory and falling back to persistent cookie session check...`);
+        slot.bearerToken = null;
       }
     } catch (e) {
       console.warn(`[SLOT-${slotId}][PROFILE] OAuth userinfo fetch failed:`, e.message);
@@ -199,23 +210,22 @@ async function fetchSlotSession(slotId) {
     if (all.length > 0) {
       const cookieHeader = all.map(c => `${c.name}=${c.value}`).join('; ');
       const cleanUA = buildCleanUserAgent();
-      const resp = await net.fetch('https://labs.google/fx/api/auth/session', {
-        headers: {
-          'accept': 'application/json',
-          'cookie': cookieHeader,
-          'user-agent': cleanUA,
-          'origin': 'https://labs.google',
-          'referer': 'https://labs.google/fx/tools/flow',
-        },
-      });
-      if (resp.ok) {
-        const d = await resp.json();
-        if (d && d.user) {
-          const user = {
-            email: d.user.email || null,
-            name: d.user.name || null,
-            avatar: d.user.image || null,
-          };
+      try {
+        const resp = await net.fetch('https://labs.google/fx/api/auth/session', {
+          headers: {
+            'accept': 'application/json',
+            'cookie': cookieHeader,
+            'user-agent': cleanUA,
+            'origin': 'https://labs.google',
+            'referer': 'https://labs.google/fx/tools/flow',
+          },
+        });
+
+        const d = await resp.json().catch(() => null);
+        const classified = classifySessionFetchResult({ status: resp.status, data: d });
+
+        if (classified.kind === 'authenticated' && classified.user) {
+          const user = classified.user;
           if (user.email) slot.email = user.email;
           if (user.name) slot.displayName = user.name;
           if (user.avatar) slot.avatar = user.avatar;
@@ -223,12 +233,18 @@ async function fetchSlotSession(slotId) {
           if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
             runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...user });
           }
-          return user;
+          return { ok: true, kind: 'authenticated', user, status: resp.status };
         }
+
+        return { ok: false, ...classified };
+      } catch (fetchErr) {
+        console.warn(`[SLOT-${slotId}][PROFILE] net.fetch request error:`, fetchErr.message);
+        return { ok: false, kind: 'network-error', error: fetchErr.message };
       }
     }
   } catch (e) {
     console.warn(`[SLOT-${slotId}][PROFILE] net.fetch failed:`, e.message);
+    return { ok: false, kind: 'network-error', error: e.message };
   }
 
   // 3. Fallback to webview executeJavaScript
@@ -242,42 +258,65 @@ async function fetchSlotSession(slotId) {
               credentials: 'include',
               headers: { 'accept': 'application/json' }
             });
-            if (!r.ok) return null;
-            const d = await r.json();
-            if (d && d.user) return { email: d.user.email, name: d.user.name, avatar: d.user.image };
-          } catch(e) {}
-          return null;
+            const d = await r.json().catch(() => null);
+            return { status: r.status, data: d };
+          } catch(e) {
+            return { error: e.message };
+          }
         })()
-      `);
+      `).catch(() => null);
+
       if (result) {
-        if (result.email) slot.email = result.email;
-        if (result.name) slot.displayName = result.name;
-        if (result.avatar) slot.avatar = result.avatar;
-        console.log(`[SLOT-${slotId}][PROFILE] ✅ Fetched via webview: email=${result.email}, name=${result.name}`);
-        if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
-          runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...result });
+        const classified = classifySessionFetchResult({
+          status: result.status,
+          data: result.data,
+          error: result.error ? new Error(result.error) : null,
+        });
+
+        if (classified.kind === 'authenticated' && classified.user) {
+          const user = classified.user;
+          if (user.email) slot.email = user.email;
+          if (user.name) slot.displayName = user.name;
+          if (user.avatar) slot.avatar = user.avatar;
+          console.log(`[SLOT-${slotId}][PROFILE] ✅ Fetched via webview: email=${user.email}, name=${user.name}`);
+          if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+            runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...user });
+          }
+          return { ok: true, kind: 'authenticated', user, status: result.status || 200 };
         }
-        return result;
+
+        return { ok: false, ...classified };
       }
     }
   } catch (e) { }
 
-  return null;
+  return { ok: false, kind: 'unauthenticated' };
 }
 
 async function clearSlotSessionData(slotId, { reloadWebview = true } = {}) {
   const slot = getSlot(slotId);
   const ses = session.fromPartition(slot.partition);
 
-  const allCookies = await ses.cookies.get({});
-  await Promise.all(allCookies.map(c => {
-    const url = `${c.secure ? 'https' : 'http'}://${c.domain.replace(/^\./, '')}${c.path || '/'}`;
-    return ses.cookies.remove(url, c.name).catch(() => {});
-  }));
+  const allCookies = await ses.cookies.get({}).catch(() => []);
+  await Promise.all(
+    allCookies.map((c) => {
+      const url = `${c.secure ? "https" : "http"}://${c.domain.replace(/^\./, "")}${c.path || "/"}`;
+      return ses.cookies.remove(url, c.name).catch(() => {});
+    })
+  );
 
-  await ses.clearStorageData({
-    storages: ['cookies', 'localstorage', 'sessionstorage', 'indexdb', 'cachestorage', 'serviceworkers'],
-  }).catch(() => {});
+  await ses
+    .clearStorageData({
+      storages: [
+        "cookies",
+        "localstorage",
+        "sessionstorage",
+        "indexdb",
+        "cachestorage",
+        "serviceworkers",
+      ],
+    })
+    .catch(() => {});
 
   await ses.clearCache().catch(() => {});
 
@@ -301,6 +340,96 @@ async function clearSlotSessionData(slotId, { reloadWebview = true } = {}) {
       const wv = findFlowWebview(slotId);
       if (wv) wv.loadURL('https://labs.google/fx/tools/flow');
     } catch (e) {}
+  }
+}
+
+// ── Silent Session Hydration & Restoration ───────────────────────────
+// Khôi phục trạng thái session từ persistent partition sau khi khởi động lại app.
+// Tuyệt đối không lưu token/cookie ra file JSON; dùng trực tiếp Chromium partition.
+async function restoreSlotSession(slotId) {
+  const slot = getSlot(slotId);
+  if (!slot) return { status: 'empty' };
+
+  try {
+    const ses = session.fromPartition(slot.partition || `persist:slot-${slotId}`);
+
+    // 1. Kiểm tra cookie trong partition
+    const [googleCookies, labsCookies] = await Promise.all([
+      ses.cookies.get({ domain: '.google.com' }).catch(() => []),
+      ses.cookies.get({ domain: 'labs.google' }).catch(() => []),
+    ]);
+    const allCookies = [...googleCookies, ...labsCookies];
+
+    if (!allCookies.length) {
+      slot.status = 'empty';
+      slot.cookies = '';
+      return { status: 'empty' };
+    }
+
+    slot.cookies = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
+    slot.status = 'restoring';
+    const hasAuthCookies = hasAuthenticationCookie(allCookies);
+
+    // 2. Xác minh session hợp lệ qua endpoint với response phân loại
+    const sessionRes = await fetchSlotSession(slotId);
+
+    const calculatedStatus = evaluateSlotStatus({
+      cookiesCount: allCookies.length,
+      hasAuthCookies,
+      hasBearerToken: Boolean(slot.bearerToken),
+      sessionClassification: sessionRes,
+      previousStatus: slot.status === 'restoring' ? 'empty' : slot.status,
+    });
+
+    slot.status = calculatedStatus;
+
+    if (sessionRes && sessionRes.user) {
+      if (sessionRes.user.email) slot.email = sessionRes.user.email;
+      if (sessionRes.user.name) slot.displayName = sessionRes.user.name;
+      if (sessionRes.user.avatar) slot.avatar = sessionRes.user.avatar;
+      if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+        runtime.mainWindow.webContents.send('slot-session-updated', {
+          slotId,
+          email: slot.email,
+          name: slot.displayName,
+          avatar: slot.avatar,
+        });
+      }
+    }
+
+    console.log(`[SLOT-${slotId}][RESTORE] Evaluated status: "${slot.status}" (email: ${slot.email || 'none'})`);
+    return {
+      status: slot.status,
+      email: slot.email,
+      displayName: slot.displayName,
+      avatar: slot.avatar,
+    };
+  } catch (err) {
+    console.warn(`[SLOT-${slotId}][RESTORE] Check failed:`, err.message);
+    slot.status = slot.cookies ? 'error' : 'empty';
+    return { status: slot.status, error: err.message };
+  }
+}
+
+let isRestoringAllSessions = false;
+function getIsRestoringSessions() {
+  return isRestoringAllSessions;
+}
+
+async function restoreAllSlotSessions() {
+  if (isRestoringAllSessions) return;
+  isRestoringAllSessions = true;
+  console.log('[FLOW-SESSION] 🔄 Starting silent session hydration for all slots...');
+  try {
+    for (let i = 0; i < MAX_SLOTS; i += 1) {
+      await restoreSlotSession(i);
+    }
+    console.log('[FLOW-SESSION] ✅ Completed silent session hydration.');
+    if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+      runtime.mainWindow.webContents.send('slot-session-updated', { all: true });
+    }
+  } finally {
+    isRestoringAllSessions = false;
   }
 }
 
@@ -921,6 +1050,9 @@ function findFlowWebview(slotId = null) {
     pickRandomSlot,
     refreshCapturedCookies,
     fetchSlotSession,
+    restoreSlotSession,
+    restoreAllSlotSessions,
+    getIsRestoringSessions,
     clearSlotSessionData,
     fetchSlotEmail,
     createWindow,

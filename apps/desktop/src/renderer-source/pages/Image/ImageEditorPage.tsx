@@ -1,14 +1,24 @@
 import {
+  Crop,
   Download,
+  FileCheck,
   Images,
+  Info,
+  Layers,
   Pencil,
   Sparkles,
   Square,
   Upload,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+} from "react";
 import { Button } from "@/components/ui/Button";
-import { imageApi } from "@/services/electron-api/image";
+import { formatImageError, imageApi } from "@/services/electron-api/image";
 import type { ProviderId } from "@/types/electron-api";
 import {
   ImageAnnotationCanvas,
@@ -19,8 +29,12 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
   const [file, setFile] = useState<File>();
   const [preview, setPreview] = useState("");
   const [prompt, setPrompt] = useState("");
+  const [imageReady, setImageReady] = useState(false);
   const [result, setResult] = useState<{
+    createdAt?: string;
     mediaId: string | null;
+    promptUsed?: string;
+    slotId?: number;
     src: string;
   }>();
   const [error, setError] = useState<string>();
@@ -44,14 +58,35 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
   useEffect(() => {
     if (!file) {
       setPreview("");
+      setImageReady(false);
       return;
     }
+    setImageReady(false);
     const url = URL.createObjectURL(file);
     setPreview(url);
     return () => URL.revokeObjectURL(url);
   }, [file]);
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const selected = event.target.files?.[0];
+    if (!selected) return;
+    const allowed = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+    if (!allowed.includes(selected.type)) {
+      setError(
+        "Định dạng ảnh không được hỗ trợ. Vui lòng chọn PNG, JPEG, WebP hoặc GIF.",
+      );
+      return;
+    }
+    if (selected.size > 25 * 1024 * 1024) {
+      setError("Dung lượng ảnh tối đa cho phép là 25MB.");
+      return;
+    }
+    setError(undefined);
+    setFile(selected);
+  };
+
   const edit = async () => {
-    if (!file || !prompt.trim() || !canvasRef.current) return;
+    if (!file || !imageReady || !prompt.trim() || !canvasRef.current) return;
     setRunning(true);
     setError(undefined);
     try {
@@ -60,10 +95,16 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
         dataUrl,
         prompt: prompt.trim(),
       });
-      setResult(output);
-      await imageApi.save(output.src);
+      setResult({
+        ...output,
+        promptUsed: prompt.trim(),
+        createdAt: new Date().toLocaleTimeString(),
+      });
+      await imageApi.save(output.src, output.slotId).catch((saveErr) => {
+        console.warn("Không thể lưu ảnh local:", saveErr);
+      });
     } catch (value) {
-      setError(value instanceof Error ? value.message : String(value));
+      setError(formatImageError(value));
     } finally {
       setRunning(false);
     }
@@ -73,12 +114,17 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
     setRunning(true);
     setError(undefined);
     try {
+      const upscaledSrc = await imageApi.upscale(
+        result.mediaId,
+        resolution,
+        result.slotId ?? 0,
+      );
       setResult({
         ...result,
-        src: await imageApi.upscale(result.mediaId, resolution),
+        src: upscaledSrc,
       });
     } catch (value) {
-      setError(value instanceof Error ? value.message : String(value));
+      setError(formatImageError(value));
     } finally {
       setRunning(false);
     }
@@ -95,15 +141,26 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
       coordinates.left >= coordinates.right ||
       coordinates.top >= coordinates.bottom
     ) {
-      setError("Vùng crop không hợp lệ.");
+      setError(
+        "Vùng crop không hợp lệ (Tọa độ bắt đầu phải nhỏ hơn tọa độ kết thúc).",
+      );
       return;
     }
     setRunning(true);
     setError(undefined);
     try {
-      setResult(await imageApi.crop(result.mediaId, coordinates));
+      const cropped = await imageApi.crop(
+        result.mediaId,
+        coordinates,
+        result.slotId ?? 0,
+      );
+      setResult({
+        ...result,
+        mediaId: cropped.mediaId,
+        src: cropped.src,
+      });
     } catch (value) {
-      setError(value instanceof Error ? value.message : String(value));
+      setError(formatImageError(value));
     } finally {
       setRunning(false);
     }
@@ -117,7 +174,7 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
         <div>
           <small>CHỈNH SỬA</small>
           <h1 id="image-editor-title">
-            <Images size={22} />
+            <Images size={22} aria-hidden="true" />
             Chỉnh sửa ảnh
           </h1>
           <p>
@@ -133,23 +190,31 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
       <div className="source-tool-layout">
         <section className="source-tool-preview">
           {preview ? (
-            <ImageAnnotationCanvas
-              canvasRef={canvasRef}
-              color={annotationColor}
-              fileUrl={preview}
-              onCountChange={updateAnnotationCount}
-              tool={annotationTool}
-              width={annotationWidth}
-            />
+            <div className="source-canvas-wrapper">
+              <div className="source-image-guide-banner">
+                <Info size={14} aria-hidden="true" />
+                <span>
+                  Dùng chuột hoặc bút cảm ứng vẽ trực tiếp lên ảnh để đánh dấu
+                  vùng cần AI chỉnh sửa.
+                </span>
+              </div>
+              <ImageAnnotationCanvas
+                key={preview}
+                canvasRef={canvasRef}
+                color={annotationColor}
+                fileUrl={preview}
+                onCountChange={updateAnnotationCount}
+                onImageLoaded={() => setImageReady(true)}
+                tool={annotationTool}
+                width={annotationWidth}
+              />
+            </div>
           ) : (
             <label className="source-drop-input">
-              <Upload size={28} />
+              <Upload size={28} aria-hidden="true" />
               <strong>Chọn ảnh gốc</strong>
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => setFile(event.target.files?.[0])}
-              />
+              <span>Hỗ trợ PNG, JPG, WebP, GIF (tối đa 25MB)</span>
+              <input type="file" accept="image/*" onChange={handleFileChange} />
             </label>
           )}
         </section>
@@ -157,8 +222,8 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
           <h2>Yêu cầu chỉnh sửa</h2>
           {file && (
             <Button variant="secondary" onClick={() => setFile(undefined)}>
-              <Upload size={15} />
-              Đổi ảnh
+              <Upload size={15} aria-hidden="true" />
+              Đổi ảnh khác
             </Button>
           )}
           {file && (
@@ -170,7 +235,7 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
                   variant={annotationTool === "pen" ? "primary" : "secondary"}
                   onClick={() => setAnnotationTool("pen")}
                 >
-                  <Pencil size={15} />
+                  <Pencil size={15} aria-hidden="true" />
                   Bút
                 </Button>
                 <Button
@@ -180,12 +245,12 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
                   }
                   onClick={() => setAnnotationTool("rectangle")}
                 >
-                  <Square size={15} />
+                  <Square size={15} aria-hidden="true" />
                   Khung
                 </Button>
               </div>
               <label>
-                Màu
+                Màu nét
                 <input
                   aria-label="Màu nét vẽ"
                   type="color"
@@ -209,45 +274,92 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
             </fieldset>
           )}
           <label>
-            Prompt
+            Prompt chỉnh sửa
             <textarea
               rows={7}
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              placeholder="Mô tả thay đổi cần thực hiện..."
+              placeholder="Mô tả thay đổi cần thực hiện (ví dụ: thay đổi bầu trời thành hoàng hôn, xóa đối tượng trong vùng chọn...)"
             />
           </label>
           <Button
-            disabled={!file || !prompt.trim() || running}
+            disabled={!file || !imageReady || !prompt.trim() || running}
             onClick={() => void edit()}
           >
-            <Sparkles size={16} />
-            {running ? "Đang xử lý..." : "Tạo ảnh đã chỉnh sửa"}
+            <Sparkles size={16} aria-hidden="true" />
+            {running
+              ? "Đang xử lý..."
+              : !imageReady && file
+                ? "Đang tải ảnh..."
+                : "Tạo ảnh đã chỉnh sửa"}
           </Button>
         </section>
       </div>
       {result && (
         <section className="source-edit-result">
-          <h2>Kết quả</h2>
-          <img src={result.src} alt="Ảnh đã chỉnh sửa" />
-          <div>
-            <a href={result.src} download>
-              <Download size={15} />
-              Tải ảnh
+          <h2>Kết quả chỉnh sửa</h2>
+          <div className="source-edit-result-grid">
+            <img
+              src={result.src}
+              alt="Ảnh đã chỉnh sửa"
+              className="source-edit-result-image"
+            />
+            <div className="source-edit-result-meta-card">
+              <div className="source-meta-item">
+                <span className="source-meta-label">Prompt:</span>
+                <span className="source-meta-value">
+                  {result.promptUsed || prompt}
+                </span>
+              </div>
+              <div className="source-meta-item">
+                <span className="source-meta-label">Tài khoản:</span>
+                <span className="source-meta-value">
+                  Slot {result.slotId ?? 0}
+                </span>
+              </div>
+              {result.mediaId && (
+                <div className="source-meta-item">
+                  <span className="source-meta-label">Media ID:</span>
+                  <code className="source-meta-code">{result.mediaId}</code>
+                </div>
+              )}
+              {result.createdAt && (
+                <div className="source-meta-item">
+                  <span className="source-meta-label">Thời gian:</span>
+                  <span className="source-meta-value">{result.createdAt}</span>
+                </div>
+              )}
+            </div>
+          </div>
+          <div className="source-edit-result-actions">
+            <a
+              href={result.src}
+              download={`edited-img-${Date.now()}.png`}
+              className="source-task-action-link"
+            >
+              <Download
+                size={15}
+                className="source-action-icon--download"
+                aria-hidden="true"
+              />
+              Tải ảnh về máy
             </a>
             {providerId === "veo3" && result.mediaId && (
               <>
                 <fieldset className="source-image-crop-controls">
-                  <legend>Crop theo phần trăm</legend>
+                  <legend>
+                    <Crop size={14} aria-hidden="true" />
+                    Crop theo tỷ lệ (0% - 100% kích thước ảnh gốc)
+                  </legend>
                   {(["top", "left", "right", "bottom"] as const).map((edge) => (
                     <label key={edge}>
                       {edge === "top"
-                        ? "Trên"
+                        ? "Trên (%)"
                         : edge === "left"
-                          ? "Trái"
+                          ? "Trái (%)"
                           : edge === "right"
-                            ? "Phải"
-                            : "Dưới"}
+                            ? "Phải (%)"
+                            : "Dưới (%)"}
                       <input
                         aria-label={`Crop ${edge}`}
                         type="number"
@@ -275,20 +387,22 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
                     Crop ảnh
                   </Button>
                 </fieldset>
-                <Button
-                  variant="secondary"
-                  disabled={running}
-                  onClick={() => void upscale("2K")}
-                >
-                  Upscale 2K
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={running}
-                  onClick={() => void upscale("4K")}
-                >
-                  Upscale 4K
-                </Button>
+                <div className="source-upscale-group">
+                  <Button
+                    variant="secondary"
+                    disabled={running}
+                    onClick={() => void upscale("2K")}
+                  >
+                    Upscale 2K
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    disabled={running}
+                    onClick={() => void upscale("4K")}
+                  >
+                    Upscale 4K
+                  </Button>
+                </div>
               </>
             )}
           </div>

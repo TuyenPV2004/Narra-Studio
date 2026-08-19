@@ -59,39 +59,74 @@ export interface NarraElectronApi {
   openExternalUrl: (url: string) => Promise<unknown>;
   getAllSlots: () => Promise<unknown>;
   pickRandomSlot: () => Promise<unknown>;
-  generateImage: (payload: Record<string, unknown>) => Promise<unknown>;
+  generateImage: (payload: {
+    aspectRatio?: string;
+    captchaToken?: string;
+    count?: number;
+    model?: string;
+    prompt: string;
+    referenceImageName?: string | null;
+    referenceImageNames?: string[];
+    seed?: number;
+    slotId?: number;
+  }) => Promise<unknown>;
   selectModelOnWebview: (payload: { model: string }) => Promise<unknown>;
   selectQuantityOnWebview: (payload: { quantity: number }) => Promise<unknown>;
   selectAspectOnWebview: (payload: { aspect: string }) => Promise<unknown>;
   generateViaPage: (payload: Record<string, unknown>) => Promise<unknown>;
   waitPageGenResult: (payload: {
-    timeoutMs: number;
     requestId?: string;
+    timeoutMs: number;
   }) => Promise<unknown>;
   saveImageLocally: (payload: {
+    fileName?: string;
+    slotId?: number;
     src: string;
-    fileName: string;
   }) => Promise<unknown>;
-  upscaleImage: (payload: Record<string, unknown>) => Promise<unknown>;
+  upscaleImage: (payload: {
+    captchaToken?: string;
+    mediaId: string;
+    slotId?: number;
+    targetResolution?: string;
+  }) => Promise<unknown>;
   getFlowProjectInitialData: (payload: { slotId: number }) => Promise<unknown>;
   generateFlowVoicePreview: (
     payload: Record<string, unknown>,
   ) => Promise<unknown>;
   saveFileDialog: (payload: Record<string, unknown>) => Promise<unknown>;
   getFilePath: (file: File) => string;
-  uploadImage: (payload: Record<string, unknown>) => Promise<unknown>;
-  uploadImageFromPath: (payload: Record<string, unknown>) => Promise<unknown>;
-  editImage: (payload: Record<string, unknown>) => Promise<unknown>;
+  uploadImage: (payload: {
+    fileName?: string;
+    imageBytes: string;
+    mimeType?: string;
+    slotId?: number;
+  }) => Promise<unknown>;
+  uploadImageFromPath: (payload: {
+    fileName?: string;
+    filePath: string;
+    mimeType?: string;
+    slotId?: number;
+  }) => Promise<unknown>;
+  editImage: (payload: {
+    baseMediaId: string;
+    captchaToken?: string;
+    prompt: string;
+    slotId?: number;
+  }) => Promise<unknown>;
   transformImage: (payload: {
-    mediaId: string;
     cropCoordinates: {
-      top: number;
+      bottom: number;
       left: number;
       right: number;
-      bottom: number;
+      top: number;
     };
+    mediaId: string;
+    slotId?: number;
   }) => Promise<unknown>;
-  resolveVideoUrl: (payload: Record<string, unknown>) => Promise<unknown>;
+  resolveVideoUrl: (payload: {
+    slotId?: number;
+    url: string;
+  }) => Promise<unknown>;
   generateVideo: (payload: Record<string, unknown>) => Promise<unknown>;
   generateVideoStartImage: (
     payload: Record<string, unknown>,

@@ -936,7 +936,7 @@ ipcMain.handle('capture-region', async (_, rect) => {
 });
 
 // ── Save image locally (download from URL or save base64) ─────────────
-ipcMain.handle('save-image-locally', async (_, { src, fileName }) => {
+ipcMain.handle('save-image-locally', async (_, { src, fileName, slotId = 0 } = {}) => {
   const imagesDir = getImageOutputDir();
   if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
 
@@ -944,13 +944,18 @@ ipcMain.handle('save-image-locally', async (_, { src, fileName }) => {
   const uniqueName = getNextFilename(imagesDir, ext);
   const filepath = path.join(imagesDir, uniqueName);
 
+  if (typeof src !== 'string' || !src.trim()) {
+    throw new Error('Dữ liệu nguồn ảnh không hợp lệ.');
+  }
+
   if (src.startsWith('data:')) {
     // base64 data URL
     const base64Data = src.replace(/^data:image\/\w+;base64,/, '');
     fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
   } else if (src.startsWith('http')) {
-    // Download from URL using Electron session downloadURL
-    const ses = session.fromPartition(SESSION_PARTITION);
+    // Download from URL using Electron session downloadURL with matching slot partition
+    const targetPartition = `persist:slot-${slotId ?? 0}`;
+    const ses = session.fromPartition(targetPartition);
     await new Promise((resolve, reject) => {
       let done = false;
       const finish = (err) => {

@@ -22,7 +22,7 @@ module.exports = function registerFlowSelectorsIpc(dependencies) {
 const MODEL_MAP = {
   'NARWHAL': 'Nano Banana 2',
   'GEM_PIX_2': 'Nano Banana Pro',
-  'IMAGEN_3_5': 'Imagen 4',
+  'HARBOR_SEAL': 'Nano Banana 2 Lite',
 };
 
 ipcMain.handle('select-model-on-webview', async (_, { model }) => {
@@ -39,7 +39,7 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
     (async function() {
       var debug = [];
       var targetText = '${targetModel}';
-      var modelNames = ['Nano Banana 2', 'Nano Banana Pro', 'Imagen 4'];
+      var modelNames = ['Nano Banana 2', 'Nano Banana Pro', 'Nano Banana 2 Lite'];
 
       try {
         // ═══ STEP 1: Click config trigger button ═══
@@ -315,11 +315,11 @@ ipcMain.handle('select-quantity-on-webview', async (_, { quantity }) => {
 
         if (!clicked) {
           // Broader search: any button with exact quantity text
-          var allBtns = Array.from(document.querySelectorAll('button'));
+          var allBtns = Array.from(searchRoot.querySelectorAll('button'));
           for (var i = 0; i < allBtns.length; i++) {
-            var txt = (allBtns[i].textContent || '').trim();
-            if (txt === targetText && allBtns[i] !== configBtn) {
-              debug.push('Clicking button: "' + txt + '"');
+            var bText = (allBtns[i].textContent || '').trim();
+            if (bText === targetText) {
+              debug.push('Clicking fallback button: "' + bText + '"');
               var br = allBtns[i].getBoundingClientRect();
               var bx = br.x + br.width/2, by = br.y + br.height/2;
               allBtns[i].dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, clientX:bx, clientY:by}));
@@ -355,6 +355,19 @@ ipcMain.handle('select-quantity-on-webview', async (_, { quantity }) => {
 const ASPECT_MAP = {
   'IMAGE_ASPECT_RATIO_LANDSCAPE': '16:9',
   'IMAGE_ASPECT_RATIO_PORTRAIT': '9:16',
+  'IMAGE_ASPECT_RATIO_SQUARE': '1:1',
+  'IMAGE_ASPECT_RATIO_LANDSCAPE_FOUR_THREE': '4:3',
+  'IMAGE_ASPECT_RATIO_PORTRAIT_THREE_FOUR': '3:4',
+  'IMAGE_ASPECT_RATIO_FOUR_THREE': '4:3',
+  'IMAGE_ASPECT_RATIO_THREE_FOUR': '3:4',
+  '16:9': '16:9',
+  '9:16': '9:16',
+  '1:1': '1:1',
+  '4:3': '4:3',
+  '3:4': '3:4',
+  'landscape': '16:9',
+  'portrait': '9:16',
+  'square': '1:1',
 };
 
 ipcMain.handle('select-aspect-on-webview', async (_, { aspect }) => {
@@ -362,8 +375,7 @@ ipcMain.handle('select-aspect-on-webview', async (_, { aspect }) => {
     const wv = findFlowWebview();
     if (!wv) return { success: false, error: 'WebView not found' };
 
-    const targetText = ASPECT_MAP[aspect];
-    if (!targetText) return { success: false, error: 'Unknown aspect: ' + aspect };
+    const targetText = ASPECT_MAP[aspect] || '16:9';
 
     console.log('[ASPECT-SYNC] Selecting aspect:', targetText);
 
@@ -371,7 +383,7 @@ ipcMain.handle('select-aspect-on-webview', async (_, { aspect }) => {
     (async function() {
       var debug = [];
       var targetText = '${targetText}';
-      var modelNames = ['Nano Banana 2', 'Nano Banana Pro', 'Imagen 4'];
+      var modelNames = ['Nano Banana 2', 'Nano Banana Pro', 'Nano Banana 2 Lite', 'Nano Banana'];
 
       try {
         // Step 1: Open config panel
@@ -381,10 +393,14 @@ ipcMain.handle('select-aspect-on-webview', async (_, { aspect }) => {
           var text = (buttons[i].textContent || '');
           var id = buttons[i].id || '';
           for (var j = 0; j < modelNames.length; j++) {
-            if (text.indexOf(modelNames[j]) !== -1 && (id.indexOf('radix') !== -1 || text.indexOf('crop_') !== -1)) {
+            if (text.indexOf(modelNames[j]) !== -1 && (id.indexOf('radix') !== -1 || text.indexOf('crop_') !== -1 || text.indexOf('16:9') !== -1 || text.indexOf('9:16') !== -1 || text.indexOf('1:1') !== -1)) {
               configBtn = buttons[i];
               break;
             }
+          }
+          if (!configBtn && (id.indexOf('radix') !== -1 && (text.indexOf('crop_') !== -1 || text.indexOf('16:9') !== -1 || text.indexOf('9:16') !== -1 || text.indexOf('1:1') !== -1 || text.indexOf('Landscape') !== -1 || text.indexOf('Portrait') !== -1))) {
+            configBtn = buttons[i];
+            break;
           }
           if (configBtn) break;
         }
