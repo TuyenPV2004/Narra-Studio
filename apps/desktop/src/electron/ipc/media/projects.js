@@ -18,6 +18,9 @@ module.exports = function registerMediaProjectsIpc(dependencies) {
     pathToFileURL,
     fileURLToPath,
     runtime,
+    getImageOutputDir,
+    getVideoOutputDir,
+    loadSettings,
   } = dependencies;
 
 // ── Select video files dialog ─────────────────────────────────────────
@@ -196,42 +199,31 @@ ipcMain.handle('select-agent-canvas-media-files', async () => {
   return selectedMedia;
 });
 
-// ── Delete file (Move to OS Recycle Bin) ───────────────────────────────
-function resolveLocalFilePath(filePath) {
-  if (!filePath || typeof filePath !== 'string') return '';
-  if (filePath.startsWith('file:')) {
-    try {
-      return fileURLToPath(filePath);
-    } catch {}
-  }
-  let decoded = filePath;
-  try {
-    decoded = decodeURIComponent(filePath);
-  } catch {}
-  decoded = decoded.replace(/^file:[/\\]{2,3}/, '').replace(/^\/([A-Za-z]:)/, '$1');
-  return path.normalize(decoded);
-}
+// ── Delete file (Move to OS Recycle Bin with boundary and realpath checks) ──
+const { validateMediaDeleteTarget } = require('../../runtime/mediaSecurity');
 
 ipcMain.handle('delete-file', async (_, filePath) => {
   try {
-    const resolved = resolveLocalFilePath(filePath);
-    console.log(`[FILE] Deleting target: "${filePath}" -> resolved: "${resolved}"`);
-    if (resolved && fs.existsSync(resolved)) {
-      if (shell && typeof shell.trashItem === 'function') {
-        try {
-          await shell.trashItem(resolved);
-          console.log(`[FILE] Moved to Recycle Bin: ${resolved}`);
-          return true;
-        } catch (trashErr) {
-          console.warn('[FILE] trashItem failed, falling back to unlinkSync:', trashErr);
-        }
-      }
-      fs.unlinkSync(resolved);
-      console.log(`[FILE] Deleted: ${resolved}`);
-      return true;
+    const validation = validateMediaDeleteTarget(filePath, dependencies);
+    if (!validation.valid) {
+      console.warn(`[FILE] Rejected delete: ${validation.reason} (target: "${filePath}")`);
+      return false;
     }
-    console.warn(`[FILE] Target file does not exist: "${resolved}" (original: "${filePath}")`);
-    return false;
+
+    const resolvedPath = validation.resolvedPath;
+    console.log(`[FILE] Deleting target: "${filePath}" -> resolved: "${resolvedPath}"`);
+    if (shell && typeof shell.trashItem === 'function') {
+      try {
+        await shell.trashItem(resolvedPath);
+        console.log(`[FILE] Moved to Recycle Bin: ${resolvedPath}`);
+        return true;
+      } catch (trashErr) {
+        console.warn('[FILE] trashItem failed, falling back to unlinkSync:', trashErr);
+      }
+    }
+    fs.unlinkSync(resolvedPath);
+    console.log(`[FILE] Deleted: ${resolvedPath}`);
+    return true;
   } catch (err) {
     console.error('[FILE] Delete error:', err);
     throw err;

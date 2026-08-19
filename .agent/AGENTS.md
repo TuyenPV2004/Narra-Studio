@@ -15,6 +15,21 @@
 
 Thiết kế documentary/Remotion/SQLite/Codex pipeline cũ không còn là kiến trúc hiện hành.
 
+## Superpowers
+
+- Khi plugin Superpowers khả dụng, kiểm tra và dùng skill phù hợp trước khi thực hiện tác vụ:
+  - `brainstorming` cho tính năng hoặc thay đổi hành vi mới.
+  - `systematic-debugging` cho bug, lỗi test hoặc hành vi bất ngờ.
+  - `writing-plans` cho tác vụ nhiều bước hoặc ảnh hưởng nhiều file.
+  - `test-driven-development` khi có test surface phù hợp cho thay đổi code.
+  - `requesting-code-review` và `verification-before-completion` trước khi bàn giao.
+- Dùng `using-git-worktrees`, `subagent-driven-development`, `dispatching-parallel-agents` hoặc
+  `finishing-a-development-branch` chỉ khi phù hợp với phạm vi và quyền đã được người dùng cho phép;
+  không tự tạo branch, worktree, commit, merge hoặc push.
+- Skill Superpowers bổ sung quy trình, không thay thế chỉ thị người dùng, rule workspace, giới hạn an toàn,
+  source of truth hoặc lệnh kiểm tra của dự án. Nếu skill không khả dụng, tiếp tục theo các rule này và
+  nêu rõ giới hạn trong báo cáo.
+
 ## Phạm vi sản phẩm
 
 - Narra Studio là ứng dụng Electron local, single-user, dựa trên runtime đã khôi phục và local hóa.

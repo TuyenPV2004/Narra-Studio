@@ -3,30 +3,53 @@ import { getElectronApi } from "@/services/electron-api/client";
 export interface LocalMedia {
   name: string;
   path: string;
+  localPath: string;
   size: number;
   time: number;
   type: "image" | "video";
 }
+
 const record = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
     : {};
+
+export const normalizeMediaItem = (
+  item: Record<string, unknown>,
+  type: LocalMedia["type"],
+): LocalMedia | null => {
+  const rawPath = typeof item.path === "string" ? item.path : "";
+  const fileUrl = typeof item.fileUrl === "string" ? item.fileUrl : "";
+  const target = fileUrl || rawPath;
+  if (!target) return null;
+
+  const src =
+    fileUrl ||
+    (rawPath.startsWith("file:")
+      ? rawPath
+      : `file:///${rawPath.replace(/\\/g, "/")}`);
+  const fallbackName =
+    rawPath.split(/[\\/]/).pop() || fileUrl.split(/[\\/]/).pop() || type;
+  const name =
+    typeof item.name === "string" && item.name.trim()
+      ? item.name.trim()
+      : fallbackName;
+
+  return {
+    name,
+    path: src,
+    localPath: rawPath || fileUrl,
+    size: typeof item.size === "number" ? item.size : 0,
+    time: typeof item.time === "number" ? item.time : 0,
+    type,
+  };
+};
+
 const normalize = (value: unknown, type: LocalMedia["type"]): LocalMedia[] =>
-  (Array.isArray(value) ? value : []).map(record).flatMap((item) => {
-    if (typeof item.path !== "string") return [];
-    return [
-      {
-        name:
-          typeof item.name === "string"
-            ? item.name
-            : item.path.split(/[\\/]/).pop() || type,
-        path: item.path,
-        size: typeof item.size === "number" ? item.size : 0,
-        time: typeof item.time === "number" ? item.time : 0,
-        type,
-      },
-    ];
-  });
+  (Array.isArray(value) ? value : [])
+    .map(record)
+    .map((item) => normalizeMediaItem(item, type))
+    .filter((item): item is LocalMedia => item !== null);
 
 export const mediaApi = {
   async list(): Promise<LocalMedia[]> {
@@ -38,12 +61,16 @@ export const mediaApi = {
       (left, right) => right.time - left.time,
     );
   },
-  delete(path: string) {
-    return getElectronApi().deleteFile(path);
+  delete(mediaOrPath: LocalMedia | string) {
+    const pathToDelete =
+      typeof mediaOrPath === "object" && mediaOrPath !== null
+        ? mediaOrPath.localPath || mediaOrPath.path
+        : mediaOrPath;
+    return getElectronApi().deleteFile(pathToDelete);
   },
   async importImages(): Promise<number> {
     const selected = await getElectronApi().selectFiles();
-    if (!Array.isArray(selected)) return 0;
+    if (!Array.isArray(selected) || selected.length === 0) return 0;
     let saved = 0;
     for (const raw of selected) {
       const file = record(raw);

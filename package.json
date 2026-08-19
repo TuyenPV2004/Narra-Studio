@@ -12,7 +12,7 @@
     "build:source": "node scripts/build-source-renderer.mjs",
     "dev": "pnpm --filter @narra/desktop dev",
     "dev:source": "vite --config apps/desktop/src/renderer-source/vite.config.mts",
-    "test": "node scripts/smoke-local-workspace.cjs && node scripts/test-captcha-extension.cjs && node scripts/test-captcha-extension-package.mjs && node scripts/test-ai-provider-profiles.cjs && node scripts/test-source-ui-contract.cjs && node scripts/test-package-windows-resolver.mjs",
+    "test": "node scripts/smoke-local-workspace.cjs && node scripts/test-captcha-extension.cjs && node scripts/test-captcha-extension-package.mjs && node scripts/test-ai-provider-profiles.cjs && node scripts/test-media-library.cjs && node scripts/test-source-ui-contract.cjs && node scripts/test-package-windows-resolver.mjs",
     "typecheck": "pnpm --filter @narra/desktop typecheck && pnpm typecheck:source",
     "typecheck:source": "tsc -p apps/desktop/src/renderer-source/tsconfig.json --noEmit",
     "format:source:check": "prettier --check \"apps/desktop/src/renderer-source/**/*.{ts,tsx,css,mts}\"",

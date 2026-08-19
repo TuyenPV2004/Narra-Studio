@@ -303,7 +303,8 @@ ipcMain.handle('list-image-files', async () => {
         const stat = fs.statSync(fp);
         return {
           name: f,
-          path: pathToFileURL(fp).toString(),
+          path: fp,
+          fileUrl: pathToFileURL(fp).toString(),
           size: stat.size,
           time: stat.mtimeMs,
         };

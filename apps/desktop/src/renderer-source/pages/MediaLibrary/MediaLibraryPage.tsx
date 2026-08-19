@@ -7,12 +7,13 @@ import {
   Image as ImageIcon,
   Play,
   RefreshCw,
+  Search,
   Trash2,
   Upload,
   Video,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
   Dialog,
@@ -50,29 +51,41 @@ export function MediaLibraryPage() {
   const [items, setItems] = useState<LocalMedia[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [filter, setFilter] = useState<"all" | "image" | "video">("all");
+  const [searchQuery, setSearchQuery] = useState("");
   const [previewMedia, setPreviewMedia] = useState<LocalMedia | null>(null);
   const [deletingMedia, setDeletingMedia] = useState<LocalMedia | null>(null);
   const [error, setError] = useState<string>();
 
+  const filteredItems = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    return items.filter((item) => {
+      if (filter !== "all" && item.type !== filter) return false;
+      if (query && !item.name.toLowerCase().includes(query)) return false;
+      return true;
+    });
+  }, [items, filter, searchQuery]);
+
   const currentIndex = previewMedia
-    ? items.findIndex((item) => item.path === previewMedia.path)
+    ? filteredItems.findIndex((item) => item.path === previewMedia.path)
     : -1;
   const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex >= 0 && currentIndex < items.length - 1;
+  const hasNext = currentIndex >= 0 && currentIndex < filteredItems.length - 1;
 
   const goToPrev = useCallback(() => {
     if (hasPrev) {
-      const prev = items[currentIndex - 1];
+      const prev = filteredItems[currentIndex - 1];
       if (prev) setPreviewMedia(prev);
     }
-  }, [hasPrev, currentIndex, items]);
+  }, [hasPrev, currentIndex, filteredItems]);
 
   const goToNext = useCallback(() => {
     if (hasNext) {
-      const next = items[currentIndex + 1];
+      const next = filteredItems[currentIndex + 1];
       if (next) setPreviewMedia(next);
     }
-  }, [hasNext, currentIndex, items]);
+  }, [hasNext, currentIndex, filteredItems]);
 
   useEffect(() => {
     if (!previewMedia) return;
@@ -80,20 +93,20 @@ export function MediaLibraryPage() {
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         if (currentIndex > 0) {
-          const prev = items[currentIndex - 1];
+          const prev = filteredItems[currentIndex - 1];
           if (prev) setPreviewMedia(prev);
         }
       } else if (event.key === "ArrowRight") {
         event.preventDefault();
-        if (currentIndex >= 0 && currentIndex < items.length - 1) {
-          const next = items[currentIndex + 1];
+        if (currentIndex >= 0 && currentIndex < filteredItems.length - 1) {
+          const next = filteredItems[currentIndex + 1];
           if (next) setPreviewMedia(next);
         }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [previewMedia, currentIndex, items]);
+  }, [previewMedia, currentIndex, filteredItems]);
 
   const load = useCallback(async (isManual = false) => {
     if (isManual) {
@@ -103,12 +116,7 @@ export function MediaLibraryPage() {
     }
     setError(undefined);
     try {
-      const [data] = await Promise.all([
-        mediaApi.list(),
-        isManual
-          ? new Promise((resolve) => setTimeout(resolve, 500))
-          : Promise.resolve(),
-      ]);
+      const data = await mediaApi.list();
       setItems(data);
       if (isManual) {
         toast.success("Đã làm mới thư viện.");
@@ -126,18 +134,28 @@ export function MediaLibraryPage() {
   }, [load]);
 
   const importImages = async () => {
+    setImporting(true);
     try {
-      await mediaApi.importImages();
-      await load();
-      toast.success("Đã nhập ảnh vào thư viện.");
+      const count = await mediaApi.importImages();
+      if (count === 0) {
+        toast.info("Không có ảnh mới nào được chọn.");
+      } else {
+        await load();
+        toast.success(`Đã nhập thành công ${count} ảnh vào thư viện.`);
+      }
     } catch (value) {
       setError(value instanceof Error ? value.message : String(value));
+      toast.error("Nhập ảnh thất bại", {
+        description: value instanceof Error ? value.message : String(value),
+      });
+    } finally {
+      setImporting(false);
     }
   };
 
   const remove = async (item: LocalMedia) => {
     try {
-      await mediaApi.delete(item.path);
+      await mediaApi.delete(item);
       setItems((current) =>
         current.filter((value) => value.path !== item.path),
       );
@@ -149,6 +167,8 @@ export function MediaLibraryPage() {
       setError(value instanceof Error ? value.message : String(value));
     }
   };
+
+  const isBusy = loading || refreshing || importing;
 
   return (
     <section
@@ -175,7 +195,7 @@ export function MediaLibraryPage() {
           <Button
             variant="secondary"
             onClick={() => void load(true)}
-            disabled={loading || refreshing}
+            disabled={isBusy}
           >
             <RefreshCw
               size={16}
@@ -183,9 +203,9 @@ export function MediaLibraryPage() {
             />
             Làm mới
           </Button>
-          <Button onClick={() => void importImages()}>
-            <Upload size={16} />
-            Nhập ảnh
+          <Button onClick={() => void importImages()} disabled={isBusy}>
+            <Upload size={16} className={importing ? "is-spinning" : ""} />
+            {importing ? "Đang nhập..." : "Nhập ảnh"}
           </Button>
         </div>
       </header>
@@ -196,81 +216,149 @@ export function MediaLibraryPage() {
         </p>
       )}
 
+      {items.length > 0 && (
+        <div className="source-media-toolbar">
+          <div
+            className="source-media-filters"
+            role="group"
+            aria-label="Lọc loại media"
+          >
+            <button
+              type="button"
+              className="source-media-filter-btn"
+              data-active={filter === "all"}
+              onClick={() => setFilter("all")}
+            >
+              Tất cả ({items.length})
+            </button>
+            <button
+              type="button"
+              className="source-media-filter-btn"
+              data-active={filter === "image"}
+              onClick={() => setFilter("image")}
+            >
+              <ImageIcon size={13} aria-hidden="true" />
+              Ảnh ({items.filter((i) => i.type === "image").length})
+            </button>
+            <button
+              type="button"
+              className="source-media-filter-btn"
+              data-active={filter === "video"}
+              onClick={() => setFilter("video")}
+            >
+              <Video size={13} aria-hidden="true" />
+              Video ({items.filter((i) => i.type === "video").length})
+            </button>
+          </div>
+
+          <div className="source-media-search">
+            <Search
+              size={14}
+              className="source-media-search__icon"
+              aria-hidden="true"
+            />
+            <input
+              type="text"
+              placeholder="Tìm kiếm tệp theo tên..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Tìm kiếm media theo tên"
+            />
+          </div>
+        </div>
+      )}
+
       {items.length === 0 ? (
         <div className="source-generation-empty source-media-empty">
           <FolderOpen size={32} />
           <p>{loading ? "Đang tải thư viện..." : "Chưa có media cục bộ."}</p>
         </div>
+      ) : filteredItems.length === 0 ? (
+        <div className="source-generation-empty source-media-empty">
+          <FolderOpen size={32} />
+          <p>Không tìm thấy media phù hợp với bộ lọc.</p>
+        </div>
       ) : (
         <div className="source-media-grid">
-          {items.map((item) => (
-            <article
-              key={item.path}
-              className="source-media-card"
-              onClick={() => setPreviewMedia(item)}
-            >
+          {filteredItems.map((item) => (
+            <article key={item.path} className="source-media-card">
               <div className="source-media-card__thumb">
-                {item.type === "image" ? (
-                  <img
-                    src={item.path}
-                    alt={item.name}
-                    loading="lazy"
-                    className="source-media-card__media"
-                  />
-                ) : (
-                  <video
-                    src={item.path}
-                    preload="metadata"
-                    className="source-media-card__media"
-                  />
-                )}
-
-                <div className="source-media-card__badge">
+                <button
+                  type="button"
+                  className="source-media-card__preview-btn"
+                  onClick={() => setPreviewMedia(item)}
+                  aria-label={`Xem ${item.name}`}
+                >
                   {item.type === "image" ? (
-                    <>
-                      <ImageIcon size={11} aria-hidden="true" />
-                      <span>Ảnh</span>
-                    </>
+                    <img
+                      src={item.path}
+                      alt={item.name}
+                      loading="lazy"
+                      className="source-media-card__media"
+                    />
                   ) : (
-                    <>
-                      <Play size={11} fill="currentColor" aria-hidden="true" />
-                      <span>Video</span>
-                    </>
+                    <video
+                      src={item.path}
+                      preload="metadata"
+                      className="source-media-card__media"
+                    />
                   )}
-                </div>
+
+                  <div className="source-media-card__badge">
+                    {item.type === "image" ? (
+                      <>
+                        <ImageIcon size={11} aria-hidden="true" />
+                        <span>Ảnh</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play
+                          size={11}
+                          fill="currentColor"
+                          aria-hidden="true"
+                        />
+                        <span>Video</span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="source-media-card__overlay">
+                    <span className="source-media-card__action-icon">
+                      {item.type === "video" ? (
+                        <Play
+                          size={20}
+                          fill="currentColor"
+                          style={{ marginLeft: 2 }}
+                        />
+                      ) : (
+                        <Eye size={20} />
+                      )}
+                    </span>
+                  </div>
+                </button>
 
                 <button
                   type="button"
                   className="source-media-card__btn-delete"
                   title={`Xóa ${item.name}`}
                   aria-label={`Xóa ${item.name}`}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeletingMedia(item);
-                  }}
+                  onClick={() => setDeletingMedia(item)}
                 >
-                  <Trash2 size={13} />
+                  <Trash2 size={13} aria-hidden="true" />
                 </button>
-
-                <div className="source-media-card__overlay">
-                  <span className="source-media-card__action-icon">
-                    {item.type === "video" ? (
-                      <Play
-                        size={20}
-                        fill="currentColor"
-                        style={{ marginLeft: 2 }}
-                      />
-                    ) : (
-                      <Eye size={20} />
-                    )}
-                  </span>
-                </div>
               </div>
 
               <div className="source-media-card__info">
-                <h4 className="source-media-card__name" title={item.name}>
-                  {item.name}
-                </h4>
+                <button
+                  type="button"
+                  className="source-media-card__title-btn"
+                  onClick={() => setPreviewMedia(item)}
+                  aria-label={`Xem chi tiết ${item.name}`}
+                >
+                  <h4 className="source-media-card__name" title={item.name}>
+                    {item.name}
+                  </h4>
+                </button>
                 <div className="source-media-card__meta">
                   <span>{formatFileSize(item.size)}</span>
                   <span>{formatDate(item.time)}</span>
@@ -297,9 +385,9 @@ export function MediaLibraryPage() {
                 Xem chi tiết media
               </DialogDescription>
 
-              {items.length > 1 && currentIndex >= 0 && (
+              {filteredItems.length > 1 && currentIndex >= 0 && (
                 <div className="source-media-lightbox__counter">
-                  {currentIndex + 1} / {items.length}
+                  {currentIndex + 1} / {filteredItems.length}
                 </div>
               )}
 

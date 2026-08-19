@@ -30,6 +30,8 @@ const providerConnections = read(
 const aiProviders = read("pages/ProviderAccount/AiProviderProfilesPanel.tsx");
 const flow = read("pages/GoogleFlow/GoogleFlowPage.tsx");
 const flowApi = read("services/electron-api/flow.ts");
+const mediaLibrary = read("pages/MediaLibrary/MediaLibraryPage.tsx");
+const mediaApi = read("services/electron-api/media.ts");
 const storageIpc = fs.readFileSync(
   path.join(
     repositoryRoot,
@@ -39,6 +41,19 @@ const storageIpc = fs.readFileSync(
     "electron",
     "ipc",
     "storage.js",
+  ),
+  "utf8",
+);
+const projectsIpc = fs.readFileSync(
+  path.join(
+    repositoryRoot,
+    "apps",
+    "desktop",
+    "src",
+    "electron",
+    "ipc",
+    "media",
+    "projects.js",
   ),
   "utf8",
 );
@@ -117,6 +132,17 @@ for (const token of [
 ]) {
   assert.match(aiProviders, new RegExp(token));
 }
+
+assert.match(mediaLibrary, /className="source-media-card__preview-btn"/);
+assert.match(mediaLibrary, /aria-label=\{`Xem \$\{item\.name\}`\}/);
+assert.doesNotMatch(mediaLibrary, /<article[^>]*role="button"/);
+assert.match(mediaLibrary, /Trash2 size=\{13\} aria-hidden="true"/);
+assert.match(mediaLibrary, /importing/);
+assert.match(mediaLibrary, /source-media-filters/);
+assert.match(mediaApi, /normalizeMediaItem/);
+assert.match(mediaApi, /localPath:/);
+assert.match(projectsIpc, /validateMediaDeleteTarget/);
+
 
 const sourceFiles = [];
 const visit = (directory) => {
