@@ -9,7 +9,6 @@ import {
   GlobeLock,
   Inbox,
   KeyRound,
-  MousePointerClick,
   RotateCcw,
   SquarePen,
   Trash2,
@@ -250,10 +249,6 @@ export function AiProviderProfilesPanel({
       toast.warning("Vui lòng chọn hoặc nhập Model.");
       return;
     }
-    if (draft.capabilities.length === 0) {
-      toast.warning("Vui lòng chọn ít nhất một Khả năng hỗ trợ.");
-      return;
-    }
     if (!draft.id && !draft.apiKey.trim()) {
       toast.warning("Vui lòng nhập API key.");
       return;
@@ -265,7 +260,7 @@ export function AiProviderProfilesPanel({
         name: draft.name.trim(),
         baseUrl: draft.baseUrl.trim(),
         model: draft.model.trim(),
-        capabilities: draft.capabilities,
+        capabilities: protocolCapabilities[draft.protocol],
         protocol: draft.protocol,
         ...(draft.apiKey.trim() ? { apiKey: draft.apiKey.trim() } : {}),
       });
@@ -277,25 +272,6 @@ export function AiProviderProfilesPanel({
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       toast.error("Lưu AI provider thất bại", { description: msg });
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const activate = async (
-    id: string,
-    capability: AiProviderCapability = "text",
-  ) => {
-    setBusy(true);
-    try {
-      await aiProviderApi.setActive(id, capability);
-      setActiveByCapability((current) => ({ ...current, [capability]: id }));
-      toast.success(
-        `Đã kích hoạt AI provider cho ${capabilityLabels[capability]}!`,
-      );
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      toast.error("Kích hoạt AI provider thất bại", { description: msg });
     } finally {
       setBusy(false);
     }
@@ -382,37 +358,10 @@ export function AiProviderProfilesPanel({
                             {capabilityLabels[capability]}
                           </span>
                         ))}
-                        {activeCapabilities.map((capability) => (
-                          <span
-                            key={`active-${capability}`}
-                            className="source-provider-card__cap-pill source-provider-card__cap-pill--active"
-                          >
-                            Đang dùng: {capabilityLabels[capability]}
-                          </span>
-                        ))}
                       </div>
                     </div>
                   </button>
                   <div className="source-provider-card__actions">
-                    {profile.capabilities.map((capability) => (
-                      <Button
-                        key={`activate-${capability}`}
-                        variant="secondary"
-                        className="source-provider-card__btn-select"
-                        disabled={
-                          busy ||
-                          !profile.model ||
-                          activeByCapability[capability] === profile.id
-                        }
-                        aria-label={`Kích hoạt ${capabilityLabels[capability]} cho ${profile.name}`}
-                        onClick={() => void activate(profile.id, capability)}
-                      >
-                        <MousePointerClick size={13} aria-hidden="true" />
-                        {activeByCapability[capability] === profile.id
-                          ? `Đang dùng ${capabilityLabels[capability]}`
-                          : `Dùng ${capabilityLabels[capability]}`}
-                      </Button>
-                    ))}
                     {isEditing ? (
                       <Button
                         variant="secondary"
@@ -645,33 +594,6 @@ export function AiProviderProfilesPanel({
               />
             )}
           </div>
-          <fieldset className="source-ai-providers__capability-options">
-            <legend>Capabilities</legend>
-            {(Object.keys(capabilityLabels) as AiProviderCapability[]).map(
-              (capability) => (
-                <label key={capability}>
-                  <input
-                    type="checkbox"
-                    disabled={
-                      !protocolCapabilities[draft.protocol].includes(capability)
-                    }
-                    checked={draft.capabilities.includes(capability)}
-                    onChange={(event) =>
-                      setDraft((current) => ({
-                        ...current,
-                        capabilities: event.target.checked
-                          ? [...new Set([...current.capabilities, capability])]
-                          : current.capabilities.filter(
-                              (value) => value !== capability,
-                            ),
-                      }))
-                    }
-                  />
-                  {capabilityLabels[capability]}
-                </label>
-              ),
-            )}
-          </fieldset>
           <Button
             type="submit"
             disabled={
@@ -679,7 +601,6 @@ export function AiProviderProfilesPanel({
               !draft.name.trim() ||
               !draft.baseUrl.trim() ||
               !draft.model.trim() ||
-              draft.capabilities.length === 0 ||
               (!draft.id && !draft.apiKey.trim())
             }
           >

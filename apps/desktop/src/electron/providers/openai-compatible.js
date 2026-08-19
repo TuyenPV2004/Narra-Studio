@@ -254,6 +254,9 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
       saveSettings({
         aiProviderProfiles: profiles,
         activeAiProviderProfileId: settings.activeAiProviderProfileId || (capabilities.includes('text') ? id : ''),
+        activeVisionProviderProfileId: settings.activeVisionProviderProfileId || (capabilities.includes('vision') ? id : ''),
+        activeTtsProviderProfileId: settings.activeTtsProviderProfileId || (capabilities.includes('text-to-speech') ? id : ''),
+        activeLipSyncProviderProfileId: settings.activeLipSyncProviderProfileId || (capabilities.includes('lip-sync') ? id : ''),
         aiProvider: 'openai-compatible',
       });
       return publicProfile(profile);

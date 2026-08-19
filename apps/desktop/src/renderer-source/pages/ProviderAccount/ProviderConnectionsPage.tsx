@@ -1,6 +1,7 @@
 import { KeyRound, RefreshCw } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { toast } from "@/components/ui/Toast";
 import { AiProviderProfilesPanel } from "@/pages/ProviderAccount/AiProviderProfilesPanel";
 import type { ProviderId } from "@/types/electron-api";
 
@@ -11,9 +12,10 @@ export function ProviderConnectionsPage({
 }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [dirty, setDirty] = useState(false);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     if (
       dirty &&
       !window.confirm(
@@ -21,8 +23,17 @@ export function ProviderConnectionsPage({
       )
     )
       return;
+    setRefreshing(true);
     setReloadKey((prev) => prev + 1);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      toast.success("Đã làm mới danh sách provider.");
+    } finally {
+      setRefreshing(false);
+    }
   };
+
+  const isSpinning = loading || refreshing;
 
   return (
     <section
@@ -42,8 +53,12 @@ export function ProviderConnectionsPage({
             </p>
           </div>
         </div>
-        <Button variant="secondary" onClick={handleRefresh} disabled={loading}>
-          <RefreshCw size={16} className={loading ? "is-spinning" : ""} />
+        <Button
+          variant="secondary"
+          onClick={() => void handleRefresh()}
+          disabled={isSpinning}
+        >
+          <RefreshCw size={16} className={isSpinning ? "is-spinning" : ""} />
           Làm mới
         </Button>
       </header>

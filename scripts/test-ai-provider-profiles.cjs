@@ -119,6 +119,8 @@ assert.deepEqual(saved.capabilities, ["text", "vision"]);
 assert.equal(saved.protocol, "openai-compatible");
 assert.equal(Object.hasOwn(saved, "apiKey"), false);
 assert.equal(JSON.stringify(settings).includes("top-secret-key"), false);
+assert.equal(provider.list().activeByCapability.text, "local-ai");
+assert.equal(provider.list().activeByCapability.vision, "local-ai");
 
 const list = provider.list();
 assert.equal(list.activeId, "local-ai");
