@@ -282,8 +282,10 @@ function testSetupUsesBundledExtension() {
   );
   assert.equal(captchaAdapter.includes("getElectronApi().openExtensionFolder()"), true);
   assert.equal(setupAsset.includes('Download Extension (.zip)'), false);
-  assert.equal(setupAsset.includes('Tải Extension'), true);
-  assert.equal(setupAsset.includes('Mở thư mục'), true);
+  assert.equal(setupAsset.includes('Mở thư mục Extension'), true);
+  assert.equal(/>\s*Tải Extension\s*</u.test(setupAsset), false);
+  assert.equal(/>\s*Mở thư mục\s*</u.test(setupAsset), false);
+  assert.equal(/[ÃÂÆÄ]|áº|á»/u.test(setupAsset), false);
 }
 
 (async () => {

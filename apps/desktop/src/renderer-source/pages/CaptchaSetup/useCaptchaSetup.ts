@@ -4,6 +4,7 @@ import { captchaApi } from "@/services/electron-api";
 export interface CaptchaStatus {
   extensionCompatible: boolean;
   extensionConnected: boolean;
+  extensionFilesAvailable: boolean;
   extensionVersion: string;
   labsProjectOpen: boolean;
   labsTabOpen: boolean;
@@ -16,6 +17,7 @@ export interface CaptchaStatus {
 const emptyStatus: CaptchaStatus = {
   extensionCompatible: false,
   extensionConnected: false,
+  extensionFilesAvailable: false,
   extensionVersion: "",
   labsProjectOpen: false,
   labsTabOpen: false,
@@ -32,6 +34,7 @@ const field = (value: unknown, key: string): unknown =>
 const parseStatus = (value: unknown): CaptchaStatus => ({
   extensionCompatible: field(value, "extensionCompatible") === true,
   extensionConnected: field(value, "extensionConnected") === true,
+  extensionFilesAvailable: field(value, "extensionFilesAvailable") === true,
   extensionVersion:
     typeof field(value, "extensionVersion") === "string"
       ? (field(value, "extensionVersion") as string)
@@ -93,12 +96,13 @@ export function useCaptchaSetup() {
         captchaApi.testExtension(),
         new Promise((resolve) => setTimeout(resolve, 450)),
       ]);
-      await refresh();
+      const next = await refresh();
       return (
         typeof result === "object" &&
         result !== null &&
         "ok" in result &&
-        (result as Record<string, unknown>).ok === true
+        (result as Record<string, unknown>).ok === true &&
+        next.setupReady
       );
     } catch (runtimeError) {
       setError(

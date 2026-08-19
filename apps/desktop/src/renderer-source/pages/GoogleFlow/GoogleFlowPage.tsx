@@ -9,10 +9,11 @@ import {
   User,
   Users,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
 import { flowApi, type FlowSlot } from "@/services/electron-api/flow";
+import { getElectronApi } from "@/services/electron-api/client";
 
 export function GoogleFlowPage() {
   const [slots, setSlots] = useState<FlowSlot[]>([]);
@@ -20,16 +21,23 @@ export function GoogleFlowPage() {
   const [syncingId, setSyncingId] = useState<number | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [error, setError] = useState<string>();
+  const [activeAction, setActiveAction] = useState<{
+    slotId: number;
+    type: "login" | "logout" | "switch" | "sync" | "create";
+  } | null>(null);
+  const loadRequestRef = useRef(0);
+  const refreshTimerRef = useRef<number | undefined>(undefined);
 
   const load = useCallback(async () => {
     setLoading(true);
     setError(undefined);
+    const requestId = ++loadRequestRef.current;
     try {
       const [nextSlots] = await Promise.all([
         flowApi.listSlots(),
         new Promise((resolve) => setTimeout(resolve, 450)),
       ]);
-      setSlots(nextSlots);
+      if (requestId === loadRequestRef.current) setSlots(nextSlots);
     } catch (value) {
       setError(value instanceof Error ? value.message : String(value));
     } finally {
@@ -39,10 +47,23 @@ export function GoogleFlowPage() {
 
   useEffect(() => {
     void load();
-    return flowApi.subscribeSlotsChanged(() => void load());
+    const scheduleLoad = () => {
+      window.clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = window.setTimeout(() => void load(), 100);
+    };
+    const cleanup = flowApi.subscribeSlotsChanged(scheduleLoad);
+    return () => {
+      cleanup();
+      window.clearTimeout(refreshTimerRef.current);
+    };
   }, [load]);
 
-  const action = async (operation: () => Promise<unknown>) => {
+  const action = async (
+    slotId: number,
+    type: "login" | "logout" | "switch" | "create",
+    operation: () => Promise<unknown>,
+  ) => {
+    setActiveAction({ slotId, type });
     setError(undefined);
     try {
       await operation();
@@ -51,11 +72,14 @@ export function GoogleFlowPage() {
       const msg = value instanceof Error ? value.message : String(value);
       setError(msg);
       toast.error("Thao tác thất bại", { description: msg });
+    } finally {
+      setActiveAction(null);
     }
   };
 
   const handleSync = async (slotId: number) => {
     setSyncingId(slotId);
+    setActiveAction({ slotId, type: "sync" });
     try {
       await Promise.all([
         flowApi.sync(slotId),
@@ -69,16 +93,24 @@ export function GoogleFlowPage() {
       toast.error(`Đồng bộ Slot ${slotId + 1} thất bại`, { description: msg });
     } finally {
       setSyncingId(null);
+      setActiveAction(null);
     }
   };
 
   const copyProjectId = async (projectId: string) => {
     try {
-      await navigator.clipboard.writeText(projectId);
+      try {
+        await navigator.clipboard.writeText(projectId);
+      } catch {
+        await getElectronApi().copyToClipboard(projectId);
+      }
       setCopiedId(projectId);
       toast.success("Đã sao chép Project ID vào bộ nhớ tạm!");
       setTimeout(() => setCopiedId(null), 2000);
-    } catch (_) {}
+    } catch (value) {
+      const msg = value instanceof Error ? value.message : String(value);
+      toast.error("Không thể sao chép Project ID", { description: msg });
+    }
   };
 
   return (
@@ -135,7 +167,7 @@ export function GoogleFlowPage() {
                         ? "Đã sao chép vào bộ nhớ tạm!"
                         : `Project ID: ${slot.projectId} (Nhấn để sao chép)`
                     }
-                    aria-label="Sao chép Project ID"
+                    aria-label={`Sao chép Project ID Slot ${slot.id + 1}`}
                     onClick={() => void copyProjectId(slot.projectId!)}
                   >
                     <span className="source-flow-slot-project__label">
@@ -167,7 +199,16 @@ export function GoogleFlowPage() {
                     className="source-flow-slot-logout"
                     title="Đăng xuất khỏi slot này"
                     aria-label="Đăng xuất"
-                    onClick={() => void action(() => flowApi.logout(slot.id))}
+                    onClick={() => {
+                      if (
+                        window.confirm(
+                          `Xác nhận đăng xuất Slot ${slot.id + 1}?`,
+                        )
+                      )
+                        void action(slot.id, "logout", () =>
+                          flowApi.logout(slot.id),
+                        );
+                    }}
                   >
                     <LogOut size={16} aria-hidden="true" />
                   </button>
@@ -229,8 +270,12 @@ export function GoogleFlowPage() {
                   <Button
                     variant="primary"
                     className="source-flow-btn-open"
+                    disabled={activeAction?.slotId === slot.id}
+                    aria-label={`Mở phiên Slot ${slot.id + 1}`}
                     onClick={() =>
-                      void action(() => flowApi.switchSlot(slot.id))
+                      void action(slot.id, "switch", () =>
+                        flowApi.switchSlot(slot.id),
+                      )
                     }
                   >
                     <RotateCw size={15} />
@@ -252,8 +297,9 @@ export function GoogleFlowPage() {
                     <Button
                       variant="secondary"
                       className="source-flow-btn-create-project"
+                      disabled={activeAction?.slotId === slot.id}
                       onClick={() =>
-                        void action(async () => {
+                        void action(slot.id, "create", async () => {
                           await flowApi.switchSlot(slot.id);
                           return flowApi.createProject();
                         })
@@ -268,7 +314,10 @@ export function GoogleFlowPage() {
                 <Button
                   variant="primary"
                   className="source-flow-btn-login"
-                  onClick={() => void action(() => flowApi.login(slot.id))}
+                  disabled={activeAction?.slotId === slot.id}
+                  onClick={() =>
+                    void action(slot.id, "login", () => flowApi.login(slot.id))
+                  }
                 >
                   <LogIn size={15} />
                   Đăng nhập

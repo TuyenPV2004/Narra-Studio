@@ -39,6 +39,7 @@ import {
   type AiProviderCapability,
   type AiProviderProtocol,
   type AiProviderProfile,
+  providerCapabilities,
 } from "@/services/electron-api/ai-providers";
 
 const capabilityLabels: Record<AiProviderCapability, string> = {
@@ -80,19 +81,28 @@ function cleanErrorMessage(error: unknown): string {
   );
 }
 
-export function AiProviderProfilesPanel() {
+interface AiProviderProfilesPanelProps {
+  refreshSignal?: number;
+  onLoadingChange?: (loading: boolean) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+}
+
+export function AiProviderProfilesPanel({
+  refreshSignal = 0,
+  onLoadingChange,
+  onDirtyChange,
+}: AiProviderProfilesPanelProps) {
   const [profiles, setProfiles] = useState<AiProviderProfile[]>([]);
-  const [activeId, setActiveId] = useState("");
   const [activeByCapability, setActiveByCapability] = useState<
     Partial<Record<AiProviderCapability, string>>
   >({});
   const [draft, setDraft] = useState(emptyDraft);
+  const [draftSnapshot, setDraftSnapshot] = useState(emptyDraft);
   const [models, setModels] = useState<AiProviderModel[]>([]);
   const [busy, setBusy] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [deletingProfile, setDeletingProfile] =
     useState<AiProviderProfile | null>(null);
-
   const toggleExpand = (id: string) => {
     setExpandedIds((prev) => ({
       ...prev,
@@ -102,25 +112,57 @@ export function AiProviderProfilesPanel() {
 
   const load = useCallback(async () => {
     setBusy(true);
+    onLoadingChange?.(true);
     try {
       const value = await aiProviderApi.list();
       setProfiles(value.profiles);
-      setActiveId(value.activeId);
       setActiveByCapability(value.activeByCapability);
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       toast.error("Tải danh sách provider thất bại", { description: msg });
     } finally {
       setBusy(false);
+      onLoadingChange?.(false);
     }
-  }, []);
+  }, [onLoadingChange]);
 
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, refreshSignal]);
+
+  useEffect(() => {
+    if (refreshSignal > 0) {
+      setDraft(emptyDraft);
+      setDraftSnapshot(emptyDraft);
+      setModels([]);
+    }
+  }, [refreshSignal]);
+
+  const updateConnectionField = (
+    field: "baseUrl" | "apiKey",
+    value: string,
+  ) => {
+    setModels([]);
+    setDraft((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateProtocol = (protocol: AiProviderProtocol) => {
+    setDraft((current) => ({
+      ...current,
+      protocol,
+      capabilities: protocolCapabilities[protocol],
+    }));
+    setModels([]);
+  };
+
+  const draftDirty = JSON.stringify(draft) !== JSON.stringify(draftSnapshot);
+
+  useEffect(() => {
+    onDirtyChange?.(draftDirty);
+  }, [draftDirty, onDirtyChange]);
 
   const edit = (profile: AiProviderProfile) => {
-    setDraft({
+    const nextDraft = {
       id: profile.id,
       name: profile.name,
       baseUrl: profile.baseUrl,
@@ -128,7 +170,9 @@ export function AiProviderProfilesPanel() {
       model: profile.model,
       capabilities: profile.capabilities,
       protocol: profile.protocol,
-    });
+    };
+    setDraft(nextDraft);
+    setDraftSnapshot(nextDraft);
     setModels(
       profile.model ? [{ id: profile.model, name: profile.model }] : [],
     );
@@ -226,6 +270,7 @@ export function AiProviderProfilesPanel() {
         ...(draft.apiKey.trim() ? { apiKey: draft.apiKey.trim() } : {}),
       });
       setDraft(emptyDraft);
+      setDraftSnapshot(emptyDraft);
       setModels([]);
       await load();
       toast.success("Đã lưu AI provider thành công!");
@@ -244,7 +289,6 @@ export function AiProviderProfilesPanel() {
     setBusy(true);
     try {
       await aiProviderApi.setActive(id, capability);
-      if (capability === "text") setActiveId(id);
       setActiveByCapability((current) => ({ ...current, [capability]: id }));
       toast.success(
         `Đã kích hoạt AI provider cho ${capabilityLabels[capability]}!`,
@@ -270,6 +314,7 @@ export function AiProviderProfilesPanel() {
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       toast.error("Xóa AI provider thất bại", { description: msg });
+    } finally {
       setBusy(false);
     }
   };
@@ -289,7 +334,10 @@ export function AiProviderProfilesPanel() {
             </div>
           )}
           {profiles.map((profile) => {
-            const isActive = profile.id === activeId;
+            const activeCapabilities = providerCapabilities.filter(
+              (capability) => activeByCapability[capability] === profile.id,
+            );
+            const isActive = activeCapabilities.length > 0;
             const isExpanded = expandedIds[profile.id] ?? true;
             const isEditing = draft.id === profile.id;
             return (
@@ -301,11 +349,12 @@ export function AiProviderProfilesPanel() {
                 data-editing={isEditing}
               >
                 <div className="source-provider-card__header">
-                  <div
+                  <button
+                    type="button"
                     className="source-provider-card__identity"
                     onClick={() => toggleExpand(profile.id)}
-                    style={{ cursor: "pointer" }}
                     title={isExpanded ? "Bấm để thu gọn" : "Bấm để mở rộng"}
+                    aria-expanded={isExpanded}
                   >
                     <CloudCheck
                       size={23}
@@ -333,20 +382,37 @@ export function AiProviderProfilesPanel() {
                             {capabilityLabels[capability]}
                           </span>
                         ))}
+                        {activeCapabilities.map((capability) => (
+                          <span
+                            key={`active-${capability}`}
+                            className="source-provider-card__cap-pill source-provider-card__cap-pill--active"
+                          >
+                            Đang dùng: {capabilityLabels[capability]}
+                          </span>
+                        ))}
                       </div>
                     </div>
-                  </div>
+                  </button>
                   <div className="source-provider-card__actions">
-                    {!isActive && (
+                    {profile.capabilities.map((capability) => (
                       <Button
+                        key={`activate-${capability}`}
                         variant="secondary"
                         className="source-provider-card__btn-select"
-                        disabled={busy || !profile.model}
-                        onClick={() => void activate(profile.id)}
+                        disabled={
+                          busy ||
+                          !profile.model ||
+                          activeByCapability[capability] === profile.id
+                        }
+                        aria-label={`Kích hoạt ${capabilityLabels[capability]} cho ${profile.name}`}
+                        onClick={() => void activate(profile.id, capability)}
                       >
-                        <MousePointerClick size={13} aria-hidden="true" /> Chọn
+                        <MousePointerClick size={13} aria-hidden="true" />
+                        {activeByCapability[capability] === profile.id
+                          ? `Đang dùng ${capabilityLabels[capability]}`
+                          : `Dùng ${capabilityLabels[capability]}`}
                       </Button>
-                    )}
+                    ))}
                     {isEditing ? (
                       <Button
                         variant="secondary"
@@ -355,6 +421,7 @@ export function AiProviderProfilesPanel() {
                         title={`Quay lại tạo mới provider`}
                         onClick={() => {
                           setDraft(emptyDraft);
+                          setDraftSnapshot(emptyDraft);
                           setModels([]);
                         }}
                       >
@@ -466,10 +533,7 @@ export function AiProviderProfilesPanel() {
               type="url"
               value={draft.baseUrl}
               onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  baseUrl: event.target.value,
-                }))
+                updateConnectionField("baseUrl", event.target.value)
               }
               placeholder="https://provider.example/v1"
             />
@@ -482,11 +546,7 @@ export function AiProviderProfilesPanel() {
               value={draft.protocol}
               onValueChange={(val) => {
                 const protocol = val as AiProviderProtocol;
-                setDraft((current) => ({
-                  ...current,
-                  protocol,
-                  capabilities: protocolCapabilities[protocol],
-                }));
+                updateProtocol(protocol);
               }}
             >
               <SelectTrigger>
@@ -514,10 +574,7 @@ export function AiProviderProfilesPanel() {
               value={draft.apiKey}
               autoComplete="new-password"
               onChange={(event) =>
-                setDraft((current) => ({
-                  ...current,
-                  apiKey: event.target.value,
-                }))
+                updateConnectionField("apiKey", event.target.value)
               }
               placeholder={draft.id ? "••••••••" : "Nhập API key"}
             />
@@ -676,6 +733,17 @@ export function AiProviderProfilesPanel() {
             Bạn có chắc chắn muốn xóa cấu hình AI provider{" "}
             <strong>"{deletingProfile?.name}"</strong> không? Toàn bộ API key và
             thông số đã lưu sẽ bị xóa khỏi hệ thống.
+            {deletingProfile &&
+              activeByCapability &&
+              Object.entries(activeByCapability).some(
+                ([, profileId]) => profileId === deletingProfile.id,
+              ) && (
+                <>
+                  <br />
+                  Provider này đang được dùng cho một hoặc nhiều capability; xóa
+                  sẽ vô hiệu hóa các capability đó.
+                </>
+              )}
           </div>
           <DialogFooter>
             <Button

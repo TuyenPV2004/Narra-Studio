@@ -11,12 +11,17 @@ export function ProviderConnectionsPage({
 }) {
   const [reloadKey, setReloadKey] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [dirty, setDirty] = useState(false);
 
-  const handleRefresh = async () => {
-    setLoading(true);
+  const handleRefresh = () => {
+    if (
+      dirty &&
+      !window.confirm(
+        "Bạn có thay đổi chưa lưu. Làm mới sẽ xóa các thay đổi này. Tiếp tục?",
+      )
+    )
+      return;
     setReloadKey((prev) => prev + 1);
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    setLoading(false);
   };
 
   return (
@@ -37,17 +42,17 @@ export function ProviderConnectionsPage({
             </p>
           </div>
         </div>
-        <Button
-          variant="secondary"
-          onClick={() => void handleRefresh()}
-          disabled={loading}
-        >
+        <Button variant="secondary" onClick={handleRefresh} disabled={loading}>
           <RefreshCw size={16} className={loading ? "is-spinning" : ""} />
           Làm mới
         </Button>
       </header>
 
-      <AiProviderProfilesPanel key={reloadKey} />
+      <AiProviderProfilesPanel
+        refreshSignal={reloadKey}
+        onLoadingChange={setLoading}
+        onDirtyChange={setDirty}
+      />
     </section>
   );
 }

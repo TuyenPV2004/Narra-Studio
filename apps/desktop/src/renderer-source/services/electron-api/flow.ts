@@ -9,53 +9,68 @@ export interface FlowSlot {
   projectId?: string;
   status: string;
 }
+export interface FlowActionResult {
+  success?: boolean;
+  error?: string;
+}
 const record = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
     : {};
+const requireSuccessful = async <T>(operation: Promise<T>): Promise<T> => {
+  const result = await operation;
+  const value = record(result);
+  if (value.success === false) {
+    throw new Error(
+      typeof value.error === "string"
+        ? value.error
+        : "Thao tác Google Flow thất bại.",
+    );
+  }
+  return result;
+};
 export const flowApi = {
   createProject() {
-    return getElectronApi().createFlowProject();
+    return requireSuccessful(getElectronApi().createFlowProject());
   },
   async listSlots(): Promise<FlowSlot[]> {
     const response = await getElectronApi().getAllSlots();
-    return (Array.isArray(response) ? response : [])
-      .map(record)
-      .flatMap((slot) =>
-        typeof slot.id === "number"
-          ? [
-              {
-                id: slot.id,
-                status: typeof slot.status === "string" ? slot.status : "empty",
-                hasBearerToken: slot.hasBearerToken === true,
-                ...(typeof slot.avatar === "string"
-                  ? { avatar: slot.avatar }
-                  : {}),
-                ...(typeof slot.email === "string"
-                  ? { email: slot.email }
-                  : {}),
-                ...(typeof slot.displayName === "string"
-                  ? { displayName: slot.displayName }
-                  : {}),
-                ...(typeof slot.projectId === "string"
-                  ? { projectId: slot.projectId }
-                  : {}),
-              },
-            ]
-          : [],
-      );
+    if (!Array.isArray(response))
+      throw new Error("Phản hồi danh sách slot không hợp lệ.");
+    return response.map(record).flatMap((slot) => {
+      const id = typeof slot.id === "number" ? slot.id : NaN;
+      return Number.isInteger(id) && id >= 0
+        ? [
+            {
+              id,
+              status: typeof slot.status === "string" ? slot.status : "empty",
+              hasBearerToken: slot.hasBearerToken === true,
+              ...(typeof slot.avatar === "string"
+                ? { avatar: slot.avatar }
+                : {}),
+              ...(typeof slot.email === "string" ? { email: slot.email } : {}),
+              ...(typeof slot.displayName === "string"
+                ? { displayName: slot.displayName }
+                : {}),
+              ...(typeof slot.projectId === "string"
+                ? { projectId: slot.projectId }
+                : {}),
+            },
+          ]
+        : [];
+    });
   },
   login(slotId: number) {
-    return getElectronApi().openIncognitoLogin({ slotId });
+    return requireSuccessful(getElectronApi().openIncognitoLogin({ slotId }));
   },
   logout(slotId: number) {
-    return getElectronApi().logoutSlot({ slotId });
+    return requireSuccessful(getElectronApi().logoutSlot({ slotId }));
   },
   sync(slotId: number) {
-    return getElectronApi().syncSlotSession({ slotId });
+    return requireSuccessful(getElectronApi().syncSlotSession({ slotId }));
   },
   switchSlot(slotId: number) {
-    return getElectronApi().switchWebviewSlot({ slotId });
+    return requireSuccessful(getElectronApi().switchWebviewSlot({ slotId }));
   },
   subscribeSlotsChanged(callback: () => void): () => void {
     const cleanups = [

@@ -444,7 +444,7 @@ const assertions = {
     && (requestedPage !== 'settings' || (runtime.targetPage.tabCount === 2 && runtime.targetPage.folderRows === 2
       && JSON.stringify(runtime.targetPage.labels) === JSON.stringify(['Video', 'Hình ảnh'])))
     && (requestedPage !== 'captcha-setup' || (runtime.targetPage.stepCount === 4 && runtime.targetPage.overflowingActions === 0
-      && JSON.stringify(runtime.targetPage.titles) === JSON.stringify(['Bước 1/4. Tải Extension về máy', 'Bước 2/4. Cài đặt Extension', 'Bước 3/4. Mở Google Flow', 'Bước 4/4. Kiểm tra kết nối'])))
+      && JSON.stringify(runtime.targetPage.titles) === JSON.stringify(['Bước 1/4. Chuẩn bị Extension', 'Bước 2/4. Cài đặt Extension', 'Bước 3/4. Mở Google Flow', 'Bước 4/4. Kiểm tra kết nối'])))
     && (requestedPage !== 'image-ultra' || (runtime.targetPage.promptCount === 1 && runtime.targetPage.emptyVisible
       && runtime.interaction?.promptCount === 1 && runtime.interaction?.generateEnabled === true))
     && (requestedPage !== 'image-editor' || (runtime.interaction?.canvasReady && runtime.interaction?.flattenedImage

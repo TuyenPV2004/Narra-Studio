@@ -1205,17 +1205,6 @@
   gap: var(--space-5);
 }
 
-.source-page-heading__title {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-}
-.source-page-heading h1 {
-  margin: 0;
-  font-size: 1.6rem;
-  line-height: 1.2;
-}
-
 .source-settings-section {
   display: grid;
   gap: var(--space-5);
@@ -1369,7 +1358,8 @@
 .source-tool-page > header.source-provider-hero,
 .source-provider-hero,
 .source-tool-page > header.source-media-hero,
-.source-media-hero {
+.source-media-hero,
+.source-settings-hero {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1379,7 +1369,8 @@
 .source-captcha-hero__left,
 .source-flow-hero__left,
 .source-provider-hero__left,
-.source-media-hero__left {
+.source-media-hero__left,
+.source-settings-hero__left {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -1388,7 +1379,8 @@
 .source-captcha-hero__icon,
 .source-flow-hero__icon,
 .source-provider-hero__icon,
-.source-media-hero__icon {
+.source-media-hero__icon,
+.source-settings-hero__icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1400,10 +1392,12 @@
 .source-flow-hero h1,
 .source-provider-hero h1,
 .source-media-hero h1,
+.source-settings-hero h1,
 .source-captcha-hero__left h1,
 .source-flow-hero__left h1,
 .source-provider-hero__left h1,
-.source-media-hero__left h1 {
+.source-media-hero__left h1,
+.source-settings-hero__left h1 {
   margin: 0;
   display: block;
   font-size: 1.5rem;
@@ -1413,10 +1407,12 @@
 .source-flow-hero p,
 .source-provider-hero p,
 .source-media-hero p,
+.source-settings-hero p,
 .source-captcha-hero__left p,
 .source-flow-hero__left p,
 .source-provider-hero__left p,
-.source-media-hero__left p {
+.source-media-hero__left p,
+.source-settings-hero__left p {
   margin: var(--space-1) 0 0;
   color: var(--muted-foreground);
   font-size: 0.875rem;
@@ -2854,6 +2850,12 @@
   gap: 10px;
   min-width: 0;
   cursor: pointer;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  font: inherit;
+  text-align: left;
 }
 
 .source-provider-card__cloud-icon {

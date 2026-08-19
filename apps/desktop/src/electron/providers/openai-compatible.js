@@ -7,7 +7,7 @@ const MODEL_LIMIT = 500;
 const REQUEST_TIMEOUT_MS = 8000;
 const CAPABILITIES = ['text', 'vision', 'text-to-speech', 'lip-sync'];
 const PROTOCOL_CAPABILITIES = {
-  'openai-compatible': ['text', 'vision'],
+  'openai-compatible': ['text', 'vision', 'text-to-speech', 'lip-sync'],
   'narra-tts-v1': ['text-to-speech'],
   'sync-v2': ['lip-sync'],
 };

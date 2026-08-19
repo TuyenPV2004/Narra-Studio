@@ -34,18 +34,23 @@ export function CaptchaSetupPage() {
   const openFolder = async () => {
     try {
       const result = await captchaApi.openExtensionFolder();
-      const ok =
-        typeof result === "object" &&
-        result !== null &&
-        "ok" in result &&
-        (result as Record<string, unknown>).ok === true;
-      if (ok) {
+      if (result.ok) {
         toast.success("Đã mở thư mục Extension.");
       } else {
-        toast.error("Không thể mở thư mục Extension.");
+        toast.error("Không thể mở thư mục Extension.", {
+          description: result.error,
+        });
       }
     } catch (e) {
       toast.error("Lỗi khi mở thư mục", { description: String(e) });
+    }
+  };
+
+  const openFlow = async () => {
+    try {
+      await captchaApi.openGoogleFlow();
+    } catch (e) {
+      toast.error("Không thể mở Google Flow", { description: String(e) });
     }
   };
 
@@ -77,25 +82,20 @@ export function CaptchaSetupPage() {
     () => [
       {
         id: "files",
-        done: status.extensionConnected,
-        title: "Bước 1/4. Tải Extension về máy",
-        description: status.extensionConnected
+        done: status.extensionFilesAvailable,
+        title: "Bước 1/4. Chuẩn bị Extension",
+        description: status.extensionFilesAvailable
           ? `Đã nhận diện Extension ${status.extensionVersion || ""}`.trim()
-          : "Tải và giải nén Extension Narra trên máy.",
+          : "Mở thư mục Extension Narra đã được đóng gói cùng ứng dụng.",
         instructions: [
-          "Tải Extension Narra.",
-          "Giải nén tệp vào một thư mục dễ tìm.",
+          "Mở thư mục Extension Narra.",
+          "Trong Chrome, chọn Load unpacked và chọn thư mục này.",
         ],
         actions: (
-          <>
-            <Button onClick={() => void openFolder()}>
-              <FolderOpen size={16} />
-              Tải Extension
-            </Button>
-            <Button variant="secondary" onClick={() => void openFolder()}>
-              Mở thư mục
-            </Button>
-          </>
+          <Button onClick={() => void openFolder()}>
+            <FolderOpen size={16} />
+            Mở thư mục Extension
+          </Button>
         ),
       },
       {
@@ -104,7 +104,7 @@ export function CaptchaSetupPage() {
         title: "Bước 2/4. Cài đặt Extension",
         description: extensionReady
           ? `Extension ${status.extensionVersion || status.requiredExtensionVersion} tương thích.`
-          : "Tải Extension dạng unpacked trong Chrome.",
+          : "Cài đặt Extension dạng unpacked trong Chrome.",
         instructions: [
           "Mở trang quản lý Extension.",
           "Bật Chế độ dành cho nhà phát triển.",
@@ -116,8 +116,12 @@ export function CaptchaSetupPage() {
               <Clipboard size={16} />
               chrome://extensions
             </Button>
-            <Button variant="secondary" onClick={() => void openFolder()}>
-              Mở thư mục
+            <Button
+              variant="secondary"
+              aria-label="Mở thư mục Extension để cài đặt"
+              onClick={() => void openFolder()}
+            >
+              Mở Extension
             </Button>
           </>
         ),
@@ -137,7 +141,7 @@ export function CaptchaSetupPage() {
           "Giữ tab dự án đang mở khi sử dụng Narra Studio.",
         ],
         actions: (
-          <Button onClick={() => void captchaApi.openGoogleFlow()}>
+          <Button onClick={() => void openFlow()}>
             <ExternalLink size={16} />
             Mở Google Flow
           </Button>

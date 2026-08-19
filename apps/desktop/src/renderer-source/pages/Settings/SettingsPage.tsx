@@ -152,10 +152,15 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
 
   return (
     <section className="source-settings-page" aria-labelledby="settings-title">
-      <header className="source-page-heading">
-        <div className="source-page-heading__title">
-          <Settings size={24} aria-hidden="true" />
-          <h1 id="settings-title">Cài đặt</h1>
+      <header className="source-settings-hero">
+        <div className="source-settings-hero__left">
+          <span className="source-settings-hero__icon">
+            <Settings size={28} aria-hidden="true" />
+          </span>
+          <div>
+            <h1 id="settings-title">Cài đặt</h1>
+            <p>Tùy chỉnh thư mục lưu trữ và các thiết lập hệ thống.</p>
+          </div>
         </div>
       </header>
       <Tabs

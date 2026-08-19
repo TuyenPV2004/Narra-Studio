@@ -12,6 +12,13 @@ export type AiProviderCapability =
 export type AiProviderProtocol =
   "openai-compatible" | "narra-tts-v1" | "sync-v2";
 
+export const providerCapabilities: readonly AiProviderCapability[] = [
+  "text",
+  "vision",
+  "text-to-speech",
+  "lip-sync",
+];
+
 export interface AiProviderProfile {
   apiKeyPreview: string;
   baseUrl: string;
@@ -43,6 +50,19 @@ const record = (value: unknown): Record<string, unknown> =>
   typeof value === "object" && value !== null
     ? (value as Record<string, unknown>)
     : {};
+
+const requireSuccessful = async <T>(operation: Promise<T>): Promise<T> => {
+  const result = await operation;
+  const value = record(result);
+  if (value.success === false) {
+    throw new Error(
+      typeof value.error === "string"
+        ? value.error
+        : "Thao tác provider thất bại.",
+    );
+  }
+  return result;
+};
 
 const profile = (value: unknown): AiProviderProfile | null => {
   const item = record(value);
@@ -82,22 +102,34 @@ export const aiProviderApi = {
     activeByCapability: Partial<Record<AiProviderCapability, string>>;
     profiles: AiProviderProfile[];
   }> {
-    const response = record(await getElectronApi().aiProviderProfileList());
+    const raw = await getElectronApi().aiProviderProfileList();
+    const response = record(raw);
+    if (!Array.isArray(response.profiles)) {
+      throw new Error("Provider trả về danh sách cấu hình không hợp lệ.");
+    }
+    const profiles = response.profiles.flatMap((item) => {
+      const value = profile(item);
+      return value ? [value] : [];
+    });
+    const validIds = new Set(profiles.map((item) => item.id));
+    const activeByCapability =
+      typeof response.activeByCapability === "object" &&
+      response.activeByCapability !== null
+        ? Object.fromEntries(
+            providerCapabilities.flatMap((capability) => {
+              const id = (
+                response.activeByCapability as Record<string, unknown>
+              )[capability];
+              return typeof id === "string" && validIds.has(id)
+                ? [[capability, id]]
+                : [];
+            }),
+          )
+        : {};
     return {
       activeId: typeof response.activeId === "string" ? response.activeId : "",
-      activeByCapability:
-        typeof response.activeByCapability === "object" &&
-        response.activeByCapability !== null
-          ? (response.activeByCapability as Partial<
-              Record<AiProviderCapability, string>
-            >)
-          : {},
-      profiles: Array.isArray(response.profiles)
-        ? response.profiles.flatMap((item) => {
-            const value = profile(item);
-            return value ? [value] : [];
-          })
-        : [],
+      activeByCapability,
+      profiles,
     };
   },
   async save(draft: AiProviderDraft): Promise<AiProviderProfile> {
@@ -114,9 +146,12 @@ export const aiProviderApi = {
     const id = value.activeByCapability[capability];
     return value.profiles.find((profile) => profile.id === id) || null;
   },
-  remove: (id: string) => getElectronApi().aiProviderProfileDelete({ id }),
+  remove: (id: string) =>
+    requireSuccessful(getElectronApi().aiProviderProfileDelete({ id })),
   setActive: (id: string, capability: AiProviderCapability = "text") =>
-    getElectronApi().aiProviderProfileSetActive({ id, capability }),
+    requireSuccessful(
+      getElectronApi().aiProviderProfileSetActive({ id, capability }),
+    ),
   async models(connection: AiProviderConnection): Promise<AiProviderModel[]> {
     const response = record(
       await getElectronApi().aiProviderProfileModels(connection),
@@ -124,7 +159,7 @@ export const aiProviderApi = {
     if (response.connected === false && typeof response.error === "string") {
       throw new Error(response.error);
     }
-    return Array.isArray(response.models)
+    const models = Array.isArray(response.models)
       ? response.models.flatMap((value) => {
           const item = record(value);
           if (typeof item.id !== "string") return [];
@@ -139,6 +174,10 @@ export const aiProviderApi = {
           ];
         })
       : [];
+    if (!models.length) {
+      throw new Error("Provider kết nối được nhưng không tìm thấy model nào.");
+    }
+    return models;
   },
   async test(connection: AiProviderConnection): Promise<number> {
     const response = record(
