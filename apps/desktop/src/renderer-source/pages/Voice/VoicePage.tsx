@@ -1,6 +1,21 @@
-import { Download, Mic2, Play, RefreshCw, Sparkles } from "lucide-react";
+import {
+  AudioLines,
+  Download,
+  Inbox,
+  Info,
+  MicAudioLines,
+  Play,
+  RefreshCw,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
 import { voiceApi, type FlowVoice } from "@/services/electron-api";
 
 interface VoiceResult {
@@ -37,6 +52,7 @@ export function VoicePage() {
       setLoading(false);
     }
   }, []);
+
   useEffect(() => {
     void loadVoices();
   }, [loadVoices]);
@@ -91,13 +107,13 @@ export function VoicePage() {
       aria-labelledby="voice-title"
       data-loading={loading}
     >
-      <header>
-        <span>
-          <Mic2 size={22} />
+      <header className="source-voice-hero">
+        <span className="source-voice-hero__icon">
+          <MicAudioLines size={28} aria-hidden="true" />
         </span>
         <div>
-          <small>VOICE STUDIO</small>
           <h1 id="voice-title">Giọng nói</h1>
+          <p>Tạo giọng đọc tự nhiên từ văn bản với các mô hình giọng nói AI.</p>
         </div>
       </header>
       {error && (
@@ -107,28 +123,37 @@ export function VoicePage() {
       )}
       <div className="source-voice-workbench">
         <section className="source-voice-editor">
-          <label className="source-voice-task">
-            Tên tác vụ
+          <label className="source-voice-field">
+            <span className="source-voice-field__label">
+              Tên tác vụ <span className="source-required-mark">*</span>
+            </span>
             <input
               value={taskName}
               onChange={(event) => setTaskName(event.target.value)}
-              placeholder="Tên tác vụ"
+              placeholder="Nhập tên tác vụ..."
             />
           </label>
-          <textarea
-            value={text}
-            maxLength={120}
-            onChange={(event) => setText(event.target.value)}
-            placeholder="Nhập nội dung bạn muốn chuyển thành giọng đọc..."
-            aria-label="Nội dung giọng đọc"
-          />
+
+          <label className="source-voice-field">
+            <span className="source-voice-field__label">
+              Nội dung văn bản <span className="source-required-mark">*</span>
+            </span>
+            <textarea
+              value={text}
+              maxLength={120}
+              onChange={(event) => setText(event.target.value)}
+              placeholder="Nhập nội dung bạn muốn chuyển thành giọng đọc..."
+              aria-label="Nội dung văn bản"
+            />
+          </label>
+
           <div className="source-voice-editor__footer">
-            <span>{text.length}/120</span>
+            <span>{text.length}/120 ký tự</span>
             <Button
               disabled={!text.trim() || !selectedId || generating}
               onClick={() => void generate()}
             >
-              <Sparkles size={16} />
+              <AudioLines size={16} />
               {generating ? "Đang tạo..." : "Tạo giọng đọc"}
             </Button>
           </div>
@@ -136,45 +161,60 @@ export function VoicePage() {
         <aside className="source-voice-settings" aria-label="Cài đặt giọng">
           <div className="source-control-card__heading">
             <h2>Google Flow Voice</h2>
-            <button
-              type="button"
-              onClick={() => void loadVoices()}
-              aria-label="Làm mới voice"
-            >
-              <RefreshCw size={15} className={loading ? "is-spinning" : ""} />
-            </button>
           </div>
-          <label>
-            Giọng đọc
-            <select
-              value={selectedId}
-              onChange={(event) => setSelectedId(event.target.value)}
-              disabled={loading}
+          <div className="source-voice-field">
+            <span className="source-voice-field__label">
+              Giọng đọc <span className="source-required-mark">*</span>
+            </span>
+            <Select
+              value={selectedId || ""}
+              onValueChange={(val) => setSelectedId(val)}
+              disabled={loading || !voices.length}
             >
-              {voices.length ? (
-                voices.map((voice) => (
-                  <option key={voice.mediaId} value={voice.mediaId}>
+              <SelectTrigger>
+                <SelectValue
+                  placeholder={
+                    loading
+                      ? "Đang tải danh sách voice..."
+                      : voices.length
+                        ? "Chọn giọng đọc"
+                        : "Chưa có voice"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {voices.map((voice) => (
+                  <SelectItem key={voice.mediaId} value={voice.mediaId}>
                     {voice.name}
-                  </option>
-                ))
-              ) : (
-                <option value="">Chưa có voice</option>
-              )}
-            </select>
-          </label>
-          {voices.find((voice) => voice.mediaId === selectedId)?.sampleUrl && (
-            <audio
-              controls
-              preload="metadata"
-              src={
-                voices.find((voice) => voice.mediaId === selectedId)?.sampleUrl
-              }
-            />
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {voices.find((voice) => voice.mediaId === selectedId)?.description && (
+            <div className="source-voice-desc">
+              <span className="source-voice-desc__label">
+                <Info size={14} aria-hidden="true" />
+                <span>Mô tả :</span>
+              </span>
+              <span className="source-voice-desc__text">
+                {voices.find((voice) => voice.mediaId === selectedId)?.description}
+              </span>
+            </div>
           )}
-          <p>
-            {voices.find((voice) => voice.mediaId === selectedId)
-              ?.description || "Chọn voice có sẵn trong dự án Google Flow."}
-          </p>
+
+          {voices.find((voice) => voice.mediaId === selectedId)?.sampleUrl && (
+            <div className="source-voice-player">
+              <audio
+                controls
+                preload="metadata"
+                src={
+                  voices.find((voice) => voice.mediaId === selectedId)?.sampleUrl
+                }
+              />
+            </div>
+          )}
         </aside>
       </div>
       <section className="source-voice-history">
@@ -183,8 +223,10 @@ export function VoicePage() {
           <span>{results.length}</span>
         </header>
         {results.length === 0 ? (
-          <div className="source-generation-empty">
-            <Play size={28} />
+          <div className="source-generation-empty source-voice-empty">
+            <span className="source-voice-empty__icon">
+              <Inbox size={34} aria-hidden="true" />
+            </span>
             <p>Chưa có âm thanh.</p>
           </div>
         ) : (

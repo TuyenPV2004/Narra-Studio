@@ -55,8 +55,20 @@ module.exports = function registerProviderIpc(dependencies) {
   ipcMain.handle('ai-provider-profile-save', async (_event, payload) => openAiProvider.save(payload));
   ipcMain.handle('ai-provider-profile-delete', async (_event, { id } = {}) => openAiProvider.remove(id));
   ipcMain.handle('ai-provider-profile-set-active', async (_event, { id, capability = 'text' } = {}) => openAiProvider.setActive(id, capability));
-  ipcMain.handle('ai-provider-profile-test', async (_event, payload) => openAiProvider.test(payload));
-  ipcMain.handle('ai-provider-profile-models', async (_event, payload) => openAiProvider.models(payload));
+  ipcMain.handle('ai-provider-profile-test', async (_event, payload) => {
+    try {
+      return await openAiProvider.test(payload);
+    } catch (error) {
+      return { connected: false, error: error?.message || String(error) };
+    }
+  });
+  ipcMain.handle('ai-provider-profile-models', async (_event, payload) => {
+    try {
+      return await openAiProvider.models(payload);
+    } catch (error) {
+      return { connected: false, error: error?.message || String(error), models: [] };
+    }
+  });
 
   ipcMain.handle('provider-get-active', async () => {
     return registry.normalizeProviderId(loadSettings().activeProvider);

@@ -1,5 +1,4 @@
 import {
-  Cable,
   Check,
   ChevronDown,
   Clipboard,
@@ -8,9 +7,11 @@ import {
   RefreshCw,
   ShieldCheck,
   TriangleAlert,
+  WifiCog,
 } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
+import { toast } from "@/components/ui/Toast";
 import { captchaApi } from "@/services/electron-api";
 import { useCaptchaSetup } from "@/pages/CaptchaSetup/useCaptchaSetup";
 
@@ -29,28 +30,48 @@ export function CaptchaSetupPage() {
   const extensionReady =
     status.extensionConnected && status.extensionCompatible;
   const [expanded, setExpanded] = useState(0);
-  const [feedback, setFeedback] = useState<string | null>(null);
+
   const openFolder = async () => {
-    const result = await captchaApi.openExtensionFolder();
-    const ok =
-      typeof result === "object" &&
-      result !== null &&
-      "ok" in result &&
-      (result as Record<string, unknown>).ok === true;
-    setFeedback(
-      ok ? "Đã mở thư mục Extension." : "Không thể mở thư mục Extension.",
-    );
+    try {
+      const result = await captchaApi.openExtensionFolder();
+      const ok =
+        typeof result === "object" &&
+        result !== null &&
+        "ok" in result &&
+        (result as Record<string, unknown>).ok === true;
+      if (ok) {
+        toast.success("Đã mở thư mục Extension.");
+      } else {
+        toast.error("Không thể mở thư mục Extension.");
+      }
+    } catch (e) {
+      toast.error("Lỗi khi mở thư mục", { description: String(e) });
+    }
   };
+
   const copyAddress = async () => {
-    await captchaApi.copyChromeExtensionsAddress();
-    setFeedback("Đã sao chép chrome://extensions.");
+    try {
+      await captchaApi.copyChromeExtensionsAddress();
+      toast.success("Đã sao chép chrome://extensions vào bộ nhớ tạm.");
+    } catch {
+      toast.error("Không thể sao chép địa chỉ extension.");
+    }
   };
-  const runVerify = async () =>
-    setFeedback(
-      (await verify())
-        ? "Kết nối đã được xác minh."
-        : "Chưa thể xác minh kết nối.",
-    );
+
+  const runVerify = async () => {
+    try {
+      const ok = await verify();
+      if (ok) {
+        toast.success("Kết nối VEO3 đã được xác minh thành công!");
+      } else {
+        toast.error("Chưa thể xác minh kết nối VEO3.", {
+          description: "Vui lòng kiểm tra lại tab Google Flow và Extension trong Chrome.",
+        });
+      }
+    } catch (e) {
+      toast.error("Xác minh thất bại", { description: String(e) });
+    }
+  };
   const steps = useMemo<Step[]>(
     () => [
       {
@@ -161,15 +182,17 @@ export function CaptchaSetupPage() {
   return (
     <section className="source-captcha-page" aria-labelledby="captcha-title">
       <header className="source-captcha-hero">
-        <span className="source-captcha-hero__icon">
-          <Cable size={25} aria-hidden="true" />
-        </span>
-        <div>
-          <h1 id="captcha-title">Kết nối VEO3 với Narra Studio</h1>
-          <p>
-            Làm theo từng bước bên dưới. Narra Studio sẽ tự nhận diện và chuyển
-            bước khi Chrome đã sẵn sàng.
-          </p>
+        <div className="source-captcha-hero__left">
+          <span className="source-captcha-hero__icon">
+            <WifiCog size={28} aria-hidden="true" />
+          </span>
+          <div>
+            <h1 id="captcha-title">Kết nối VEO3 với Narra Studio</h1>
+            <p>
+              Làm theo từng bước bên dưới. Narra Studio sẽ tự nhận diện và chuyển
+              bước khi Chrome đã sẵn sàng.
+            </p>
+          </div>
         </div>
         <span className="source-captcha-state" data-ready={status.setupReady}>
           {checking ? (
@@ -197,13 +220,13 @@ export function CaptchaSetupPage() {
           <span style={{ width: `${(completed / 4) * 100}%` }} />
         </i>
       </div>
-      {(error || feedback) && (
+      {error && (
         <p
           className="source-captcha-feedback"
-          role={error ? "alert" : "status"}
-          aria-live={error ? "assertive" : "polite"}
+          role="alert"
+          aria-live="assertive"
         >
-          {error || feedback}
+          {error}
         </p>
       )}
       <div className="source-captcha-steps">

@@ -53,55 +53,106 @@ ipcMain.handle('get-auth-info', () => {
 
 ipcMain.handle('create-flow-project', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
-  const wv = findFlowWebview(slot.id);
-  if (!wv || wv.isDestroyed()) throw new Error('Không tìm thấy phiên Google Flow đang hoạt động.');
+  let wv = findFlowWebview(slot.id);
+  let tempWin = null;
 
-  const previousProjectId = String(
-    wv.getURL().match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1]
-      || slot.projectId
-      || capturedAuth.projectId
-      || '',
-  );
-  await wv.loadURL('https://labs.google/fx/tools/flow');
+  if (!wv || wv.isDestroyed()) {
+    const ses = session.fromPartition(slot.partition);
+    const cleanUA = slot.userAgent || DEFAULTS.userAgent;
+    ses.setUserAgent(cleanUA);
 
-  let clicked = false;
-  for (let attempt = 0; attempt < 30 && !clicked; attempt += 1) {
-    clicked = await wv.executeJavaScript(`
-      (() => {
-        const controls = Array.from(document.querySelectorAll('button, [role="button"]'));
-        const control = controls.find(item => {
-          const text = (item.textContent || '').trim().toLowerCase();
-          return text.includes('new project') || text.includes('tạo project') || text.includes('dự án mới');
-        });
-        if (!control) return false;
-        control.click();
-        return true;
-      })()
-    `, true).catch(() => false);
-    if (!clicked) await new Promise(resolve => setTimeout(resolve, 500));
+    tempWin = new BrowserWindow({
+      width: 1100,
+      height: 750,
+      show: false,
+      title: `Google Flow — Slot ${slot.id + 1}`,
+      backgroundColor: '#202124',
+      webPreferences: {
+        partition: slot.partition,
+        nodeIntegration: false,
+        contextIsolation: true,
+      },
+    });
+    tempWin.webContents.setUserAgent(cleanUA);
+    wv = tempWin.webContents;
   }
-  if (!clicked) throw new Error('Không tìm thấy nút tạo project mới trong Google Flow.');
 
-  let projectId = '';
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    const currentUrl = wv.getURL();
-    const candidate = currentUrl.match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1] || '';
-    if (candidate && candidate !== previousProjectId) {
-      projectId = candidate;
-      break;
+  try {
+    const previousProjectId = String(
+      (typeof wv.getURL === 'function' ? wv.getURL() : '').match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1]
+        || slot.projectId
+        || capturedAuth.projectId
+        || '',
+    );
+    await wv.loadURL('https://labs.google/fx/tools/flow');
+
+    let clicked = false;
+    for (let attempt = 0; attempt < 30 && !clicked; attempt += 1) {
+      clicked = await wv.executeJavaScript(`
+        (() => {
+          const controls = Array.from(document.querySelectorAll('button, [role="button"], a'));
+          const control = controls.find(item => {
+            const text = (item.textContent || '').trim().toLowerCase();
+            return text.includes('new project') || text.includes('tạo project') || text.includes('dự án mới') || text.includes('create project') || text.includes('new');
+          });
+          if (!control) return false;
+          control.click();
+          return true;
+        })()
+      `, true).catch(() => false);
+      if (!clicked) await new Promise(resolve => setTimeout(resolve, 600));
     }
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  if (!projectId) throw new Error('Google Flow chưa trả về project ID mới.');
 
-  slot.projectId = projectId;
-  capturedAuth.projectId = projectId;
-  saveSettings({ lastProjectUrl: `https://labs.google/fx/tools/flow/project/${projectId}` });
-  if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
-    runtime.mainWindow.webContents.send('flow-project-changed', { projectId, slotId: slot.id });
-    runtime.mainWindow.webContents.send('auto-entered-project');
+    let projectId = '';
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      const currentUrl = typeof wv.getURL === 'function' ? wv.getURL() : '';
+      const candidate = currentUrl.match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1] || '';
+      if (candidate && candidate !== previousProjectId) {
+        projectId = candidate;
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    if (!projectId) {
+      const domProjectId = await wv.executeJavaScript(`
+        (() => {
+          const m = window.location.href.match(/\\/project\\/([a-zA-Z0-9_-]+)/);
+          if (m) return m[1];
+          const projectLink = document.querySelector('a[href*="/project/"]');
+          if (projectLink) {
+            const match = projectLink.getAttribute('href').match(/\\/project\\/([a-zA-Z0-9_-]+)/);
+            if (match) return match[1];
+          }
+          return null;
+        })()
+      `).catch(() => null);
+      if (domProjectId) {
+        projectId = domProjectId;
+      }
+    }
+
+    if (!projectId) {
+      if (tempWin && !tempWin.isDestroyed()) {
+        tempWin.show();
+        tempWin.focus();
+      }
+      throw new Error('Google Flow chưa trả về project ID mới. Hãy tạo một dự án trong Google Flow.');
+    }
+
+    slot.projectId = projectId;
+    capturedAuth.projectId = projectId;
+    saveSettings({ lastProjectUrl: `https://labs.google/fx/tools/flow/project/${projectId}` });
+    if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+      runtime.mainWindow.webContents.send('flow-project-changed', { projectId, slotId: slot.id });
+      runtime.mainWindow.webContents.send('auto-entered-project');
+    }
+    return { success: true, projectId };
+  } finally {
+    if (tempWin && !tempWin.isDestroyed()) {
+      tempWin.close();
+    }
   }
-  return { success: true, projectId };
 });
 
 // Read the current Flow project's preset/custom Voice references through the
@@ -347,6 +398,11 @@ ipcMain.handle('sync-session', async () => {
 
 // ── IPC: Get all slots status ─────────────────────────────────────────
 ipcMain.handle('get-all-slots', () => {
+  accountSlots.forEach(slot => {
+    if (slot.status === 'connected' && !slot.email) {
+      fetchSlotSession(slot.id).catch(() => {});
+    }
+  });
   return accountSlots.map(slot => ({
     id: slot.id,
     status: slot.status,
@@ -622,6 +678,7 @@ ipcMain.handle('sync-slot-session', async (_, { slotId = 0 } = {}) => {
   try {
     const slot = getSlot(slotId);
     await refreshCapturedCookies(slotId);
+    await fetchSlotSession(slotId).catch(() => {});
 
     // Trigger fetch qua webview sinh đúng partition (slot 0 dùng flowWebview chính)
     const wv = findFlowWebview();
@@ -633,13 +690,16 @@ ipcMain.handle('sync-slot-session', async (_, { slotId = 0 } = {}) => {
     }
 
     const cookieCount = slot.cookies.split(';').filter(Boolean).length;
-    console.log(`[SLOT-${slotId}][SYNC] Session synced: cookies=${cookieCount}, token=${!!slot.bearerToken}`);
+    console.log(`[SLOT-${slotId}][SYNC] Session synced: cookies=${cookieCount}, token=${!!slot.bearerToken}, email=${slot.email}`);
     return {
       success: true,
       slotId,
       hasBearerToken: !!slot.bearerToken,
       cookieCount,
       projectId: slot.projectId,
+      email: slot.email || null,
+      displayName: slot.displayName || null,
+      avatar: slot.avatar || null,
       lastCaptured: slot.lastCaptured,
     };
   } catch (err) {

@@ -11,6 +11,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { Tabs, type TabOption } from "@/components/ui/Tabs";
+import { toast } from "@/components/ui/Toast";
 import { captchaApi, settingsApi } from "@/services/electron-api";
 import type { ProviderId } from "@/types/electron-api";
 
@@ -29,10 +30,6 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
     "6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV",
   );
   const [captchaAction, setCaptchaAction] = useState("submit");
-  const [feedback, setFeedback] = useState<{
-    message: string;
-    tone: "error" | "success";
-  } | null>(null);
   const [busy, setBusy] = useState(false);
   const tabs: readonly TabOption<SettingsTab>[] = [
     {
@@ -62,11 +59,10 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
         }
       })
       .catch((error) => {
-        if (!cancelled)
-          setFeedback({
-            message: error instanceof Error ? error.message : String(error),
-            tone: "error",
-          });
+        if (!cancelled) {
+          const msg = error instanceof Error ? error.message : String(error);
+          toast.error("Không thể tải đường dẫn lưu", { description: msg });
+        }
       });
     return () => {
       cancelled = true;
@@ -79,7 +75,6 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
 
   const changeFolder = async (kind: "image" | "video") => {
     setBusy(true);
-    setFeedback(null);
     try {
       const path =
         kind === "video"
@@ -88,31 +83,29 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
       if (path) {
         if (kind === "video") setVideoPath(path);
         else setImagePath(path);
-        setFeedback({ message: "Đã cập nhật thư mục lưu.", tone: "success" });
+        toast.success("Đã cập nhật thư mục lưu thành công!", { description: path });
       }
     } catch (error) {
-      setFeedback({
-        message: error instanceof Error ? error.message : String(error),
-        tone: "error",
-      });
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error("Không thể đổi thư mục lưu", { description: msg });
     } finally {
       setBusy(false);
     }
   };
 
   const saveAuth = async () => {
-    if (!authToken.trim()) return;
+    if (!authToken.trim()) {
+      toast.warning("Vui lòng dán mã xác thực trước khi lưu.");
+      return;
+    }
     setBusy(true);
-    setFeedback(null);
     try {
       await settingsApi.setManualAuth(authToken.trim());
       setAuthToken("");
-      setFeedback({ message: "Đã lưu mã xác thực.", tone: "success" });
+      toast.success("Đã lưu mã xác thực Google thành công!");
     } catch (error) {
-      setFeedback({
-        message: error instanceof Error ? error.message : String(error),
-        tone: "error",
-      });
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error("Lưu mã xác thực thất bại", { description: msg });
     } finally {
       setBusy(false);
     }
@@ -120,7 +113,6 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
 
   const testCaptcha = async () => {
     setBusy(true);
-    setFeedback(null);
     try {
       const status = await captchaApi.getBridgeStatus();
       const connected =
@@ -128,19 +120,16 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
         status !== null &&
         "connected" in status &&
         (status as Record<string, unknown>).connected === true;
-      if (!connected)
-        throw new Error(
-          "CAPTCHA bridge chưa kết nối. Hãy mở Google Flow và kiểm tra Extension.",
-        );
-      setFeedback({
-        message: `Kết nối CAPTCHA hoạt động (${captchaAction || "submit"}).`,
-        tone: "success",
-      });
+      if (!connected) {
+        toast.error("CAPTCHA bridge chưa kết nối", {
+          description: "Hãy mở Google Flow và kiểm tra Extension trong Chrome.",
+        });
+        return;
+      }
+      toast.success(`Kết nối CAPTCHA hoạt động (${captchaAction || "submit"}).`);
     } catch (error) {
-      setFeedback({
-        message: error instanceof Error ? error.message : String(error),
-        tone: "error",
-      });
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error("Kiểm tra CAPTCHA thất bại", { description: msg });
     } finally {
       setBusy(false);
     }
@@ -160,15 +149,6 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
         onChange={setTab}
         ariaLabel="Các mục cài đặt"
       />
-      {feedback && (
-        <p
-          className="source-settings-feedback"
-          data-tone={feedback.tone}
-          role={feedback.tone === "error" ? "alert" : "status"}
-        >
-          {feedback.message}
-        </p>
-      )}
       {tab === "output" && (
         <section
           className="source-settings-section"
@@ -180,7 +160,7 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
           </header>
           <div className="source-folder-list">
             <FolderRow
-              icon={<Video size={19} aria-hidden="true" />}
+              icon={<Video size={24} aria-hidden="true" />}
               label="Video"
               path={videoPath}
               busy={busy}
@@ -188,7 +168,7 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
               onOpen={() => void settingsApi.openOutputFolder(videoPath)}
             />
             <FolderRow
-              icon={<Image size={19} aria-hidden="true" />}
+              icon={<Image size={24} aria-hidden="true" />}
               label="Hình ảnh"
               path={imagePath}
               busy={busy}
@@ -288,11 +268,21 @@ function FolderRow({
         <strong>{label}</strong>
         <code title={path}>{path || "Đang tải..."}</code>
       </div>
-      <Button variant="secondary" disabled={busy} onClick={onChange}>
+      <Button
+        variant="secondary"
+        className="source-folder-row__btn-change"
+        disabled={busy}
+        onClick={onChange}
+      >
         <FolderOpen size={16} aria-hidden="true" />
         Đổi thư mục
       </Button>
-      <Button variant="ghost" disabled={!path} onClick={onOpen}>
+      <Button
+        variant="primary"
+        className="source-folder-row__btn-open"
+        disabled={!path}
+        onClick={onOpen}
+      >
         <Folder size={16} aria-hidden="true" />
         Mở
       </Button>

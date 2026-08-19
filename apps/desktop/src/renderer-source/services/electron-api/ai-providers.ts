@@ -121,6 +121,9 @@ export const aiProviderApi = {
     const response = record(
       await getElectronApi().aiProviderProfileModels(connection),
     );
+    if (response.connected === false && typeof response.error === "string") {
+      throw new Error(response.error);
+    }
     return Array.isArray(response.models)
       ? response.models.flatMap((value) => {
           const item = record(value);
@@ -141,8 +144,13 @@ export const aiProviderApi = {
     const response = record(
       await getElectronApi().aiProviderProfileTest(connection),
     );
-    if (response.connected !== true)
-      throw new Error("Không thể kết nối AI provider.");
+    if (response.connected !== true) {
+      throw new Error(
+        typeof response.error === "string" && response.error
+          ? response.error
+          : "Không thể kết nối AI provider.",
+      );
+    }
     return typeof response.modelCount === "number" ? response.modelCount : 0;
   },
 };

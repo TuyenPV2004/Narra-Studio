@@ -60,7 +60,10 @@ export function useCaptchaSetup() {
     setChecking(true);
     setError(null);
     try {
-      const next = parseStatus(await captchaApi.getBridgeStatus());
+      const [next] = await Promise.all([
+        captchaApi.getBridgeStatus().then(parseStatus),
+        new Promise((resolve) => setTimeout(resolve, 450)),
+      ]);
       setStatus(next);
       window.dispatchEvent(
         new CustomEvent("genyu:captcha-status-changed", { detail: next }),
@@ -86,7 +89,10 @@ export function useCaptchaSetup() {
     setVerifying(true);
     setError(null);
     try {
-      const result = await captchaApi.testExtension();
+      const [result] = await Promise.all([
+        captchaApi.testExtension(),
+        new Promise((resolve) => setTimeout(resolve, 450)),
+      ]);
       await refresh();
       return (
         typeof result === "object" &&

@@ -141,7 +141,6 @@ function pickRandomSlot() {
 async function refreshCapturedCookies(slotId = 0) {
   const slot = getSlot(slotId);
   try {
-    const { session } = require('electron');
     const ses = session.fromPartition(slot.partition);
     const [googleCookies, labsCookies] = await Promise.all([
       ses.cookies.get({ domain: '.google.com' }),
@@ -155,8 +154,84 @@ async function refreshCapturedCookies(slotId = 0) {
   }
 }
 
-// Fetch session info (name, email, avatar) from labs.google/session endpoint
+// Fetch session info (name, email, avatar) from Google OAuth & labs.google/session endpoint
 async function fetchSlotSession(slotId) {
+  const slot = getSlot(slotId);
+  if (!slot) return null;
+
+  // 1. Google OAuth UserInfo API via Bearer token (fastest & most reliable)
+  if (slot.bearerToken) {
+    try {
+      const token = slot.bearerToken.replace(/^(Bearer\s+)+/i, 'Bearer ');
+      const userinfoResp = await net.fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: {
+          'Authorization': token,
+          'Accept': 'application/json',
+        },
+      });
+      if (userinfoResp.ok) {
+        const data = await userinfoResp.json();
+        if (data && (data.email || data.name)) {
+          const user = {
+            email: data.email || null,
+            name: data.name || data.given_name || (data.email ? data.email.split('@')[0] : null),
+            avatar: data.picture || null,
+          };
+          if (user.email) slot.email = user.email;
+          if (user.name) slot.displayName = user.name;
+          if (user.avatar) slot.avatar = user.avatar;
+          console.log(`[SLOT-${slotId}][PROFILE] ✅ Fetched via googleapis userinfo: email=${user.email}, name=${user.name}`);
+          if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+            runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...user });
+          }
+          return user;
+        }
+      }
+    } catch (e) {
+      console.warn(`[SLOT-${slotId}][PROFILE] OAuth userinfo fetch failed:`, e.message);
+    }
+  }
+
+  // 2. Direct fetch using slot partition cookies (labs.google/fx/api/auth/session)
+  try {
+    const ses = session.fromPartition(slot.partition || `persist:slot-${slotId}`);
+    const all = await ses.cookies.get({}).catch(() => []);
+    if (all.length > 0) {
+      const cookieHeader = all.map(c => `${c.name}=${c.value}`).join('; ');
+      const cleanUA = buildCleanUserAgent();
+      const resp = await net.fetch('https://labs.google/fx/api/auth/session', {
+        headers: {
+          'accept': 'application/json',
+          'cookie': cookieHeader,
+          'user-agent': cleanUA,
+          'origin': 'https://labs.google',
+          'referer': 'https://labs.google/fx/tools/flow',
+        },
+      });
+      if (resp.ok) {
+        const d = await resp.json();
+        if (d && d.user) {
+          const user = {
+            email: d.user.email || null,
+            name: d.user.name || null,
+            avatar: d.user.image || null,
+          };
+          if (user.email) slot.email = user.email;
+          if (user.name) slot.displayName = user.name;
+          if (user.avatar) slot.avatar = user.avatar;
+          console.log(`[SLOT-${slotId}][PROFILE] ✅ Fetched via net.fetch labs session: email=${user.email}, name=${user.name}`);
+          if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+            runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...user });
+          }
+          return user;
+        }
+      }
+    }
+  } catch (e) {
+    console.warn(`[SLOT-${slotId}][PROFILE] net.fetch failed:`, e.message);
+  }
+
+  // 3. Fallback to webview executeJavaScript
   try {
     const wv = findFlowWebview(slotId);
     if (wv) {
@@ -174,9 +249,19 @@ async function fetchSlotSession(slotId) {
           return null;
         })()
       `);
-      if (result) return result;
+      if (result) {
+        if (result.email) slot.email = result.email;
+        if (result.name) slot.displayName = result.name;
+        if (result.avatar) slot.avatar = result.avatar;
+        console.log(`[SLOT-${slotId}][PROFILE] ✅ Fetched via webview: email=${result.email}, name=${result.name}`);
+        if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+          runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...result });
+        }
+        return result;
+      }
     }
   } catch (e) { }
+
   return null;
 }
 

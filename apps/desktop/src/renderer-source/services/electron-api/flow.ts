@@ -1,6 +1,7 @@
 import { getElectronApi } from "@/services/electron-api/client";
 
 export interface FlowSlot {
+  avatar?: string;
   displayName?: string;
   email?: string;
   hasBearerToken: boolean;
@@ -27,6 +28,9 @@ export const flowApi = {
                 id: slot.id,
                 status: typeof slot.status === "string" ? slot.status : "empty",
                 hasBearerToken: slot.hasBearerToken === true,
+                ...(typeof slot.avatar === "string"
+                  ? { avatar: slot.avatar }
+                  : {}),
                 ...(typeof slot.email === "string"
                   ? { email: slot.email }
                   : {}),

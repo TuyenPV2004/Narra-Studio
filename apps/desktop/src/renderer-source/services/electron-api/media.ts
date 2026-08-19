@@ -39,9 +39,7 @@ export const mediaApi = {
     );
   },
   delete(path: string) {
-    return getElectronApi().deleteFile(
-      path.replace(/^file:[/\\]{2,3}/, "").replace(/^\/([A-Za-z]:)/, "$1"),
-    );
+    return getElectronApi().deleteFile(path);
   },
   async importImages(): Promise<number> {
     const selected = await getElectronApi().selectFiles();

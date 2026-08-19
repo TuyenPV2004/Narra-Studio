@@ -1,69 +1,178 @@
 import {
+  AlertTriangle,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
   FolderOpen,
   Image as ImageIcon,
+  Play,
   RefreshCw,
   Trash2,
   Upload,
   Video,
+  X,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/Dialog";
+import { toast } from "@/components/ui/Toast";
 import { mediaApi, type LocalMedia } from "@/services/electron-api/media";
+
+function formatFileSize(bytes: number): string {
+  if (!bytes || bytes <= 0) return "—";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function formatDate(time: number): string {
+  if (!time) return "—";
+  try {
+    const d = new Date(time);
+    return d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return "—";
+  }
+}
 
 export function MediaLibraryPage() {
   const [items, setItems] = useState<LocalMedia[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [previewMedia, setPreviewMedia] = useState<LocalMedia | null>(null);
+  const [deletingMedia, setDeletingMedia] = useState<LocalMedia | null>(null);
   const [error, setError] = useState<string>();
-  const load = useCallback(async () => {
-    setLoading(true);
+
+  const currentIndex = previewMedia
+    ? items.findIndex((item) => item.path === previewMedia.path)
+    : -1;
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex >= 0 && currentIndex < items.length - 1;
+
+  const goToPrev = useCallback(() => {
+    if (hasPrev) {
+      const prev = items[currentIndex - 1];
+      if (prev) setPreviewMedia(prev);
+    }
+  }, [hasPrev, currentIndex, items]);
+
+  const goToNext = useCallback(() => {
+    if (hasNext) {
+      const next = items[currentIndex + 1];
+      if (next) setPreviewMedia(next);
+    }
+  }, [hasNext, currentIndex, items]);
+
+  useEffect(() => {
+    if (!previewMedia) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "ArrowLeft") {
+        event.preventDefault();
+        if (currentIndex > 0) {
+          const prev = items[currentIndex - 1];
+          if (prev) setPreviewMedia(prev);
+        }
+      } else if (event.key === "ArrowRight") {
+        event.preventDefault();
+        if (currentIndex >= 0 && currentIndex < items.length - 1) {
+          const next = items[currentIndex + 1];
+          if (next) setPreviewMedia(next);
+        }
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [previewMedia, currentIndex, items]);
+
+  const load = useCallback(async (isManual = false) => {
+    if (isManual) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     setError(undefined);
     try {
-      setItems(await mediaApi.list());
+      const [data] = await Promise.all([
+        mediaApi.list(),
+        isManual ? new Promise((resolve) => setTimeout(resolve, 500)) : Promise.resolve(),
+      ]);
+      setItems(data);
+      if (isManual) {
+        toast.success("Đã làm mới thư viện.");
+      }
     } catch (value) {
       setError(value instanceof Error ? value.message : String(value));
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, []);
+
   useEffect(() => {
     void load();
   }, [load]);
+
   const importImages = async () => {
     try {
       await mediaApi.importImages();
       await load();
+      toast.success("Đã nhập ảnh vào thư viện.");
     } catch (value) {
       setError(value instanceof Error ? value.message : String(value));
     }
   };
-  const remove = async (item: LocalMedia) => {
+
+      const remove = async (item: LocalMedia) => {
     try {
       await mediaApi.delete(item.path);
       setItems((current) =>
         current.filter((value) => value.path !== item.path),
       );
+      if (previewMedia?.path === item.path) {
+        setPreviewMedia(null);
+      }
+      toast.success(`Đã chuyển "${item.name}" vào Thùng rác.`);
     } catch (value) {
       setError(value instanceof Error ? value.message : String(value));
     }
   };
+
   return (
-    <section className="source-media-page" aria-labelledby="media-title">
-      <header>
-        <div>
-          <small>TÀI NGUYÊN CỤC BỘ</small>
-          <h1 id="media-title">
-            <FolderOpen size={22} />
-            Thư viện
-          </h1>
-          <p>Ảnh và video được lưu trên thiết bị này.</p>
+    <section
+      className="source-tool-page source-media-page"
+      aria-labelledby="media-title"
+    >
+      <header className="source-media-hero">
+        <div className="source-media-hero__left">
+          <span className="source-media-hero__icon">
+            <FolderOpen size={28} aria-hidden="true" />
+          </span>
+          <div>
+            <h1 id="media-title">Thư viện</h1>
+            <p>Ảnh và video được lưu trên thiết bị này.</p>
+          </div>
         </div>
-        <div>
+        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
           <Button
             variant="secondary"
-            onClick={() => void load()}
-            disabled={loading}
+            onClick={() => void load(true)}
+            disabled={loading || refreshing}
           >
-            <RefreshCw size={16} className={loading ? "is-spinning" : ""} />
+            <RefreshCw
+              size={16}
+              className={loading || refreshing ? "is-spinning" : ""}
+            />
             Làm mới
           </Button>
           <Button onClick={() => void importImages()}>
@@ -72,11 +181,13 @@ export function MediaLibraryPage() {
           </Button>
         </div>
       </header>
+
       {error && (
         <p className="source-generation-error" role="alert">
           {error}
         </p>
       )}
+
       {items.length === 0 ? (
         <div className="source-generation-empty source-media-empty">
           <FolderOpen size={32} />
@@ -85,39 +196,226 @@ export function MediaLibraryPage() {
       ) : (
         <div className="source-media-grid">
           {items.map((item) => (
-            <article key={item.path}>
-              {item.type === "image" ? (
-                <img src={item.path} alt={item.name} />
-              ) : (
-                <video src={item.path} preload="metadata" />
-              )}
-              <div>
-                <span>
+            <article
+              key={item.path}
+              className="source-media-card"
+              onClick={() => setPreviewMedia(item)}
+            >
+              <div className="source-media-card__thumb">
+                {item.type === "image" ? (
+                  <img
+                    src={item.path}
+                    alt={item.name}
+                    loading="lazy"
+                    className="source-media-card__media"
+                  />
+                ) : (
+                  <video
+                    src={item.path}
+                    preload="metadata"
+                    className="source-media-card__media"
+                  />
+                )}
+
+                <div className="source-media-card__badge">
                   {item.type === "image" ? (
-                    <ImageIcon size={14} />
+                    <>
+                      <ImageIcon size={11} aria-hidden="true" />
+                      <span>Ảnh</span>
+                    </>
                   ) : (
-                    <Video size={14} />
+                    <>
+                      <Play size={11} fill="currentColor" aria-hidden="true" />
+                      <span>Video</span>
+                    </>
                   )}
-                  {item.type === "image" ? "Ảnh" : "Video"}
-                </span>
-                <strong title={item.name}>{item.name}</strong>
-                <small>
-                  {item.size
-                    ? `${(item.size / 1024 / 1024).toFixed(1)} MB`
-                    : "—"}
-                </small>
+                </div>
+
+                <button
+                  type="button"
+                  className="source-media-card__btn-delete"
+                  title={`Xóa ${item.name}`}
+                  aria-label={`Xóa ${item.name}`}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeletingMedia(item);
+                  }}
+                >
+                  <Trash2 size={13} />
+                </button>
+
+                <div className="source-media-card__overlay">
+                  <span className="source-media-card__action-icon">
+                    {item.type === "video" ? (
+                      <Play size={20} fill="currentColor" style={{ marginLeft: 2 }} />
+                    ) : (
+                      <Eye size={20} />
+                    )}
+                  </span>
+                </div>
               </div>
-              <button
-                type="button"
-                aria-label={`Xóa ${item.name}`}
-                onClick={() => void remove(item)}
-              >
-                <Trash2 size={15} />
-              </button>
+
+              <div className="source-media-card__info">
+                <h4 className="source-media-card__name" title={item.name}>
+                  {item.name}
+                </h4>
+                <div className="source-media-card__meta">
+                  <span>{formatFileSize(item.size)}</span>
+                  <span>{formatDate(item.time)}</span>
+                </div>
+              </div>
             </article>
           ))}
         </div>
       )}
+
+      <Dialog
+        open={Boolean(previewMedia)}
+        onOpenChange={(open) => {
+          if (!open) setPreviewMedia(null);
+        }}
+      >
+        <DialogContent className="source-media-lightbox" showClose={false}>
+          {previewMedia && (
+            <>
+              <DialogTitle style={{ display: "none" }}>
+                {previewMedia.name}
+              </DialogTitle>
+              <DialogDescription style={{ display: "none" }}>
+                Xem chi tiết media
+              </DialogDescription>
+
+              {items.length > 1 && currentIndex >= 0 && (
+                <div className="source-media-lightbox__counter">
+                  {currentIndex + 1} / {items.length}
+                </div>
+              )}
+
+              <button
+                type="button"
+                className="source-media-lightbox__btn-close"
+                title="Đóng (Esc)"
+                aria-label="Đóng"
+                onClick={() => setPreviewMedia(null)}
+              >
+                <X size={20} />
+              </button>
+
+              {hasPrev && (
+                <button
+                  type="button"
+                  className="source-media-lightbox__btn-nav source-media-lightbox__btn-nav--prev"
+                  title="Xem tệp trước (Phím ←)"
+                  aria-label="Xem tệp trước"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToPrev();
+                  }}
+                >
+                  <ChevronLeft size={28} />
+                </button>
+              )}
+
+              <div className="source-media-lightbox__stage">
+                {previewMedia.type === "image" ? (
+                  <img
+                    key={previewMedia.path}
+                    src={previewMedia.path}
+                    alt={previewMedia.name}
+                    className="source-media-lightbox__img"
+                  />
+                ) : (
+                  <video
+                    key={previewMedia.path}
+                    src={previewMedia.path}
+                    controls
+                    autoPlay
+                    playsInline
+                    className="source-media-lightbox__video"
+                  />
+                )}
+              </div>
+
+              {hasNext && (
+                <button
+                  type="button"
+                  className="source-media-lightbox__btn-nav source-media-lightbox__btn-nav--next"
+                  title="Xem tệp tiếp theo (Phím →)"
+                  aria-label="Xem tệp tiếp theo"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    goToNext();
+                  }}
+                >
+                  <ChevronRight size={28} />
+                </button>
+              )}
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deletingMedia)}
+        onOpenChange={(open) => {
+          if (!open) setDeletingMedia(null);
+        }}
+      >
+        <DialogContent showClose={false}>
+          <DialogHeader>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: "32px",
+                  height: "32px",
+                  borderRadius: "9999px",
+                  background: "var(--danger)",
+                  color: "#ffffff",
+                  flexShrink: 0,
+                  boxShadow: "0 2px 6px color-mix(in srgb, var(--danger) 35%, transparent)",
+                }}
+              >
+                <AlertTriangle size={17} aria-hidden="true" />
+              </div>
+              <div>
+                <DialogTitle>
+                  Xác nhận xóa {deletingMedia?.type === "image" ? "ảnh" : "video"}
+                </DialogTitle>
+                <DialogDescription>
+                  Tệp sẽ được chuyển vào Thùng rác của hệ thống.
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div style={{ padding: "8px 0", fontSize: "0.9rem", color: "var(--foreground)", lineHeight: 1.5 }}>
+            Bạn có chắc chắn muốn chuyển tệp{" "}
+            <strong>"{deletingMedia?.name}"</strong> vào Thùng rác không? Bạn vẫn có thể khôi phục lại từ Thùng rác của máy tính nếu cần.
+          </div>
+          <DialogFooter>
+            <Button
+              variant="secondary"
+              onClick={() => setDeletingMedia(null)}
+            >
+              Hủy
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (deletingMedia) {
+                  const target = deletingMedia;
+                  setDeletingMedia(null);
+                  void remove(target);
+                }
+              }}
+            >
+              Chuyển vào Thùng rác
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

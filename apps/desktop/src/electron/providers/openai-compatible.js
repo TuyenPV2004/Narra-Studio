@@ -4,7 +4,7 @@ const net = require('node:net');
 
 const PROFILE_LIMIT = 20;
 const MODEL_LIMIT = 500;
-const REQUEST_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_MS = 8000;
 const CAPABILITIES = ['text', 'vision', 'text-to-speech', 'lip-sync'];
 const PROTOCOL_CAPABILITIES = {
   'openai-compatible': ['text', 'vision'],
@@ -163,19 +163,41 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
         headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
         signal: controller.signal,
       });
+    } catch (fetchError) {
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Kết nối tới Base URL quá hạn (Timeout sau 8s).');
+      }
+      const message = fetchError?.message || String(fetchError);
+      if (message.includes('ERR_NAME_NOT_RESOLVED')) {
+        throw new Error('Tên miền không tồn tại hoặc không thể phân giải DNS (ERR_NAME_NOT_RESOLVED).');
+      }
+      if (message.includes('ERR_CONNECTION_REFUSED')) {
+        throw new Error('Máy chủ từ chối kết nối (ERR_CONNECTION_REFUSED).');
+      }
+      if (message.includes('ERR_INTERNET_DISCONNECTED')) {
+        throw new Error('Không có kết nối mạng Internet.');
+      }
+      throw new Error(`Lỗi kết nối: ${message}`);
     } finally {
       clearTimeout(timeout);
     }
     const text = await response.text();
-    if (!response.ok) throw new Error(`Provider response ${response.status}: ${redactSecret(text, apiKey).slice(0, 300)}`);
+    if (!response.ok) {
+      let detail = text;
+      try {
+        const errJson = JSON.parse(text);
+        detail = errJson?.error?.message || errJson?.message || text;
+      } catch {}
+      throw new Error(`Provider phản hồi HTTP ${response.status}: ${redactSecret(detail, apiKey).slice(0, 200)}`);
+    }
     let parsed;
     try {
       parsed = JSON.parse(text || '{}');
     } catch {
-      throw new Error('Provider returned a non-JSON model list.');
+      throw new Error('Provider trả về dữ liệu không đúng định dạng JSON.');
     }
     const models = normalizeModels(parsed);
-    if (!models.length) throw new Error('Provider connected but returned no models.');
+    if (!models.length) throw new Error('Provider kết nối được nhưng không tìm thấy model nào.');
     return { connected: true, baseUrl, models };
   };
 

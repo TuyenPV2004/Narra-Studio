@@ -12,6 +12,7 @@ module.exports = function registerMediaProjectsIpc(dependencies) {
     app,
     ipcMain,
     dialog,
+    shell,
     path,
     fs,
     pathToFileURL,
@@ -195,16 +196,41 @@ ipcMain.handle('select-agent-canvas-media-files', async () => {
   return selectedMedia;
 });
 
-// ── Delete file ───────────────────────────────────────────────────────
+// ── Delete file (Move to OS Recycle Bin) ───────────────────────────────
+function resolveLocalFilePath(filePath) {
+  if (!filePath || typeof filePath !== 'string') return '';
+  if (filePath.startsWith('file:')) {
+    try {
+      return fileURLToPath(filePath);
+    } catch {}
+  }
+  let decoded = filePath;
+  try {
+    decoded = decodeURIComponent(filePath);
+  } catch {}
+  decoded = decoded.replace(/^file:[/\\]{2,3}/, '').replace(/^\/([A-Za-z]:)/, '$1');
+  return path.normalize(decoded);
+}
+
 ipcMain.handle('delete-file', async (_, filePath) => {
   try {
-    const { fileURLToPath } = require('url');
-    const resolved = filePath.startsWith('file://') ? fileURLToPath(filePath) : filePath;
-    if (fs.existsSync(resolved)) {
+    const resolved = resolveLocalFilePath(filePath);
+    console.log(`[FILE] Deleting target: "${filePath}" -> resolved: "${resolved}"`);
+    if (resolved && fs.existsSync(resolved)) {
+      if (shell && typeof shell.trashItem === 'function') {
+        try {
+          await shell.trashItem(resolved);
+          console.log(`[FILE] Moved to Recycle Bin: ${resolved}`);
+          return true;
+        } catch (trashErr) {
+          console.warn('[FILE] trashItem failed, falling back to unlinkSync:', trashErr);
+        }
+      }
       fs.unlinkSync(resolved);
       console.log(`[FILE] Deleted: ${resolved}`);
       return true;
     }
+    console.warn(`[FILE] Target file does not exist: "${resolved}" (original: "${filePath}")`);
     return false;
   } catch (err) {
     console.error('[FILE] Delete error:', err);
