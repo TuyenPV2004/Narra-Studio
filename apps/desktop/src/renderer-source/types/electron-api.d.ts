@@ -41,7 +41,13 @@ export interface NarraElectronApi {
   testCaptchaExtension: () => Promise<unknown>;
   openExtensionFolder: () => Promise<unknown>;
   getVideoOutputPath: () => Promise<unknown>;
-  openOutputFolder: (path?: string) => Promise<unknown>;
+  openOutputFolder: (path?: string) => Promise<
+    | boolean
+    | {
+        ok: boolean;
+        error: string | null;
+      }
+  >;
   changeOutputFolder: () => Promise<unknown>;
   getImageOutputPath: () => Promise<unknown>;
   changeImageOutputFolder: () => Promise<unknown>;

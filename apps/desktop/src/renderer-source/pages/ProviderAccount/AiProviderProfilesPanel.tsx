@@ -73,7 +73,11 @@ const emptyDraft = {
 
 function cleanErrorMessage(error: unknown): string {
   const raw = error instanceof Error ? error.message : String(error || "");
-  return raw.replace(/^Error occurred in handler for '[^']+': (?:Error: )?/, "").trim() || "Đã xảy ra lỗi kết nối.";
+  return (
+    raw
+      .replace(/^Error occurred in handler for '[^']+': (?:Error: )?/, "")
+      .trim() || "Đã xảy ra lỗi kết nối."
+  );
 }
 
 export function AiProviderProfilesPanel() {
@@ -178,7 +182,9 @@ export function AiProviderProfilesPanel() {
     setBusy(true);
     try {
       const count = await aiProviderApi.test(connection());
-      toast.success("Kết nối thành công!", { description: `${count} model khả dụng.` });
+      toast.success("Kết nối thành công!", {
+        description: `${count} model khả dụng.`,
+      });
     } catch (error) {
       const msg = cleanErrorMessage(error);
       toast.error("Kiểm tra kết nối thất bại", { description: msg });
@@ -240,7 +246,9 @@ export function AiProviderProfilesPanel() {
       await aiProviderApi.setActive(id, capability);
       if (capability === "text") setActiveId(id);
       setActiveByCapability((current) => ({ ...current, [capability]: id }));
-      toast.success(`Đã kích hoạt AI provider cho ${capabilityLabels[capability]}!`);
+      toast.success(
+        `Đã kích hoạt AI provider cho ${capabilityLabels[capability]}!`,
+      );
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       toast.error("Kích hoạt AI provider thất bại", { description: msg });
@@ -272,7 +280,11 @@ export function AiProviderProfilesPanel() {
         <div className="source-ai-providers__list">
           {!profiles.length && (
             <div className="source-ai-providers__empty">
-              <Inbox size={42} className="source-ai-providers__empty-icon" aria-hidden="true" />
+              <Inbox
+                size={42}
+                className="source-ai-providers__empty-icon"
+                aria-hidden="true"
+              />
               <p>Chưa có AI provider được cấu hình</p>
             </div>
           )}
@@ -295,9 +307,15 @@ export function AiProviderProfilesPanel() {
                     style={{ cursor: "pointer" }}
                     title={isExpanded ? "Bấm để thu gọn" : "Bấm để mở rộng"}
                   >
-                    <CloudCheck size={23} className="source-provider-card__cloud-icon" aria-hidden="true" />
+                    <CloudCheck
+                      size={23}
+                      className="source-provider-card__cloud-icon"
+                      aria-hidden="true"
+                    />
                     <div className="source-provider-card__titles">
-                      <h4 className="source-provider-card__name">{profile.name}</h4>
+                      <h4 className="source-provider-card__name">
+                        {profile.name}
+                      </h4>
                       <span className="source-provider-card__protocol">
                         {protocolLabels[profile.protocol]}
                       </span>
@@ -487,7 +505,8 @@ export function AiProviderProfilesPanel() {
           </div>
           <label>
             <span>
-              API key {!draft.id && <span className="source-required-mark">*</span>}
+              API key{" "}
+              {!draft.id && <span className="source-required-mark">*</span>}
               {draft.id && <small> (Để trống để giữ key hiện tại)</small>}
             </span>
             <Input
@@ -632,7 +651,8 @@ export function AiProviderProfilesPanel() {
                   background: "var(--danger)",
                   color: "#ffffff",
                   flexShrink: 0,
-                  boxShadow: "0 2px 6px color-mix(in srgb, var(--danger) 35%, transparent)",
+                  boxShadow:
+                    "0 2px 6px color-mix(in srgb, var(--danger) 35%, transparent)",
                 }}
               >
                 <AlertTriangle size={17} aria-hidden="true" />
@@ -645,9 +665,17 @@ export function AiProviderProfilesPanel() {
               </div>
             </div>
           </DialogHeader>
-          <div style={{ padding: "8px 0", fontSize: "0.9rem", color: "var(--foreground)", lineHeight: 1.5 }}>
+          <div
+            style={{
+              padding: "8px 0",
+              fontSize: "0.9rem",
+              color: "var(--foreground)",
+              lineHeight: 1.5,
+            }}
+          >
             Bạn có chắc chắn muốn xóa cấu hình AI provider{" "}
-            <strong>"{deletingProfile?.name}"</strong> không? Toàn bộ API key và thông số đã lưu sẽ bị xóa khỏi hệ thống.
+            <strong>"{deletingProfile?.name}"</strong> không? Toàn bộ API key và
+            thông số đã lưu sẽ bị xóa khỏi hệ thống.
           </div>
           <DialogFooter>
             <Button

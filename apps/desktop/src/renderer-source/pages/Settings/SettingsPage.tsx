@@ -26,10 +26,6 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
   const [videoPath, setVideoPath] = useState("");
   const [imagePath, setImagePath] = useState("");
   const [authToken, setAuthToken] = useState("");
-  const [siteKey, setSiteKey] = useState(
-    "6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV",
-  );
-  const [captchaAction, setCaptchaAction] = useState("submit");
   const [busy, setBusy] = useState(false);
   const tabs: readonly TabOption<SettingsTab>[] = [
     {
@@ -83,7 +79,9 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
       if (path) {
         if (kind === "video") setVideoPath(path);
         else setImagePath(path);
-        toast.success("Đã cập nhật thư mục lưu thành công!", { description: path });
+        toast.success("Đã cập nhật thư mục lưu thành công!", {
+          description: path,
+        });
       }
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
@@ -111,6 +109,23 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
     }
   };
 
+  const openFolder = async (path: string) => {
+    try {
+      const result = await settingsApi.openOutputFolder(path);
+      const failed =
+        result === false ||
+        (typeof result === "object" && result !== null && result.ok === false);
+      if (failed) {
+        const error =
+          typeof result === "object" && result !== null ? result.error : null;
+        throw new Error(error || "Không thể mở thư mục");
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error("Không thể mở thư mục", { description: msg });
+    }
+  };
+
   const testCaptcha = async () => {
     setBusy(true);
     try {
@@ -126,7 +141,7 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
         });
         return;
       }
-      toast.success(`Kết nối CAPTCHA hoạt động (${captchaAction || "submit"}).`);
+      toast.success("Kết nối CAPTCHA hoạt động.");
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
       toast.error("Kiểm tra CAPTCHA thất bại", { description: msg });
@@ -165,7 +180,7 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
               path={videoPath}
               busy={busy}
               onChange={() => void changeFolder("video")}
-              onOpen={() => void settingsApi.openOutputFolder(videoPath)}
+              onOpen={() => void openFolder(videoPath)}
             />
             <FolderRow
               icon={<Image size={24} aria-hidden="true" />}
@@ -173,7 +188,7 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
               path={imagePath}
               busy={busy}
               onChange={() => void changeFolder("image")}
-              onOpen={() => void settingsApi.openOutputFolder(imagePath)}
+              onOpen={() => void openFolder(imagePath)}
             />
           </div>
         </section>
@@ -212,27 +227,9 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
           </div>
           <details className="source-settings-details">
             <summary>Kiểm tra xác minh trình duyệt</summary>
-            <div className="source-settings-technical-grid">
-              <label htmlFor="captcha-site-key">
-                Site key
-                <Input
-                  id="captcha-site-key"
-                  value={siteKey}
-                  onChange={(event) => setSiteKey(event.target.value)}
-                />
-              </label>
-              <label htmlFor="captcha-action">
-                Action
-                <Input
-                  id="captcha-action"
-                  value={captchaAction}
-                  onChange={(event) => setCaptchaAction(event.target.value)}
-                />
-              </label>
-            </div>
             <Button
               variant="secondary"
-              disabled={busy || !siteKey.trim()}
+              disabled={busy}
               onClick={() => void testCaptcha()}
             >
               Kiểm tra kết nối

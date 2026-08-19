@@ -192,14 +192,18 @@ export function VoicePage() {
             </Select>
           </div>
 
-          {voices.find((voice) => voice.mediaId === selectedId)?.description && (
+          {voices.find((voice) => voice.mediaId === selectedId)
+            ?.description && (
             <div className="source-voice-desc">
               <span className="source-voice-desc__label">
                 <Info size={14} aria-hidden="true" />
                 <span>Mô tả :</span>
               </span>
               <span className="source-voice-desc__text">
-                {voices.find((voice) => voice.mediaId === selectedId)?.description}
+                {
+                  voices.find((voice) => voice.mediaId === selectedId)
+                    ?.description
+                }
               </span>
             </div>
           )}
@@ -210,7 +214,8 @@ export function VoicePage() {
                 controls
                 preload="metadata"
                 src={
-                  voices.find((voice) => voice.mediaId === selectedId)?.sampleUrl
+                  voices.find((voice) => voice.mediaId === selectedId)
+                    ?.sampleUrl
                 }
               />
             </div>

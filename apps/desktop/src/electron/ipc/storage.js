@@ -85,8 +85,8 @@ ipcMain.handle('get-video-output-path', async () => {
 ipcMain.handle('open-output-folder', async (_, folderPath) => {
   const dir = folderPath || getVideoOutputDir();
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  await shell.openPath(dir);
-  return true;
+  const openError = await shell.openPath(dir);
+  return { ok: !openError, error: openError || null };
 });
 
 // ── Director's Desk persistence ──────────────────────────────────────

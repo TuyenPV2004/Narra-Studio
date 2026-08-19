@@ -105,7 +105,9 @@ export function MediaLibraryPage() {
     try {
       const [data] = await Promise.all([
         mediaApi.list(),
-        isManual ? new Promise((resolve) => setTimeout(resolve, 500)) : Promise.resolve(),
+        isManual
+          ? new Promise((resolve) => setTimeout(resolve, 500))
+          : Promise.resolve(),
       ]);
       setItems(data);
       if (isManual) {
@@ -133,7 +135,7 @@ export function MediaLibraryPage() {
     }
   };
 
-      const remove = async (item: LocalMedia) => {
+  const remove = async (item: LocalMedia) => {
     try {
       await mediaApi.delete(item.path);
       setItems((current) =>
@@ -163,7 +165,13 @@ export function MediaLibraryPage() {
             <p>Ảnh và video được lưu trên thiết bị này.</p>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "var(--space-2)",
+          }}
+        >
           <Button
             variant="secondary"
             onClick={() => void load(true)}
@@ -247,7 +255,11 @@ export function MediaLibraryPage() {
                 <div className="source-media-card__overlay">
                   <span className="source-media-card__action-icon">
                     {item.type === "video" ? (
-                      <Play size={20} fill="currentColor" style={{ marginLeft: 2 }} />
+                      <Play
+                        size={20}
+                        fill="currentColor"
+                        style={{ marginLeft: 2 }}
+                      />
                     ) : (
                       <Eye size={20} />
                     )}
@@ -375,14 +387,16 @@ export function MediaLibraryPage() {
                   background: "var(--danger)",
                   color: "#ffffff",
                   flexShrink: 0,
-                  boxShadow: "0 2px 6px color-mix(in srgb, var(--danger) 35%, transparent)",
+                  boxShadow:
+                    "0 2px 6px color-mix(in srgb, var(--danger) 35%, transparent)",
                 }}
               >
                 <AlertTriangle size={17} aria-hidden="true" />
               </div>
               <div>
                 <DialogTitle>
-                  Xác nhận xóa {deletingMedia?.type === "image" ? "ảnh" : "video"}
+                  Xác nhận xóa{" "}
+                  {deletingMedia?.type === "image" ? "ảnh" : "video"}
                 </DialogTitle>
                 <DialogDescription>
                   Tệp sẽ được chuyển vào Thùng rác của hệ thống.
@@ -390,15 +404,20 @@ export function MediaLibraryPage() {
               </div>
             </div>
           </DialogHeader>
-          <div style={{ padding: "8px 0", fontSize: "0.9rem", color: "var(--foreground)", lineHeight: 1.5 }}>
+          <div
+            style={{
+              padding: "8px 0",
+              fontSize: "0.9rem",
+              color: "var(--foreground)",
+              lineHeight: 1.5,
+            }}
+          >
             Bạn có chắc chắn muốn chuyển tệp{" "}
-            <strong>"{deletingMedia?.name}"</strong> vào Thùng rác không? Bạn vẫn có thể khôi phục lại từ Thùng rác của máy tính nếu cần.
+            <strong>"{deletingMedia?.name}"</strong> vào Thùng rác không? Bạn
+            vẫn có thể khôi phục lại từ Thùng rác của máy tính nếu cần.
           </div>
           <DialogFooter>
-            <Button
-              variant="secondary"
-              onClick={() => setDeletingMedia(null)}
-            >
+            <Button variant="secondary" onClick={() => setDeletingMedia(null)}>
               Hủy
             </Button>
             <Button

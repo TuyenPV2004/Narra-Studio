@@ -65,7 +65,8 @@ export function CaptchaSetupPage() {
         toast.success("Kết nối VEO3 đã được xác minh thành công!");
       } else {
         toast.error("Chưa thể xác minh kết nối VEO3.", {
-          description: "Vui lòng kiểm tra lại tab Google Flow và Extension trong Chrome.",
+          description:
+            "Vui lòng kiểm tra lại tab Google Flow và Extension trong Chrome.",
         });
       }
     } catch (e) {
@@ -189,8 +190,8 @@ export function CaptchaSetupPage() {
           <div>
             <h1 id="captcha-title">Kết nối VEO3 với Narra Studio</h1>
             <p>
-              Làm theo từng bước bên dưới. Narra Studio sẽ tự nhận diện và chuyển
-              bước khi Chrome đã sẵn sàng.
+              Làm theo từng bước bên dưới. Narra Studio sẽ tự nhận diện và
+              chuyển bước khi Chrome đã sẵn sàng.
             </p>
           </div>
         </div>

@@ -52,7 +52,10 @@ class ToastStore {
       createdAt: Date.now(),
     };
 
-    this.toasts = [newItem, ...this.toasts.filter((t) => t.id !== id)].slice(0, 4);
+    this.toasts = [newItem, ...this.toasts.filter((t) => t.id !== id)].slice(
+      0,
+      4,
+    );
     this.notify();
 
     if (duration > 0) {
@@ -99,7 +102,7 @@ export const toast = Object.assign(
       toastStore.show(title, { ...options, type: "warning" }),
     dismiss: (id: string) => toastStore.dismiss(id),
     clear: () => toastStore.clear(),
-  }
+  },
 );
 
 export function Toaster() {
@@ -133,7 +136,9 @@ export function Toaster() {
             }`}
             role="alert"
           >
-            <div className={`narra-toast-icon-wrap narra-toast-icon--${item.type}`}>
+            <div
+              className={`narra-toast-icon-wrap narra-toast-icon--${item.type}`}
+            >
               <Icon size={13} strokeWidth={3} aria-hidden="true" />
             </div>
             <div className="narra-toast-content">

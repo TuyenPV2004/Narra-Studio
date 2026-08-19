@@ -1,4 +1,14 @@
-import { Check, Copy, FolderPlus, LogIn, LogOut, RefreshCw, RotateCw, User, Users } from "lucide-react";
+import {
+  Check,
+  Copy,
+  FolderPlus,
+  LogIn,
+  LogOut,
+  RefreshCw,
+  RotateCw,
+  User,
+  Users,
+} from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { toast } from "@/components/ui/Toast";
@@ -84,8 +94,8 @@ export function GoogleFlowPage() {
           <div>
             <h1 id="flow-title">Phiên tài khoản</h1>
             <p>
-              Mỗi slot giữ session riêng; Narra không chia sẻ cookie giữa các tài
-              khoản.
+              Mỗi slot giữ session riêng; Narra không chia sẻ cookie giữa các
+              tài khoản.
             </p>
           </div>
         </div>

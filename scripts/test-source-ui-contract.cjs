@@ -19,6 +19,7 @@ const canvasGraph = read('pages/AIAgent/components/CanvasGraphPanel.tsx');
 const mediaTools = read('pages/AIAgent/components/MediaToolsPanel.tsx');
 const providerConnections = read('pages/ProviderAccount/ProviderConnectionsPage.tsx');
 const aiProviders = read('pages/ProviderAccount/AiProviderProfilesPanel.tsx');
+const storageIpc = fs.readFileSync(path.join(repositoryRoot, 'apps', 'desktop', 'src', 'electron', 'ipc', 'storage.js'), 'utf8');
 
 for (const token of ['--background', '--surface', '--surface-muted', '--surface-hover', '--foreground', '--muted-foreground', '--border', '--border-strong', '--primary', '--primary-hover', '--primary-muted', '--primary-foreground', '--focus-ring', '--sidebar-width', '--sidebar-collapsed-width', '--header-height']) {
   assert.match(tokens, new RegExp(`${token}:\\s*[^;]+;`), `Missing design token ${token}`);
@@ -32,6 +33,10 @@ assert.match(sidebar, /<nav\b/);
 assert.match(sidebar, /aria-current=/);
 assert.match(header, /<header\b/);
 assert.match(settings, /<Tabs\b/);
+assert.doesNotMatch(settings, /captcha-site-key|captcha-action|setSiteKey|setCaptchaAction/);
+assert.match(settings, /openFolder/);
+assert.match(storageIpc, /const openError = await shell\.openPath\(dir\)/);
+assert.match(storageIpc, /return \{ ok: !openError, error: openError \|\| null \}/);
 assert.match(captcha, /aria-live=/);
 assert.match(canvasGraph, /<audio controls/);
 assert.match(mediaTools, /Audio trim start/);
