@@ -1,5 +1,19 @@
 import { getElectronApi } from "@/services/electron-api/client";
 
+export const MAX_REFERENCE_IMAGES = 5;
+
+export type SaveImageResult =
+  { path: string; saved: true } | { error: string; saved: false };
+
+export interface ReferenceImageSnapshot {
+  id: string;
+  localPath: string;
+  mediaId?: string | null;
+  name: string;
+  size: number;
+  type: string;
+}
+
 export interface ImageGenerationRequest {
   aspect: string;
   model: string;
@@ -7,6 +21,7 @@ export interface ImageGenerationRequest {
   providerId: "veo3";
   referenceImage?: File | undefined;
   referenceImages?: File[] | undefined;
+  referenceImageSnapshots?: ReferenceImageSnapshot[] | undefined;
   resolution?: string | undefined;
   seed: number;
 }
@@ -113,15 +128,22 @@ const generateViaFlowPage = async (
   await getElectronApi()
     .selectAspectOnWebview({ aspect: request.aspect })
     .catch(() => undefined);
-  const refFiles =
-    request.referenceImages && request.referenceImages.length > 0
-      ? request.referenceImages
-      : request.referenceImage
-        ? [request.referenceImage]
-        : [];
-  const referenceFilePaths = refFiles.map((file) =>
-    getElectronApi().getFilePath(file),
-  );
+  const referenceFilePaths =
+    request.referenceImageSnapshots &&
+    request.referenceImageSnapshots.length > 0
+      ? request.referenceImageSnapshots
+          .slice(0, MAX_REFERENCE_IMAGES)
+          .map((s) => s.localPath)
+          .filter(Boolean)
+      : (request.referenceImages && request.referenceImages.length > 0
+          ? request.referenceImages
+          : request.referenceImage
+            ? [request.referenceImage]
+            : []
+        )
+          .slice(0, MAX_REFERENCE_IMAGES)
+          .map((file) => getElectronApi().getFilePath(file))
+          .filter(Boolean);
   const submitted = data(
     await getElectronApi().generateViaPage({
       prompt: request.prompt,
@@ -173,29 +195,87 @@ export const imageApi = {
         : typeof slot.slotId === "number"
           ? slot.slotId
           : 0;
-    const refFiles =
-      request.referenceImages && request.referenceImages.length > 0
-        ? request.referenceImages
-        : request.referenceImage
-          ? [request.referenceImage]
-          : [];
-    const referenceImageNames: string[] = [];
-    for (const refFile of refFiles) {
-      const filePath = getElectronApi().getFilePath(refFile);
-      const uploaded = record(
-        await getElectronApi().uploadImageFromPath({
-          filePath,
+
+    type RefItem = { fileName: string; filePath: string; mimeType: string };
+    const refItems: RefItem[] = [];
+
+    if (
+      request.referenceImageSnapshots &&
+      request.referenceImageSnapshots.length > 0
+    ) {
+      for (const snap of request.referenceImageSnapshots.slice(
+        0,
+        MAX_REFERENCE_IMAGES,
+      )) {
+        if (!snap.localPath || !snap.localPath.trim()) {
+          throw new Error(
+            `Không thể xác định đường dẫn tệp tin tham chiếu "${snap.name}".`,
+          );
+        }
+        refItems.push({
+          fileName: snap.name,
+          filePath: snap.localPath,
+          mimeType: snap.type || "image/png",
+        });
+      }
+    } else {
+      const rawRefFiles =
+        request.referenceImages && request.referenceImages.length > 0
+          ? request.referenceImages
+          : request.referenceImage
+            ? [request.referenceImage]
+            : [];
+      for (const refFile of rawRefFiles.slice(0, MAX_REFERENCE_IMAGES)) {
+        const filePath = getElectronApi().getFilePath(refFile);
+        if (!filePath || !filePath.trim()) {
+          throw new Error(
+            `Không thể lấy đường dẫn tệp tin "${refFile.name}". Vui lòng chọn lại ảnh.`,
+          );
+        }
+        refItems.push({
           fileName: refFile.name,
+          filePath,
           mimeType: refFile.type || "image/png",
-          slotId,
-        }),
-      );
-      const uploadedMedia = record(record(uploaded.data).media);
-      if (typeof uploadedMedia.name !== "string")
-        throw new Error(
-          `Không thể tải ảnh tham chiếu "${refFile.name}" lên Google Flow.`,
+        });
+      }
+    }
+
+    const referenceImageNames: string[] = [];
+    const uploadedItems: Array<{ fileName: string; mediaId: string }> = [];
+
+    for (const item of refItems) {
+      try {
+        const uploaded = record(
+          await getElectronApi().uploadImageFromPath({
+            filePath: item.filePath,
+            fileName: item.fileName,
+            mimeType: item.mimeType,
+            slotId,
+          }),
         );
-      referenceImageNames.push(uploadedMedia.name);
+        const uploadedMedia = record(record(uploaded.data).media);
+        if (typeof uploadedMedia.name !== "string") {
+          throw new Error("Google Flow không trả về mediaId hợp lệ.");
+        }
+        referenceImageNames.push(uploadedMedia.name);
+        uploadedItems.push({
+          fileName: item.fileName,
+          mediaId: uploadedMedia.name,
+        });
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        if (
+          reason.includes("File không tồn tại") ||
+          reason.includes("ENOENT")
+        ) {
+          throw new Error(
+            `Không thể thử lại vì ảnh tham chiếu "${item.fileName}" không còn tồn tại trên máy (đường dẫn: ${item.filePath}).`,
+          );
+        }
+        throw new Error(
+          `Tải ảnh tham chiếu thất bại (${uploadedItems.length}/${refItems.length} ảnh đã tải). Ảnh "${item.fileName}" gặp lỗi: ${reason}`,
+        );
+      }
     }
     const referenceImageName = referenceImageNames[0] || null;
     const response = data(
@@ -282,13 +362,24 @@ export const imageApi = {
     if (!src) throw new Error("Google Flow không trả ảnh chỉnh sửa hợp lệ.");
     return { mediaId, slotId, src };
   },
-  async save(src: string, slotId = 0) {
-    const result = await getElectronApi().saveImageLocally({
-      src,
-      fileName: `img-${Date.now()}.png`,
-      slotId,
-    });
-    return typeof result === "string" ? result : "";
+  async save(src: string, slotId = 0): Promise<SaveImageResult> {
+    try {
+      const result = await getElectronApi().saveImageLocally({
+        src,
+        fileName: `img-${Date.now()}.png`,
+        slotId,
+      });
+      if (typeof result === "string" && result.trim()) {
+        return { path: result, saved: true };
+      }
+      return {
+        error: "Không nhận được đường dẫn tệp tin sau khi lưu.",
+        saved: false,
+      };
+    } catch (err) {
+      const error = err instanceof Error ? err.message : String(err);
+      return { error, saved: false };
+    }
   },
   async crop(
     mediaId: string,

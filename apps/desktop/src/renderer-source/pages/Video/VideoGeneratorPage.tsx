@@ -1,4 +1,9 @@
 import {
+  Brain,
+  CirclePlus,
+  Clapperboard,
+  Clock,
+  Crop,
   Film,
   ImagePlus,
   Pause,
@@ -6,9 +11,19 @@ import {
   RotateCcw,
   Sparkles,
   Trash2,
+  Tv,
+  Volume2,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
+import { Switch } from "@/components/ui/Switch";
 import {
   videoApi,
   type VideoGenerationRequest,
@@ -21,7 +36,7 @@ import type { ProviderId } from "@/types/electron-api";
 const flowModels: VideoModel[] = [
   {
     id: "abra_t2v_8s",
-    label: "Google Abra T2V (Tiêu chuẩn / Miễn phí)",
+    label: "Google Abra T2V",
     durations: [4, 6, 8],
     resolutions: ["720p"],
   },
@@ -41,7 +56,7 @@ const flowModels: VideoModel[] = [
 const defaultFlowModel = flowModels[0]!;
 
 export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
-  const [prompt, setPrompt] = useState("");
+  const [prompts, setPrompts] = useState<string[]>([""]);
   const [mode, setMode] = useState<VideoMode>("text");
   const models = flowModels;
   const [modelId, setModelId] = useState(defaultFlowModel.id);
@@ -106,34 +121,40 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
       (mode === "charsync" && !characterImages.length)
     )
       return;
-    const requests = prompt
-      .split(/\n\s*\n/)
-      .map((value) => requestFor(value.trim()))
+    const validPrompts = prompts.map((p) => p.trim()).filter(Boolean);
+    if (!validPrompts.length) return;
+    const requests = validPrompts
+      .map((p) => requestFor(p))
       .filter((value): value is VideoGenerationRequest =>
         Boolean(value?.prompt),
       );
     if (!requests.length) return;
     queue.enqueue(requests);
-    setPrompt("");
+    setPrompts([""]);
   }, [
     characterImages.length,
     editVideo,
     endImage,
     mode,
-    prompt,
+    prompts,
     queue.enqueue,
     requestFor,
     startImage,
   ]);
   const runPostAction = useCallback(
-    async (taskId: string, mediaId: string, action: "gif" | "1080p" | "4k") => {
+    async (
+      taskId: string,
+      mediaId: string,
+      action: "gif" | "1080p" | "4k",
+      slotId = 0,
+    ) => {
       const actionId = `${taskId}:${action}`;
       setPostAction(actionId);
       queue.updateTask(taskId, { postError: undefined });
       try {
-        if (action === "gif") await videoApi.createGif(mediaId);
+        if (action === "gif") await videoApi.createGif(mediaId, slotId);
         else {
-          const src = await videoApi.upscale(mediaId, action, aspect);
+          const src = await videoApi.upscale(mediaId, action, aspect, slotId);
           queue.updateTask(taskId, { src });
         }
       } catch (error) {
@@ -153,11 +174,15 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
       aria-labelledby="video-title"
     >
       <div className="source-generation-controls">
-        <header>
-          <Film size={22} />
-          <div>
-            <h1 id="video-title">Tạo video</h1>
-            <p>Google Flow video qua phiên tài khoản hiện tại.</p>
+        <header className="source-video-hero">
+          <div className="source-video-hero__left">
+            <span className="source-video-hero__icon">
+              <Clapperboard size={28} aria-hidden="true" />
+            </span>
+            <div>
+              <h1 id="video-title">Tạo video</h1>
+              <p>Google Flow video qua phiên tài khoản hiện tại.</p>
+            </div>
           </div>
         </header>
         <section className="source-control-card">
@@ -239,93 +264,186 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
           )}
         </section>
         <section className="source-control-card">
-          <label>
-            Prompt
-            <textarea
-              rows={5}
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="Mô tả video cần tạo..."
-            />
-          </label>
+          <div className="source-control-card__heading">
+            <h2>
+              Prompt{" "}
+              <span
+                className="source-prompt-required"
+                style={{ color: "#ef4444" }}
+                aria-hidden="true"
+              >
+                *
+              </span>
+            </h2>
+            <span>{prompts.filter((p) => p.trim()).length} prompt</span>
+          </div>
+          <div className="source-prompt-list">
+            {prompts.map((p, index) => (
+              <div className="source-prompt-row" key={index}>
+                <textarea
+                  value={p}
+                  rows={3}
+                  aria-label={`Prompt ${index + 1}`}
+                  placeholder="Mô tả video cần tạo..."
+                  onChange={(event) =>
+                    setPrompts((current) =>
+                      current.map((value, itemIndex) =>
+                        itemIndex === index ? event.target.value : value,
+                      ),
+                    )
+                  }
+                />
+                <button
+                  type="button"
+                  className="source-prompt-delete-btn"
+                  disabled={prompts.length === 1}
+                  aria-label={`Xóa prompt ${index + 1}`}
+                  onClick={() =>
+                    setPrompts((current) =>
+                      current.filter((_, itemIndex) => itemIndex !== index),
+                    )
+                  }
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ))}
+          </div>
+          <Button
+            variant="secondary"
+            className="source-prompt-add-btn"
+            onClick={() => setPrompts((current) => [...current, ""])}
+          >
+            <CirclePlus size={16} />
+            Thêm prompt
+          </Button>
         </section>
-        <section className="source-control-card source-control-grid">
-          <label>
-            Model
-            <select
-              value={modelId}
-              onChange={(event) => setModelId(event.target.value)}
+        <section className="source-control-card">
+          <h2>
+            Thiết lập{" "}
+            <span
+              className="source-prompt-required"
+              style={{ color: "#ef4444" }}
+              aria-hidden="true"
             >
-              {models.map((model) => (
-                <option key={model.id} value={model.id}>
-                  {model.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Thời lượng
-            <select
-              value={duration}
-              onChange={(event) => setDuration(Number(event.target.value))}
+              *
+            </span>
+          </h2>
+          <div className="source-control-field">
+            <span className="source-control-label-text">
+              <Brain size={16} aria-hidden="true" />
+              Model
+            </span>
+            <Select value={modelId} onValueChange={(val) => setModelId(val)}>
+              <SelectTrigger aria-label="Model">
+                <SelectValue placeholder="Chọn model" />
+              </SelectTrigger>
+              <SelectContent>
+                {models.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    {model.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="source-control-field">
+            <span className="source-control-label-text">
+              <Clock size={16} aria-hidden="true" />
+              Thời lượng
+            </span>
+            <Select
+              value={String(duration)}
+              onValueChange={(val) => setDuration(Number(val))}
             >
-              {(selectedModel?.durations || []).map((value) => (
-                <option key={value} value={value}>
-                  {value}s
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Độ phân giải
-            <select
+              <SelectTrigger aria-label="Thời lượng">
+                <SelectValue placeholder="Chọn thời lượng" />
+              </SelectTrigger>
+              <SelectContent>
+                {(selectedModel?.durations || []).map((val) => (
+                  <SelectItem key={val} value={String(val)}>
+                    {val}s
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="source-control-field">
+            <span className="source-control-label-text">
+              <Tv size={16} aria-hidden="true" />
+              Độ phân giải
+            </span>
+            <Select
               value={resolution}
-              onChange={(event) => setResolution(event.target.value)}
+              onValueChange={(val) => setResolution(val)}
             >
-              {(selectedModel?.resolutions || []).map((value) => (
-                <option key={value}>{value}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Tỷ lệ
-            <select
+              <SelectTrigger aria-label="Độ phân giải">
+                <SelectValue placeholder="Chọn độ phân giải" />
+              </SelectTrigger>
+              <SelectContent>
+                {(selectedModel?.resolutions || []).map((val) => (
+                  <SelectItem key={val} value={val}>
+                    {val}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="source-control-field">
+            <span className="source-control-label-text">
+              <Crop size={16} aria-hidden="true" />
+              Tỷ lệ
+            </span>
+            <Select
               value={aspect}
-              onChange={(event) =>
-                setAspect(event.target.value as "landscape" | "portrait")
+              onValueChange={(val) =>
+                setAspect(val as "landscape" | "portrait")
               }
             >
-              <option value="landscape">16:9</option>
-              <option value="portrait">9:16</option>
-            </select>
-          </label>
-          <label className="source-check">
-            <input
-              type="checkbox"
-              checked={generateAudio}
-              onChange={(event) => setGenerateAudio(event.target.checked)}
-            />
-            Tạo âm thanh
-          </label>
+              <SelectTrigger aria-label="Tỷ lệ">
+                <SelectValue placeholder="Chọn tỷ lệ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="landscape">16:9 (Ngang)</SelectItem>
+                <SelectItem value="portrait">9:16 (Dọc)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="source-control-field source-control-field--audio">
+            <span className="source-control-label-text">
+              <Volume2 size={16} aria-hidden="true" />
+              Tạo âm thanh
+            </span>
+            <div className="source-control-switch-inline">
+              <Switch
+                checked={generateAudio}
+                onCheckedChange={setGenerateAudio}
+                aria-label="Tạo âm thanh"
+              />
+            </div>
+          </div>
         </section>
-        <Button
-          disabled={
-            queue.tasks.filter(
-              (task) =>
-                task.status === "queued" || task.status === "processing",
-            ).length >= 20 ||
-            !prompt.trim() ||
-            !selectedModel ||
-            (mode === "image" && !startImage) ||
-            (mode === "startend" && (!startImage || !endImage)) ||
-            (mode === "editvideo" && !editVideo) ||
-            (mode === "charsync" && !characterImages.length)
-          }
-          onClick={() => void generate()}
-        >
-          <Sparkles size={17} />
-          Thêm vào hàng đợi
-        </Button>
+        <div className="source-generation-actions-row">
+          <Button
+            disabled={
+              queue.tasks.filter(
+                (task) =>
+                  task.status === "queued" || task.status === "processing",
+              ).length >= 20 ||
+              !prompts.some((p) => p.trim()) ||
+              !selectedModel ||
+              (mode === "image" && !startImage) ||
+              (mode === "startend" && (!startImage || !endImage)) ||
+              (mode === "editvideo" && !editVideo) ||
+              (mode === "charsync" && !characterImages.length)
+            }
+            onClick={() => void generate()}
+            className="source-generate-main-btn"
+          >
+            <Sparkles size={17} />
+            Thêm vào hàng đợi
+          </Button>
+        </div>
       </div>
       <section className="source-generation-results">
         <header>
@@ -402,7 +520,12 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
                         variant="ghost"
                         disabled={Boolean(postAction)}
                         onClick={() =>
-                          void runPostAction(task.id, task.mediaId!, action)
+                          void runPostAction(
+                            task.id,
+                            task.mediaId!,
+                            action,
+                            task.slotId ?? 0,
+                          )
                         }
                       >
                         {postAction === `${task.id}:${action}`

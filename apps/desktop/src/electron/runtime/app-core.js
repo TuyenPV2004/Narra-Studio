@@ -1028,6 +1028,9 @@ function findFlowWebview(slotId = null) {
   });
   if (byPartition) return byPartition;
 
+  // If a specific slotId was requested, DO NOT fallback to other slots' webviews
+  if (slotId !== null) return null;
+
   // Fallback: find any webview on labs.google
   return all.find(wc => {
     try {

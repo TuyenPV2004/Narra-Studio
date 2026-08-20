@@ -42,7 +42,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/Select";
-import { formatImageError, imageApi } from "@/services/electron-api/image";
+import { getElectronApi } from "@/services/electron-api/client";
+import {
+  MAX_REFERENCE_IMAGES,
+  formatImageError,
+  imageApi,
+  type ReferenceImageSnapshot,
+} from "@/services/electron-api/image";
 import type { ProviderId } from "@/types/electron-api";
 
 function SquareDimensions({
@@ -75,7 +81,9 @@ function SquareDimensions({
   );
 }
 
-type TaskStatus = "cancelled" | "error" | "processing" | "queued" | "success";
+type TaskStatus = "error" | "processing" | "queued" | "success";
+export type SaveStatus = "failed" | "not_saved" | "saved" | "saving";
+
 interface ImageTask {
   aspect?: string | undefined;
   error?: string | undefined;
@@ -83,6 +91,10 @@ interface ImageTask {
   mediaId?: string | null | undefined;
   model?: string | undefined;
   prompt: string;
+  referenceImages?: ReferenceImageSnapshot[] | undefined;
+  savedFileUrl?: string | undefined;
+  saveError?: string | undefined;
+  saveStatus: SaveStatus;
   slotId?: number | undefined;
   src?: string | undefined;
   status: TaskStatus;
@@ -113,7 +125,6 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
     url: string;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const cancelRequestedRef = useRef(false);
 
   const successfulTasks = useMemo(
     () => tasks.filter((t) => Boolean(t.src) && t.status === "success"),
@@ -217,13 +228,16 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
     return () => clearInterval(interval);
   }, [running, progressCount?.current, tasks]);
 
-  const displayPercent = useMemo(() => {
+  const displayBatchPercent = useMemo(() => {
     if (progressCount && progressCount.total > 0) {
       const base = ((progressCount.current - 1) / progressCount.total) * 100;
       const slice = (1 / progressCount.total) * 100;
-      return Math.min(99, Math.round(base + (taskProgress * slice) / 100));
+      return Math.min(
+        95,
+        Math.max(5, Math.round(base + (taskProgress * slice) / 100)),
+      );
     }
-    return Math.min(99, taskProgress);
+    return Math.min(95, Math.max(5, taskProgress));
   }, [progressCount, taskProgress]);
 
   useEffect(() => {
@@ -267,7 +281,12 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
         const filteredNew = validFiles.filter(
           (f) => !existingKeys.has(`${f.name}-${f.size}-${f.lastModified}`),
         );
-        return [...prev, ...filteredNew];
+        const combined = [...prev, ...filteredNew];
+        if (combined.length > MAX_REFERENCE_IMAGES) {
+          alert(`Chỉ được chọn tối đa ${MAX_REFERENCE_IMAGES} ảnh tham chiếu.`);
+          return combined.slice(0, MAX_REFERENCE_IMAGES);
+        }
+        return combined;
       });
     }
     if (event.target) {
@@ -298,22 +317,47 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
     setTasks((current) => current.filter((t) => t.id !== taskId));
   };
 
-  const cancelGeneration = () => {
-    cancelRequestedRef.current = true;
+  const retrySaveTask = async (taskToSave: ImageTask) => {
+    if (!taskToSave.src) return;
     setTasks((current) =>
       current.map((t) =>
-        t.status === "queued" ? { ...t, status: "cancelled" } : t,
+        t.id === taskToSave.id
+          ? { ...t, saveError: undefined, saveStatus: "saving" }
+          : t,
       ),
     );
-    setProgressCount(null);
-    setRunning(false);
+    const saveResult = await imageApi.save(taskToSave.src, taskToSave.slotId);
+    setTasks((current) =>
+      current.map((t) =>
+        t.id === taskToSave.id
+          ? saveResult.saved
+            ? {
+                ...t,
+                saveError: undefined,
+                savedFileUrl: saveResult.path,
+                saveStatus: "saved",
+              }
+            : {
+                ...t,
+                saveError: saveResult.error,
+                saveStatus: "failed",
+              }
+          : t,
+      ),
+    );
   };
 
   const retryTask = async (taskToRetry: ImageTask) => {
     setTasks((current) =>
       current.map((t) =>
         t.id === taskToRetry.id
-          ? { ...t, error: undefined, status: "processing" }
+          ? {
+              ...t,
+              error: undefined,
+              saveError: undefined,
+              saveStatus: "not_saved",
+              status: "processing",
+            }
           : t,
       ),
     );
@@ -325,13 +369,9 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
         model: taskModel,
         prompt: taskToRetry.prompt,
         providerId,
-        referenceImages:
-          referenceImages.length > 0 ? referenceImages : undefined,
+        referenceImageSnapshots: taskToRetry.referenceImages,
         resolution: "2k",
         seed: Math.floor(Math.random() * 9_999_999),
-      });
-      await imageApi.save(result.src, result.slotId).catch((saveErr) => {
-        console.warn("Không thể lưu ảnh local:", saveErr);
       });
       setTasks((current) =>
         current.map((t) =>
@@ -341,10 +381,30 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                 aspect: taskAspect,
                 mediaId: result.mediaId,
                 model: taskModel,
+                saveStatus: "saving",
                 slotId: result.slotId,
                 src: result.src,
                 status: "success",
               }
+            : t,
+        ),
+      );
+      const saveResult = await imageApi.save(result.src, result.slotId);
+      setTasks((current) =>
+        current.map((t) =>
+          t.id === taskToRetry.id
+            ? saveResult.saved
+              ? {
+                  ...t,
+                  saveError: undefined,
+                  savedFileUrl: saveResult.path,
+                  saveStatus: "saved",
+                }
+              : {
+                  ...t,
+                  saveError: saveResult.error,
+                  saveStatus: "failed",
+                }
             : t,
         ),
       );
@@ -366,15 +426,26 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
   const run = useCallback(async () => {
     const usable = prompts.map((prompt) => prompt.trim()).filter(Boolean);
     if (!usable.length || running) return;
-    cancelRequestedRef.current = false;
     const currentAspect = aspect;
     const currentModel = model;
-    const queued = usable.flatMap((prompt) =>
+    const currentSnapshots: ReferenceImageSnapshot[] = referenceImages
+      .slice(0, MAX_REFERENCE_IMAGES)
+      .map((file) => ({
+        id: `${file.name}-${file.size}-${file.lastModified}`,
+        localPath: getElectronApi().getFilePath(file),
+        name: file.name,
+        size: file.size,
+        type: file.type || "image/png",
+      }));
+    const queued: ImageTask[] = usable.flatMap((prompt) =>
       Array.from({ length: quantity }, () => ({
         aspect: currentAspect,
         id: crypto.randomUUID(),
         model: currentModel,
         prompt,
+        referenceImages:
+          currentSnapshots.length > 0 ? currentSnapshots : undefined,
+        saveStatus: "not_saved" as const,
         status: "queued" as const,
       })),
     );
@@ -385,16 +456,6 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
     let completedCount = 0;
 
     for (const queuedTask of queued) {
-      if (cancelRequestedRef.current) {
-        setTasks((current) =>
-          current.map((t) =>
-            t.id === queuedTask.id && t.status === "queued"
-              ? { ...t, status: "cancelled" }
-              : t,
-          ),
-        );
-        continue;
-      }
       completedCount++;
       setProgressCount({ current: completedCount, total: totalCount });
       setTasks((current) =>
@@ -410,13 +471,9 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
           model: taskModel,
           prompt: queuedTask.prompt,
           providerId,
-          referenceImages:
-            referenceImages.length > 0 ? referenceImages : undefined,
+          referenceImageSnapshots: queuedTask.referenceImages,
           resolution: "2k",
           seed: Math.floor(Math.random() * 9_999_999),
-        });
-        await imageApi.save(result.src, result.slotId).catch((saveErr) => {
-          console.warn("Không thể lưu ảnh local:", saveErr);
         });
         setTasks((current) =>
           current.map((task) =>
@@ -426,10 +483,30 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                   aspect: taskAspect,
                   mediaId: result.mediaId,
                   model: taskModel,
+                  saveStatus: "saving",
                   slotId: result.slotId,
                   src: result.src,
                   status: "success",
                 }
+              : task,
+          ),
+        );
+        const saveResult = await imageApi.save(result.src, result.slotId);
+        setTasks((current) =>
+          current.map((task) =>
+            task.id === queuedTask.id
+              ? saveResult.saved
+                ? {
+                    ...task,
+                    saveError: undefined,
+                    savedFileUrl: saveResult.path,
+                    saveStatus: "saved",
+                  }
+                : {
+                    ...task,
+                    saveError: saveResult.error,
+                    saveStatus: "failed",
+                  }
               : task,
           ),
         );
@@ -542,7 +619,9 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
               Ảnh tham chiếu (Tùy chọn)
             </h2>
             {referenceImages.length > 0 && (
-              <span>{referenceImages.length} ảnh</span>
+              <span>
+                Chọn {referenceImages.length}/{MAX_REFERENCE_IMAGES}
+              </span>
             )}
           </div>
           <input
@@ -601,15 +680,17 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                   </button>
                 </div>
               ))}
-              <Button
-                type="button"
-                variant="secondary"
-                className="source-prompt-add-btn"
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <Upload size={16} aria-hidden="true" />
-                Thêm ảnh tham chiếu
-              </Button>
+              {referenceImages.length < MAX_REFERENCE_IMAGES && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  className="source-prompt-add-btn"
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <Upload size={16} aria-hidden="true" />
+                  Thêm ảnh tham chiếu
+                </Button>
+              )}
             </div>
           ) : (
             <Button
@@ -724,17 +805,10 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
             className="source-generate-main-btn"
           >
             <Sparkles size={17} aria-hidden="true" />
-            {running ? `Đang tạo (${displayPercent}%)...` : "Tạo hình ảnh"}
+            {running
+              ? `Đang tạo (~${displayBatchPercent}%)...`
+              : "Tạo hình ảnh"}
           </Button>
-          {running && (
-            <Button
-              variant="danger"
-              className="source-cancel-btn"
-              onClick={cancelGeneration}
-            >
-              Dừng lại
-            </Button>
-          )}
         </div>
       </div>
       <section
@@ -771,7 +845,10 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                     {task.status === "processing" ? (
                       <div className="source-processing-percent-box">
                         <span className="source-processing-percent-value">
-                          {displayPercent}%
+                          ~{Math.min(95, Math.max(5, taskProgress))}%
+                        </span>
+                        <span className="source-processing-estimate-label">
+                          Ước tính tiến độ
                         </span>
                       </div>
                     ) : task.status === "error" ? (
@@ -782,8 +859,6 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                           aria-hidden="true"
                         />
                       </div>
-                    ) : task.status === "cancelled" ? (
-                      <span>🚫 Đã hủy</span>
                     ) : (
                       <div className="source-queued-icon-box">
                         <Clock4
@@ -798,7 +873,7 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                 <div className="source-image-task-content">
                   <header className="source-image-task-header">
                     <div className="source-image-task-badges">
-                      <strong
+                      <span
                         className={`source-task-badge source-task-badge--${task.status}`}
                       >
                         {task.status === "queued"
@@ -807,12 +882,63 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                             ? "Đang tạo"
                             : task.status === "success"
                               ? "Hoàn tất"
-                              : task.status === "cancelled"
-                                ? "Đã hủy"
-                                : "Có lỗi"}
-                      </strong>
+                              : "Thất bại"}
+                      </span>
+                      {task.status === "success" && (
+                        <span
+                          className={`source-task-save-badge source-task-save-badge--${task.saveStatus}`}
+                          title={
+                            task.saveStatus === "failed"
+                              ? `Lưu local thất bại: ${task.saveError || "Không thể lưu"}`
+                              : task.saveStatus === "saving"
+                                ? "Đang lưu vào thư viện local..."
+                                : task.saveStatus === "saved"
+                                  ? task.savedFileUrl
+                                    ? `Đã lưu: ${task.savedFileUrl}`
+                                    : "Đã lưu vào Thư viện"
+                                  : "Chưa lưu vào local"
+                          }
+                        >
+                          {task.saveStatus === "saving"
+                            ? "Đang lưu..."
+                            : task.saveStatus === "failed"
+                              ? "Chưa lưu local"
+                              : task.saveStatus === "saved"
+                                ? "Đã lưu thư viện"
+                                : "Chưa lưu"}
+                        </span>
+                      )}
+                      {task.referenceImages &&
+                        task.referenceImages.length > 0 && (
+                          <span
+                            className="source-task-ref-badge"
+                            title={`Ảnh tham chiếu: ${task.referenceImages
+                              .map((r) => r.name)
+                              .join(", ")}`}
+                          >
+                            <ImageUp size={11} aria-hidden="true" />
+                            {task.referenceImages.length} ảnh tham chiếu
+                          </span>
+                        )}
                       {task.aspect && (
-                        <span className="source-task-aspect-badge">
+                        <span
+                          className="source-task-aspect-badge"
+                          title={`Tỷ lệ: ${
+                            task.aspect.includes("PORTRAIT_THREE_FOUR") ||
+                            task.aspect === "3:4"
+                              ? "3:4"
+                              : task.aspect.includes("LANDSCAPE_FOUR_THREE") ||
+                                  task.aspect === "4:3"
+                                ? "4:3"
+                                : task.aspect.includes("PORTRAIT") ||
+                                    task.aspect === "9:16"
+                                  ? "9:16"
+                                  : task.aspect.includes("SQUARE") ||
+                                      task.aspect === "1:1"
+                                    ? "1:1"
+                                    : "16:9"
+                          }`}
+                        >
                           {task.aspect.includes("PORTRAIT_THREE_FOUR") ||
                           task.aspect === "3:4"
                             ? "3:4"
@@ -845,6 +971,23 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                     <p className="source-task-error-text" role="alert">
                       {task.error}
                     </p>
+                  )}
+                  {task.saveStatus === "failed" && (
+                    <div className="source-task-save-failed-box">
+                      <span className="source-task-save-failed-text">
+                        Ảnh đã tạo nhưng chưa lưu local (
+                        {task.saveError || "Lỗi lưu"}).
+                      </span>
+                      <button
+                        type="button"
+                        className="source-task-save-retry-btn"
+                        onClick={() => void retrySaveTask(task)}
+                        title="Thử lưu lại vào thư mục local"
+                      >
+                        <RotateCcw size={12} aria-hidden="true" />
+                        Thử lưu lại
+                      </button>
+                    </div>
                   )}
                   <footer className="source-image-task-actions">
                     {task.src && (
@@ -889,8 +1032,7 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                       />
                       {copiedId === task.id ? "Đã copy" : "Copy"}
                     </button>
-                    {(task.status === "error" ||
-                      task.status === "cancelled") && (
+                    {task.status === "error" && (
                       <button
                         type="button"
                         className="source-task-action-btn"

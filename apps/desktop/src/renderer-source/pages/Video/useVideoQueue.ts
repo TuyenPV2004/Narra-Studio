@@ -13,6 +13,7 @@ export interface VideoQueueTask {
   postError?: string | undefined;
   prompt: string;
   request?: VideoGenerationRequest;
+  slotId?: number;
   src?: string;
   status: "error" | "processing" | "queued" | "success";
 }
@@ -62,6 +63,7 @@ export function useVideoQueue(
             return {
               ...rest,
               mediaId: result.jobId,
+              slotId: result.slotId,
               src: result.src,
               status: "success",
             };

@@ -25,6 +25,7 @@ export interface VideoGenerationRequest {
 }
 export interface VideoGenerationResult {
   jobId: string;
+  slotId: number;
   src: string;
 }
 
@@ -82,6 +83,7 @@ async function pollFlowVideo(
         });
         return {
           jobId: mediaName,
+          slotId,
           src: `https://labs.google/fx/api/trpc/media.getMediaUrlRedirect?name=${encodeURIComponent(String(item.name || mediaName))}`,
         };
       }
@@ -93,9 +95,9 @@ async function pollFlowVideo(
 }
 
 export const videoApi = {
-  async createGif(mediaId: string): Promise<void> {
+  async createGif(mediaId: string, slotId = 0): Promise<void> {
     const response = record(
-      await getElectronApi().generatePinholeGif({ mediaId }),
+      await getElectronApi().generatePinholeGif({ mediaId, slotId }),
     );
     const encodedGif = record(response.data).encodedGif;
     if (typeof encodedGif !== "string" || !encodedGif)
@@ -103,12 +105,14 @@ export const videoApi = {
     await getElectronApi().saveImageLocally({
       src: `data:image/gif;base64,${encodedGif}`,
       fileName: `video-gif-${Date.now()}.gif`,
+      slotId,
     });
   },
   async upscale(
     mediaId: string,
     resolution: "1080p" | "4k",
     aspect: "landscape" | "portrait",
+    slotId = 0,
   ): Promise<string> {
     const response = record(
       await getElectronApi().upscaleVideo({
@@ -116,6 +120,7 @@ export const videoApi = {
         captchaToken: `EXTENSION_PLACEHOLDER_${Date.now()}`,
         resolution,
         aspectRatio: aspect,
+        slotId,
       }),
     );
     const data = record(response.data);
@@ -139,6 +144,7 @@ export const videoApi = {
           await getElectronApi().pollVideoStatus({
             mediaName: initialName,
             projectId: null,
+            slotId,
           }),
         ).data,
       );
@@ -162,6 +168,7 @@ export const videoApi = {
 
     const downloadResult = await getElectronApi().downloadVideo({
       mediaName: completedName,
+      slotId,
     });
     if (typeof downloadResult === "string" && downloadResult)
       return downloadResult;

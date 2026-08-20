@@ -179,13 +179,309 @@ const storageJsPath = path.resolve(__dirname, "../apps/desktop/src/electron/ipc/
 const storageJsContent = fs.readFileSync(storageJsPath, "utf8");
 assert.equal(storageJsContent.includes("persist:slot-${slotId ?? 0}"), true, "storage.js must use slotId for save-image-locally session partition");
 
-// ── 7. Verify Service Layer Contracts (image.ts) ──────────────────────
+// ── 7. Verify Strict Slot Isolation (No DEFAULTS.projectId Fallbacks) ─
+assert.equal(genJsContent.includes("DEFAULTS.projectId"), false, "generation.js must not contain any DEFAULTS.projectId fallbacks");
+assert.equal(genJsContent.includes("capturedAuth.bearerToken"), false, "generation.js must not fallback to capturedAuth.bearerToken");
+
+// ── 8. Verify Video Post-Processing Slot Propagation ─────────────────
+const videoTsPath = path.resolve(__dirname, "../apps/desktop/src/renderer-source/services/electron-api/video.ts");
+const videoTsContent = fs.readFileSync(videoTsPath, "utf8");
+
+assert.equal(videoTsContent.includes("slotId: number;"), true, "VideoGenerationResult must include slotId");
+assert.equal(videoTsContent.includes("createGif(mediaId: string, slotId = 0)"), true, "videoApi.createGif must accept slotId");
+assert.equal(videoTsContent.includes("async upscale(") && videoTsContent.includes("slotId = 0"), true, "videoApi.upscale must accept slotId");
+assert.equal(videoTsContent.includes("generatePinholeGif({ mediaId, slotId })"), true, "generatePinholeGif must receive slotId");
+assert.equal(videoTsContent.includes("downloadVideo({\n      mediaName: completedName,\n      slotId,\n    })") || videoTsContent.includes("downloadVideo({ mediaName: completedName, slotId })"), true, "downloadVideo must receive slotId");
+
+const useVideoQueuePath = path.resolve(__dirname, "../apps/desktop/src/renderer-source/pages/Video/useVideoQueue.ts");
+const useVideoQueueContent = fs.readFileSync(useVideoQueuePath, "utf8");
+assert.equal(useVideoQueueContent.includes("slotId?: number;"), true, "VideoQueueTask must support slotId");
+assert.equal(useVideoQueueContent.includes("slotId: result.slotId,"), true, "useVideoQueue must store result.slotId");
+
+const videoPagePath = path.resolve(__dirname, "../apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx");
+const videoPageContent = fs.readFileSync(videoPagePath, "utf8");
+assert.equal(videoPageContent.includes("task.slotId ?? 0"), true, "VideoGeneratorPage must pass task.slotId to runPostAction");
+
+// ── 9. Verify Multi-Reference Limits & Validation ─────────────────────
+assert.equal(genJsContent.includes("MAX_REFERENCE_IMAGES = 5"), true, "generation.js must enforce MAX_REFERENCE_IMAGES = 5");
+assert.equal(genJsContent.includes("referenceImageNames.length > MAX_REFERENCE_IMAGES"), true, "generation.js must check max reference image count");
+
+// ── 10. Verify SaveStatus Discriminated Union & UI Invariants ──────────
 const imageTsPath = path.resolve(__dirname, "../apps/desktop/src/renderer-source/services/electron-api/image.ts");
 const imageTsContent = fs.readFileSync(imageTsPath, "utf8");
 
+assert.equal(imageTsContent.includes("export const MAX_REFERENCE_IMAGES = 5;"), true, "image.ts must export MAX_REFERENCE_IMAGES = 5");
+assert.equal(imageTsContent.includes("export type SaveImageResult ="), true, "image.ts must define SaveImageResult union");
 assert.equal(imageTsContent.includes("DEFAULT_IMAGE_MODELS"), true, "image.ts must export DEFAULT_IMAGE_MODELS catalog");
 assert.equal(imageTsContent.includes("formatImageError"), true, "image.ts must export formatImageError");
 assert.equal(imageTsContent.includes("getModels"), true, "image.ts must provide getModels method");
 assert.equal(imageTsContent.includes("resolveMediaUrl"), true, "image.ts must provide semantic resolveMediaUrl method");
 
-console.log("Production Image contract, security & SSRF prevention tests passed successfully.");
+const imageGenPagePath = path.resolve(__dirname, "../apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx");
+const imageGenPageContent = fs.readFileSync(imageGenPagePath, "utf8");
+
+assert.equal(imageGenPageContent.includes("displayBatchPercent"), true, "ImageGeneratorPage must use displayBatchPercent for batch progress");
+assert.equal(imageGenPageContent.includes("saveStatus: SaveStatus;"), true, "ImageTask must declare non-optional saveStatus");
+assert.equal(imageGenPageContent.includes("saveStatus || \"saved\""), false, "UI must never default missing saveStatus to 'saved'");
+assert.equal(imageGenPageContent.includes("\"cancelled\""), false, "TaskStatus must not contain dead code 'cancelled'");
+
+// ── 11. Behavioral Runtime Mock Tests for Slot Isolation & Mismatch ───
+const sessionJsPath = path.resolve(__dirname, "../apps/desktop/src/electron/ipc/flow/session.js");
+const sessionJsContent = fs.readFileSync(sessionJsPath, "utf8");
+assert.equal(sessionJsContent.includes("capturedAuth"), false, "session.js must not contain any capturedAuth references");
+
+const registeredHandlers = {};
+const mockIpcMain = {
+  handle: (channel, handler) => {
+    registeredHandlers[channel] = handler;
+  },
+};
+
+const mockSlots = [
+  { id: 0, bearerToken: "Bearer slot-0-token", projectId: "project-0", partition: "persist:slot-0", cookies: "c=0" },
+  { id: 1, bearerToken: "Bearer slot-1-token", projectId: "project-1", partition: "persist:slot-1", cookies: "c=1" },
+  { id: 2, bearerToken: "Bearer slot-2-token", projectId: "project-2", partition: "persist:slot-2", cookies: "c=2" },
+  { id: 3, bearerToken: null, projectId: null, partition: "persist:slot-3", cookies: "" },
+];
+
+const mockGetSlot = (slotId = 0) => {
+  const s = mockSlots.find(slot => slot.id === Number(slotId));
+  if (!s) throw new Error(`Slot ${slotId} not found`);
+  return s;
+};
+
+// Register Session IPC
+const registerFlowSessionIpc = require(sessionJsPath);
+registerFlowSessionIpc({
+  app: {},
+  BrowserWindow: class {},
+  ipcMain: mockIpcMain,
+  session: { fromPartition: () => ({ cookies: { get: async () => [] }, setUserAgent: () => {} }) },
+  clipboard: { writeText: () => {} },
+  path,
+  https: {},
+  http: {},
+  fs,
+  runtime: {},
+  loadSettings: () => ({}),
+  saveSettings: () => {},
+  DEFAULTS: { userAgent: "test-ua" },
+  accountSlots: mockSlots,
+  getSlot: mockGetSlot,
+  pickRandomSlot: () => mockSlots[0],
+  refreshCapturedCookies: async () => {},
+  fetchSlotSession: async () => {},
+  restoreSlotSession: async () => {},
+  restoreAllSlotSessions: async () => {},
+  getIsRestoringSessions: () => false,
+  findFlowWebview: () => null,
+  setActiveWebviewSlot: () => {},
+});
+
+// Register Generation IPC
+const registerGenerationIpc = require(genJsPath);
+registerGenerationIpc({
+  app: {},
+  BrowserWindow: class {},
+  ipcMain: mockIpcMain,
+  session: { fromPartition: () => ({ cookies: { get: async () => [] } }) },
+  clipboard: {},
+  protocol: {},
+  net: {},
+  shell: {},
+  dialog: {},
+  path,
+  https: {},
+  http: {},
+  fs,
+  os: require("os"),
+  crypto: require("crypto"),
+  pathToFileURL: (p) => new URL(`file:///${p}`),
+  fileURLToPath: () => "",
+  captchaBridge: {},
+  runtime: {},
+  getFfmpegBin: () => "",
+  maybePromoteFilterComplexToScript: (cmd) => cmd,
+  logFfmpegSpawnDiagnostics: () => {},
+  truncatePreview: (s) => s,
+  SESSION_PARTITION: "persist:test",
+  MAX_SLOTS: 5,
+  isDev: false,
+  SETTINGS_FILE: "",
+  loadSettings: () => ({}),
+  saveSettings: () => {},
+  getVideoOutputDir: () => "",
+  getImageOutputDir: () => "",
+  getNextFilename: () => "file.png",
+  generateUUID: () => "mock-uuid-1234",
+  makeApiRequest: async () => ({}),
+  makeApiRequestViaWebview: async () => ({}),
+  buildCleanUserAgent: () => "ua",
+  DEFAULTS: {},
+  accountSlots: mockSlots,
+  getSlot: mockGetSlot,
+  slotRequestCounts: [0, 0, 0, 0],
+  markSlotBusy: () => {},
+  markSlotFree: () => {},
+  pickRandomSlot: () => mockSlots[0],
+  refreshCapturedCookies: async () => {},
+  fetchSlotSession: async () => {},
+  clearSlotSessionData: () => {},
+  fetchSlotEmail: async () => {},
+});
+
+(async () => {
+  // 1. Verify get-auth-info slot scoping
+  const slot1Auth = await registeredHandlers["get-auth-info"]({}, { slotId: 1 });
+  assert.equal(slot1Auth.hasBearerToken, true);
+  assert.equal(slot1Auth.projectId, "project-1");
+  assert.equal(slot1Auth.bearerPreview.startsWith("Bearer slot-1-token"), true);
+
+  const slot3Auth = await registeredHandlers["get-auth-info"]({}, { slotId: 3 });
+  assert.equal(slot3Auth.hasBearerToken, false);
+  assert.equal(slot3Auth.projectId, null);
+
+  // 2. Verify set-manual-auth updates only target slot
+  await registeredHandlers["set-manual-auth"]({}, { slotId: 2, bearerToken: "new-token-2", projectId: "proj-manual-2" });
+  assert.equal(mockSlots[2].bearerToken, "Bearer new-token-2");
+  assert.equal(mockSlots[2].projectId, "proj-manual-2");
+  assert.equal(mockSlots[0].projectId, "project-0");
+  assert.equal(mockSlots[1].projectId, "project-1");
+
+  // 3. Verify extract-auth-from-webview
+  const slot2Extract = await registeredHandlers["extract-auth-from-webview"]({}, { slotId: 2 });
+  assert.equal(slot2Extract.projectId, "proj-manual-2");
+
+  // 4. Slot 1 with Project ID of Slot 0 must throw mismatch error
+  await assert.rejects(
+    async () => {
+      await registeredHandlers["generate-image"]({}, {
+        prompt: "test",
+        slotId: 1,
+        projectId: "project-0",
+      });
+    },
+    { message: "Project ID không thuộc Slot 1." },
+    "Sending Slot 0 project ID to Slot 1 must be rejected"
+  );
+
+  // 5. Slot 3 (missing bearer token) throws token error
+  await assert.rejects(
+    async () => {
+      await registeredHandlers["generate-image"]({}, {
+        prompt: "test",
+        slotId: 3,
+      });
+    },
+    /Chưa có Bearer token/,
+    "Slot without bearer token must throw"
+  );
+
+  // 6. Over 5 reference images must be rejected
+  await assert.rejects(
+    async () => {
+      await registeredHandlers["generate-image"]({}, {
+        prompt: "test",
+        slotId: 1,
+        referenceImageNames: ["1", "2", "3", "4", "5", "6"],
+      });
+    },
+    /vượt quá giới hạn tối đa/,
+    "Over 5 reference images must be rejected"
+  );
+
+  // 7. generate-video with project ID mismatch
+  await assert.rejects(
+    async () => {
+      await registeredHandlers["generate-video"]({}, {
+        prompt: "test",
+        slotId: 1,
+        projectId: "project-0",
+      });
+    },
+    { message: "Project ID không thuộc Slot 1." },
+    "generate-video mismatch project ID must be rejected"
+  );
+
+  // 8. poll-video-status with project ID mismatch
+  await assert.rejects(
+    async () => {
+      await registeredHandlers["poll-video-status"]({}, {
+        mediaName: "media-1",
+        slotId: 1,
+        projectId: "project-0",
+      });
+    },
+    { message: "Project ID không thuộc Slot 1." },
+    "poll-video-status mismatch project ID must be rejected"
+  );
+
+  // 9. Slot with null projectId must reject foreign pid and not bypass isolation
+  mockSlots[3].bearerToken = "Bearer slot-3-token";
+  mockSlots[3].projectId = null;
+  await assert.rejects(
+    async () => {
+      await registeredHandlers["generate-image"]({}, {
+        prompt: "test",
+        slotId: 3,
+        projectId: "project-0",
+      });
+    },
+    { message: "Project ID không thuộc Slot 3." },
+    "Foreign pid when slot.projectId is null must be rejected"
+  );
+  await assert.rejects(
+    async () => {
+      await registeredHandlers["generate-image"]({}, {
+        prompt: "test",
+        slotId: 3,
+      });
+    },
+    { message: "Slot 3 chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước." },
+    "Slot with null projectId without pid must be rejected"
+  );
+
+  // 10. Verify sync-session propagates slot.id to refreshCapturedCookies
+  let refreshedSlotId = null;
+  const mockSyncIpc = {};
+  const mockSyncIpcMain = { handle: (channel, fn) => { mockSyncIpc[channel] = fn; } };
+  registerFlowSessionIpc({
+    app: {},
+    BrowserWindow: class {},
+    ipcMain: mockSyncIpcMain,
+    session: { fromPartition: () => ({ cookies: { get: async () => [] }, setUserAgent: () => {} }) },
+    clipboard: { writeText: () => {} },
+    path,
+    https: {},
+    http: {},
+    fs,
+    runtime: {},
+    loadSettings: () => ({}),
+    saveSettings: () => {},
+    DEFAULTS: { userAgent: "test-ua" },
+    accountSlots: mockSlots,
+    getSlot: mockGetSlot,
+    pickRandomSlot: () => mockSlots[0],
+    refreshCapturedCookies: async (sId) => { refreshedSlotId = sId; },
+    fetchSlotSession: async () => {},
+    restoreSlotSession: async () => {},
+    restoreAllSlotSessions: async () => {},
+    getIsRestoringSessions: () => false,
+    findFlowWebview: () => null,
+    setActiveWebviewSlot: () => {},
+  });
+
+  await mockSyncIpc["sync-session"]({}, { slotId: 2 });
+  assert.equal(refreshedSlotId, 2, "sync-session must pass slot.id (2) to refreshCapturedCookies");
+
+  // 11. Verify findFlowWebview does not fallback across slots when slotId is given
+  const appCoreJsPath = path.resolve(__dirname, "../apps/desktop/src/electron/runtime/app-core.js");
+  const appCoreJsContent = fs.readFileSync(appCoreJsPath, "utf8");
+  assert.equal(
+    appCoreJsContent.includes("if (slotId !== null) return null;"),
+    true,
+    "findFlowWebview must not fallback to other slots when slotId is specified"
+  );
+
+  console.log("All production Image & Video contract, security, behavioral runtime mock & SSRF tests passed successfully.");
+})();

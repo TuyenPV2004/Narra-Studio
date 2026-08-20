@@ -141,11 +141,31 @@ export interface NarraElectronApi {
     payload: Record<string, unknown>,
   ) => Promise<unknown>;
   uploadOmniVideo: (payload: Record<string, unknown>) => Promise<unknown>;
-  pollVideoStatus: (payload: Record<string, unknown>) => Promise<unknown>;
-  queueVideoDownload: (payload: Record<string, unknown>) => Promise<unknown>;
-  downloadVideo: (payload: { mediaName: string }) => Promise<unknown>;
-  generatePinholeGif: (payload: { mediaId: string }) => Promise<unknown>;
-  upscaleVideo: (payload: Record<string, unknown>) => Promise<unknown>;
+  pollVideoStatus: (payload: {
+    mediaName: string;
+    projectId?: string | null;
+    slotId?: number;
+  }) => Promise<unknown>;
+  queueVideoDownload: (payload: {
+    itemId: string;
+    mediaName: string;
+    slotId?: number;
+  }) => Promise<unknown>;
+  downloadVideo: (payload: {
+    mediaName: string;
+    slotId?: number;
+  }) => Promise<unknown>;
+  generatePinholeGif: (payload: {
+    mediaId: string;
+    slotId?: number;
+  }) => Promise<unknown>;
+  upscaleVideo: (payload: {
+    aspectRatio: string;
+    captchaToken?: string;
+    mediaId: string;
+    resolution: string;
+    slotId?: number;
+  }) => Promise<unknown>;
   listImageFiles: () => Promise<unknown>;
   listVideoFiles: () => Promise<unknown>;
   deleteFile: (path: string) => Promise<unknown>;

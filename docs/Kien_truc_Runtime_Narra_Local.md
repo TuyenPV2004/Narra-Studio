@@ -36,6 +36,13 @@ Narra Studio là ứng dụng Electron single-user. Renderer chính được bui
 - Vite build renderer source vào `dist`; Electron Main/config được sao chép nguyên trạng vào `dist-electron` và `config`.
 - `.package-stage`, `release` và `release-*` là output tái tạo được, không phải source.
 
+## Nguồn tham khảo bên ngoài
+
+- Repository [flowkit](https://github.com/crisng95/flowkit) và tài liệu [flowkit/PLAN.md](https://github.com/crisng95/flowkit/blob/main/PLAN.md) chỉ là nguồn tham khảo để tìm ý tưởng và đối chiếu hướng triển khai; chúng không phải source of truth của Narra Studio.
+- Không mặc định tin tưởng hoặc áp dụng nguyên trạng code, kiến trúc, endpoint, payload, khóa/model identifier, quy trình xác thực, CAPTCHA, header hay nhận định kỹ thuật từ các nguồn này.
+- Trước khi sử dụng bất kỳ thông tin nào từ flowkit, phải kiểm tra độc lập với yêu cầu mới nhất của người dùng, tài liệu kiến trúc này, source thực tế trong `apps/desktop/src` và hành vi runtime đã được xác minh.
+- Khi nguồn tham khảo mâu thuẫn với source of truth hoặc chưa thể kiểm chứng, không áp dụng vào Narra Studio; phải ghi rõ phần chưa xác minh và rủi ro liên quan.
+
 ## Giới hạn kiểm chứng
 
 Kiểm tra local có thể xác nhận cú pháp, nạp module khởi động, IPC workspace và nội dung package. Đăng nhập Google, CAPTCHA, provider trả phí và tiêu credit phải được người dùng kiểm tra bằng tài khoản của mình.

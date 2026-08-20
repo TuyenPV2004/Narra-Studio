@@ -39,7 +39,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     buildCleanUserAgent,
     DEFAULTS,
     accountSlots,
-    capturedAuth,
     getSlot,
     slotRequestCounts,
     markSlotBusy,
@@ -142,9 +141,16 @@ ipcMain.handle('generate-image', async (_, { prompt, captchaToken, model, aspect
     slot.bearerToken = manualBt.startsWith('Bearer ') ? manualBt : 'Bearer ' + manualBt;
   }
 
-  const projectId = pid || slot.projectId || DEFAULTS.projectId;
   if (!slot.bearerToken) {
     throw new Error('Chưa có Bearer token! Vui lòng:\n1. Vào tab WebView → tương tác với Flow (tạo project, generate ảnh)\n2. Hoặc vào Cài đặt → nhập Bearer token thủ công');
+  }
+
+  if (pid && pid !== slot.projectId) {
+    throw new Error(`Project ID không thuộc Slot ${slot.id}.`);
+  }
+  const projectId = slot.projectId;
+  if (!projectId) {
+    throw new Error(`Slot ${slot.id} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
   }
 
   const normalizedAspect = normalizeImageAspect(aspectRatio);
@@ -157,13 +163,30 @@ ipcMain.handle('generate-image', async (_, { prompt, captchaToken, model, aspect
     projectId, tool: 'PINHOLE', sessionId,
   };
 
-  // Build imageInputs — support multiple reference images
+  // Build imageInputs — enforce max 5 reference images in Main process
+  const MAX_REFERENCE_IMAGES = 5;
   let imageInputs = [];
-  if (referenceImageNames && referenceImageNames.length > 0) {
-    imageInputs = referenceImageNames.map(name => ({ imageInputType: 'IMAGE_INPUT_TYPE_REFERENCE', name }));
-    console.log(`[SLOT-${slot.id}][API] Using ${referenceImageNames.length} reference images:`, referenceImageNames);
-  } else if (referenceImageName) {
-    imageInputs = [{ imageInputType: 'IMAGE_INPUT_TYPE_REFERENCE', name: referenceImageName }];
+  if (referenceImageNames !== undefined && referenceImageNames !== null) {
+    if (!Array.isArray(referenceImageNames)) {
+      throw new Error('referenceImageNames phải là một mảng chuỗi.');
+    }
+    if (referenceImageNames.length > MAX_REFERENCE_IMAGES) {
+      throw new Error(`Số lượng ảnh tham chiếu vượt quá giới hạn tối đa (${MAX_REFERENCE_IMAGES} ảnh).`);
+    }
+    const cleanNames = referenceImageNames
+      .map(name => (typeof name === 'string' ? name.trim() : ''))
+      .filter(Boolean);
+    const uniqueNames = Array.from(new Set(cleanNames));
+    if (uniqueNames.length > MAX_REFERENCE_IMAGES) {
+      throw new Error(`Số lượng ảnh tham chiếu vượt quá giới hạn tối đa (${MAX_REFERENCE_IMAGES} ảnh).`);
+    }
+    imageInputs = uniqueNames.map(name => ({
+      imageInputType: 'IMAGE_INPUT_TYPE_REFERENCE',
+      name: name.slice(0, 200),
+    }));
+    console.log(`[SLOT-${slot.id}][API] Using ${imageInputs.length} reference images:`, uniqueNames);
+  } else if (referenceImageName && typeof referenceImageName === 'string' && referenceImageName.trim()) {
+    imageInputs = [{ imageInputType: 'IMAGE_INPUT_TYPE_REFERENCE', name: referenceImageName.trim().slice(0, 200) }];
     console.log(`[SLOT-${slot.id}][API] Using reference image: ${referenceImageName}`);
   }
 
@@ -227,11 +250,14 @@ const MAX_IMAGE_BASE64_LENGTH = 35 * 1024 * 1024; // ~35MB Base64 string (~25MB 
 
 ipcMain.handle('edit-image', async (_, { prompt, captchaToken, baseMediaId, model, aspectRatio, seed, slotId = 0 }) => {
   const slot = getSlot(slotId);
-  const bearerToken = slot?.bearerToken || capturedAuth.bearerToken;
+  const bearerToken = slot?.bearerToken;
   if (!bearerToken) {
-    throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
+    throw new Error(`Slot ${slotId} chưa được xác thực hoặc chưa có phiên Google Flow.`);
   }
-  const projectId = slot?.projectId || capturedAuth.projectId || DEFAULTS.projectId;
+  const projectId = slot.projectId;
+  if (!projectId) {
+    throw new Error(`Slot ${slotId} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
+  }
 
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
@@ -263,11 +289,14 @@ ipcMain.handle('edit-image', async (_, { prompt, captchaToken, baseMediaId, mode
 // ── Upscale Image (1K / 2K / 4K) ─────────────────────────────────────
 ipcMain.handle('upscale-image', async (_, { mediaId, captchaToken, targetResolution, slotId = 0 }) => {
   const slot = getSlot(slotId);
-  const bearerToken = slot?.bearerToken || capturedAuth.bearerToken;
+  const bearerToken = slot?.bearerToken;
   if (!bearerToken) {
-    throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
+    throw new Error(`Slot ${slotId} chưa được xác thực hoặc chưa có phiên Google Flow.`);
   }
-  const projectId = slot?.projectId || capturedAuth.projectId || DEFAULTS.projectId;
+  const projectId = slot.projectId;
+  if (!projectId) {
+    throw new Error(`Slot ${slotId} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
+  }
   const sessionId = `;${Date.now()}`;
 
   const body = {
@@ -288,32 +317,36 @@ ipcMain.handle('upscale-image', async (_, { mediaId, captchaToken, targetResolut
 });
 
 // ── Generate Pinhole GIF (270p animated GIF from video) ───────────────
-ipcMain.handle('generate-pinhole-gif', async (_, { mediaId }) => {
-  if (!capturedAuth.bearerToken) {
-    throw new Error('Chưa có Bearer token!');
+ipcMain.handle('generate-pinhole-gif', async (_, { mediaId, slotId = 0 }) => {
+  const slot = getSlot(slotId);
+  if (!slot?.bearerToken) {
+    throw new Error(`Slot ${slotId} chưa có Bearer token!`);
   }
   const body = {
     mediaGenerationId: mediaId,
     mediaId,
   };
-  console.log(`[API] Generate Pinhole GIF mediaId=${mediaId}`);
+  console.log(`[SLOT-${slotId}][API] Generate Pinhole GIF mediaId=${mediaId}`);
   const url = 'https://aisandbox-pa.googleapis.com/v1/video:generatePinholeGif';
-  return makeApiRequestViaWebview(url, body);
+  return makeApiRequestViaWebview(url, body, slotId);
 });
 
 // ── Upscale Video (1080p / 4K) ────────────────────────────────────────
-ipcMain.handle('upscale-video', async (_, { mediaId, captchaToken, resolution, aspectRatio }) => {
-  if (!capturedAuth.bearerToken) throw new Error('Chưa có Bearer token!');
+ipcMain.handle('upscale-video', async (_, { mediaId, captchaToken, resolution, aspectRatio, slotId = 0 }) => {
+  const slot = getSlot(slotId);
+  if (!slot?.bearerToken) throw new Error(`Slot ${slotId} chưa có Bearer token!`);
   const resMap = {
     '1080p': { res: 'VIDEO_RESOLUTION_1080P', modelKey: 'veo_3_1_upsampler_1080p' },
     '4k': { res: 'VIDEO_RESOLUTION_4K', modelKey: 'veo_3_1_upsampler_4k' },
   };
   const { res, modelKey } = resMap[resolution] || resMap['1080p'];
   const aspectVal = aspectRatio === 'portrait' ? 'VIDEO_ASPECT_RATIO_PORTRAIT' : 'VIDEO_ASPECT_RATIO_LANDSCAPE';
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slotId} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
   const body = {
     mediaGenerationContext: { batchId: require('crypto').randomUUID() },
     clientContext: {
-      projectId: capturedAuth.projectId || '',
+      projectId,
       tool: 'PINHOLE',
       userPaygateTier: 'PAYGATE_TIER_TWO',
       sessionId: `;${Date.now()}`,
@@ -329,9 +362,9 @@ ipcMain.handle('upscale-video', async (_, { mediaId, captchaToken, resolution, a
     }],
     useV2ModelConfig: true,
   };
-  console.log(`[API] Upscale video ${resolution} mediaId=${mediaId}`);
+  console.log(`[SLOT-${slotId}][API] Upscale video ${resolution} mediaId=${mediaId}`);
   const url = 'https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoUpsampleVideo';
-  return makeApiRequestViaWebview(url, body, 0, 'VIDEO_GENERATION');
+  return makeApiRequestViaWebview(url, body, slotId, 'VIDEO_GENERATION');
 });
 
 
@@ -339,9 +372,9 @@ ipcMain.handle('upscale-video', async (_, { mediaId, captchaToken, resolution, a
 // ── Transform Image (Crop, etc) ───────────────────────────────────────
 ipcMain.handle('transform-image', async (_, { mediaId, cropCoordinates, slotId = 0 }) => {
   const slot = getSlot(slotId);
-  const bearerToken = slot?.bearerToken || capturedAuth.bearerToken;
+  const bearerToken = slot?.bearerToken;
   if (!bearerToken) {
-    throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
+    throw new Error(`Slot ${slotId} chưa có Bearer token hoặc chưa được xác thực!`);
   }
 
   const body = {
@@ -379,9 +412,10 @@ ipcMain.handle('upload-image', async (_, { imageBytes, fileName, mimeType, slotI
   }
 
   const slot = getSlot(slotId);
-  const bearerToken = slot?.bearerToken || capturedAuth.bearerToken;
+  const bearerToken = slot?.bearerToken;
   if (!bearerToken) throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
-  const projectId = slot?.projectId || capturedAuth.projectId || DEFAULTS.projectId;
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slotId} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
 
   const safeFileName = path.basename(fileName || 'image.jpg').replace(/[^a-zA-Z0-9._-]/g, '_');
 
@@ -409,9 +443,10 @@ ipcMain.handle('upload-image-from-path', async (_, { filePath, fileName, mimeTyp
   }
 
   const slot = getSlot(slotId);
-  const bearerToken = slot?.bearerToken || capturedAuth.bearerToken;
+  const bearerToken = slot?.bearerToken;
   if (!bearerToken) throw new Error(`Chưa có Bearer token cho slot ${slotId}!`);
-  const projectId = slot?.projectId || capturedAuth.projectId || DEFAULTS.projectId;
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slotId} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
 
   // Resolve file:// URL → absolute path (fix Windows C:\C:\ double drive + %20 encoding)
   const { fileURLToPath } = require('url');
@@ -484,9 +519,11 @@ ipcMain.handle('upload-image-from-path', async (_, { filePath, fileName, mimeTyp
 });
 
 // ── Upload Image via Webview (có reCAPTCHA, trả về CDN URL) ──────────
-ipcMain.handle('upload-image-via-webview', async (_, { filePath, imageBytes, fileName, mimeType }) => {
-  if (!capturedAuth.bearerToken) throw new Error('Chưa có Bearer token!');
-  const projectId = capturedAuth.projectId || DEFAULTS.projectId;
+ipcMain.handle('upload-image-via-webview', async (_, { filePath, imageBytes, fileName, mimeType, slotId = 0 }) => {
+  const slot = getSlot(slotId);
+  if (!slot?.bearerToken) throw new Error(`Slot ${slotId} chưa có Bearer token!`);
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slotId} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
 
   let base64 = imageBytes;
   if (filePath && !base64) {
@@ -503,18 +540,22 @@ ipcMain.handle('upload-image-via-webview', async (_, { filePath, imageBytes, fil
     mimeType: mimeType || 'image/jpeg',
   };
 
-  console.log(`[API-WEBVIEW] Upload image via webview: ${body.fileName}`);
+  console.log(`[SLOT-${slotId}][API-WEBVIEW] Upload image via webview: ${body.fileName}`);
   const url = 'https://aisandbox-pa.googleapis.com/v1/flow/uploadImage';
-  return makeApiRequestViaWebview(url, body);
+  return makeApiRequestViaWebview(url, body, slotId);
 });
 
 // ── Generate Video (legacy — used by VideoPage) ──────────────────────
 ipcMain.handle('generate-video', async (_, { prompt, captchaToken, videoModelKey, aspectRatio, seed, projectId: pid, slotId }) => {
   const slot = getSlot(slotId);
-  const projectId = pid || slot.projectId || DEFAULTS.projectId;
   if (!slot.bearerToken) {
     throw new Error('Chưa có Bearer token! Vào tab WebView → tương tác với Flow trước.');
   }
+  if (pid && pid !== slot.projectId) {
+    throw new Error(`Project ID không thuộc Slot ${slot.id}.`);
+  }
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slot.id} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
 
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
@@ -547,8 +588,9 @@ ipcMain.handle('generate-video', async (_, { prompt, captchaToken, videoModelKey
 // ── Generate Video (Text to Video) ────────────────────────────────────
 ipcMain.handle('generate-video-text', async (_, { prompt, captchaToken, videoModelKey, aspectRatio, seed, slotId }) => {
   const slot = getSlot(slotId);
-  const projectId = slot.projectId || DEFAULTS.projectId;
   if (!slot.bearerToken) throw new Error('Chưa có Bearer token!');
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slot.id} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
 
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
@@ -581,8 +623,9 @@ ipcMain.handle('generate-video-text', async (_, { prompt, captchaToken, videoMod
 // ── Generate Video from Start Image (Image-to-Video) ──────────────────
 ipcMain.handle('generate-video-start-image', async (_, { prompt, captchaToken, videoModelKey, aspectRatio, seed, mediaId, cropCoordinates, slotId }) => {
   const slot = getSlot(slotId);
-  const projectId = slot.projectId || DEFAULTS.projectId;
   if (!slot.bearerToken) throw new Error('Chưa có Bearer token!');
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slot.id} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
 
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
@@ -614,8 +657,9 @@ ipcMain.handle('generate-video-start-image', async (_, { prompt, captchaToken, v
 // ── Generate Video from Start + End Image ─────────────────────────────
 ipcMain.handle('generate-video-start-end-image', async (_, { prompt, captchaToken, videoModelKey, aspectRatio, seed, startMediaId, endMediaId, startCrop, endCrop, slotId }) => {
   const slot = getSlot(slotId);
-  const projectId = slot.projectId || DEFAULTS.projectId;
   if (!slot.bearerToken) throw new Error('Chưa có Bearer token!');
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slot.id} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
 
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
@@ -648,8 +692,9 @@ ipcMain.handle('generate-video-start-end-image', async (_, { prompt, captchaToke
 // ── Generate Video with Reference Images (Character Sync) ─────────────
 ipcMain.handle('generate-video-reference-images', async (_, { prompt, captchaToken, videoModelKey, aspectRatio, seed, referenceMediaIds, slotId }) => {
   const slot = getSlot(slotId);
-  const projectId = slot.projectId || DEFAULTS.projectId;
   if (!slot.bearerToken) throw new Error('Chưa có Bearer token!');
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slot.id} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
 
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
@@ -760,14 +805,9 @@ ipcMain.handle('generate-flow-voice-preview', async (_, {
   slotId = 0,
 } = {}) => {
   const slot = getSlot(slotId);
-  const bridgeStatus = typeof captchaBridge?.getExtensionStatus === 'function' ? captchaBridge.getExtensionStatus() : {};
-  let extProjectId = null;
-  if (bridgeStatus.labsTabUrl) {
-    const match = String(bridgeStatus.labsTabUrl).match(/project\/([a-zA-Z0-9_-]+)/);
-    if (match && match[1]) extProjectId = match[1];
-  }
-  const projectId = extProjectId || slot.projectId || capturedAuth.projectId || DEFAULTS.projectId;
-  if (!slot.bearerToken) throw new Error('Chưa có Bearer token!');
+  if (!slot.bearerToken) throw new Error(`Slot ${slotId} chưa có Bearer token!`);
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slotId} chưa có Project ID!`);
 
   const safeDialog = String(dialog || '').trim().slice(0, 120);
   const safePerformance = String(voicePerformance || '').trim().slice(0, 500);
@@ -830,8 +870,9 @@ ipcMain.handle('generate-flow-voice-preview', async (_, {
 // With video input → batchAsyncGenerateVideoEditVideo + abra_edit
 ipcMain.handle('generate-video-edit-video', async (_, { prompt, captchaToken, videoModelKey, aspectRatio, seed, videoInputMediaId, startFrameIndex, endFrameIndex, referenceImageMediaIds, referenceAudioMediaIds, slotId, duration }) => {
   const slot = getSlot(slotId);
-  const projectId = slot.projectId || DEFAULTS.projectId;
   if (!slot.bearerToken) throw new Error('Chưa có Bearer token!');
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slot.id} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
 
   const sessionId = `;${Date.now()}`;
   const batchId = generateUUID();
@@ -1004,7 +1045,9 @@ ipcMain.handle('get-spy-logs', async (_, { slotId = 0 }) => {
 // Last chunk uses "upload, finalize" (confirmed correct protocol).
 ipcMain.handle('upload-omni-video', async (_, { filePath, slotId = 0 }) => {
   const slot = getSlot(slotId);
-  const projectId = slot.projectId || DEFAULTS.projectId;
+  if (!slot?.bearerToken) throw new Error(`Slot ${slotId} chưa có Bearer token!`);
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slotId} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
   const pathMod = require('path');
   const os = require('os');
   const { execFile } = require('child_process');
@@ -1210,8 +1253,12 @@ ipcMain.handle('upload-omni-video', async (_, { filePath, slotId = 0 }) => {
 // ── Poll Video Status ─────────────────────────────────────────────────
 ipcMain.handle('poll-video-status', async (_, { mediaName, projectId: pid, slotId }) => {
   const slot = getSlot(slotId);
-  const projectId = pid || slot.projectId || DEFAULTS.projectId;
   if (!slot.bearerToken) throw new Error('Chưa có Bearer token!');
+  if (pid && pid !== slot.projectId) {
+    throw new Error(`Project ID không thuộc Slot ${slot.id}.`);
+  }
+  const projectId = slot.projectId;
+  if (!projectId) throw new Error(`Slot ${slot.id} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`);
 
   const body = { media: [{ name: mediaName, projectId }] };
   console.log(`[SLOT-${slot.id}][API] Polling video status: ${mediaName}`);
@@ -1411,8 +1458,8 @@ ipcMain.handle('queue-video-download', async (_, { mediaName, itemId, slotId }) 
 });
 
 // Backward compat: download-video vẫn hoạt động synchronously nếu cần
-ipcMain.handle('download-video', async (_, { mediaName }) => {
-  return _doDownloadVideo(mediaName);
+ipcMain.handle('download-video', async (_, { mediaName, slotId = 0 }) => {
+  return _doDownloadVideo(mediaName, slotId);
 });
 
 async function _processNextDownload() {
