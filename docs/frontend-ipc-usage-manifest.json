@@ -19,14 +19,14 @@
   "rendererRoot": "apps/desktop/src/renderer-source",
   "preloadFile": "apps/desktop/src/electron/preload.js",
   "summary": {
-    "usedMethods": 164,
-    "usedApiMethods": 164,
+    "usedMethods": 167,
+    "usedApiMethods": 167,
     "usedElectronApiMethods": 0,
-    "exposedPreloadMethods": 246,
+    "exposedPreloadMethods": 245,
     "missingFromPreload": 0,
     "missingFromPreloadDistinctMethodCount": 0,
     "missingFromPreloadCallSiteCount": 0,
-    "exposedButUnused": 82,
+    "exposedButUnused": 78,
     "dynamicImports": 0,
     "missingDynamicImports": 0
   },
@@ -288,6 +288,21 @@
     },
     {
       "global": "api",
+      "method": "authorizeFilePath",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "file"
+        ]
+      }
+    },
+    {
+      "global": "api",
       "method": "cancelDepthAnythingVideo",
       "businessArea": "Media / Generation",
       "callCount": 1,
@@ -406,8 +421,9 @@
       "global": "api",
       "method": "copyToClipboard",
       "businessArea": "Desktop / Local utility",
-      "callCount": 1,
+      "callCount": 2,
       "files": [
+        "apps/desktop/src/renderer-source/pages/GoogleFlow/GoogleFlowPage.tsx",
         "apps/desktop/src/renderer-source/services/electron-api/captcha.ts"
       ],
       "preload": {
@@ -721,8 +737,9 @@
       "global": "api",
       "method": "getAllSlots",
       "businessArea": "Google Flow / Session",
-      "callCount": 2,
+      "callCount": 3,
       "files": [
+        "apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
         "apps/desktop/src/renderer-source/services/electron-api/flow.ts",
         "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
       ],
@@ -765,9 +782,10 @@
       "global": "api",
       "method": "getCredits",
       "businessArea": "Google Flow / Session",
-      "callCount": 1,
+      "callCount": 3,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
+        "apps/desktop/src/renderer-source/services/electron-api/provider.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -793,10 +811,10 @@
       "global": "api",
       "method": "getFilePath",
       "businessArea": "Desktop / Local utility",
-      "callCount": 4,
+      "callCount": 3,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1179,6 +1197,36 @@
     },
     {
       "global": "api",
+      "method": "onVideoDownloaded",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onVideoDownloadFailed",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
       "method": "openExtensionFolder",
       "businessArea": "CAPTCHA / Extension",
       "callCount": 1,
@@ -1240,7 +1288,7 @@
       "global": "api",
       "method": "pickRandomSlot",
       "businessArea": "Google Flow / Session",
-      "callCount": 2,
+      "callCount": 3,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/image.ts",
         "apps/desktop/src/renderer-source/services/electron-api/video.ts"
@@ -1417,7 +1465,7 @@
       "global": "api",
       "method": "queueVideoDownload",
       "businessArea": "Media / Generation",
-      "callCount": 1,
+      "callCount": 2,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
@@ -1445,9 +1493,24 @@
     },
     {
       "global": "api",
+      "method": "resolveDownloadedVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "mediaName"
+        ]
+      }
+    },
+    {
+      "global": "api",
       "method": "resolveVideoUrl",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 3,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
@@ -1740,10 +1803,11 @@
       "global": "api",
       "method": "showInFolder",
       "businessArea": "Desktop / Local utility",
-      "callCount": 2,
+      "callCount": 3,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/editor.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2469,8 +2533,6 @@
     "onExportProgress",
     "onSttProgress",
     "onTeamPresence",
-    "onVideoDownloadFailed",
-    "onVideoDownloaded",
     "onVoiceAssetProgress",
     "onWebviewSwitchSlot",
     "openDevTools",
@@ -2481,7 +2543,6 @@
     "readLocalAudioFile",
     "readSkillFolder",
     "reloadAndWaitWebview",
-    "resolveDownloadedVideo",
     "saveFile",
     "saveLipSyncSettings",
     "saveMediaLibrary",

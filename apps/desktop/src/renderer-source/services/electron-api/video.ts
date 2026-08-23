@@ -9,21 +9,131 @@ export interface VideoModel {
   label: string;
   resolutions: string[];
 }
+
+export const VIDEO_MODELS_BY_MODE: Record<VideoMode, VideoModel[]> = {
+  text: [
+    {
+      id: "abra_t2v",
+      label: "Google Abra T2V - Omini",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+    {
+      id: "veo_3_1_t2v_lite",
+      label: "VEO 3.1 Lite",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+    {
+      id: "veo_3_1_t2v_fast",
+      label: "VEO 3.1 Fast",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+    {
+      id: "veo_3_1_t2v_quality",
+      label: "VEO 3.1 Quality",
+      durations: [4, 6, 8, 10],
+      resolutions: ["1080p"],
+    },
+    {
+      id: "veo_3_1_t2v_fast_ultra",
+      label: "VEO 3.1 Fast (Ultra)",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+    {
+      id: "veo_3_1_t2v_quality_ultra",
+      label: "VEO 3.1 Quality (Ultra)",
+      durations: [4, 6, 8, 10],
+      resolutions: ["1080p"],
+    },
+  ],
+  image: [
+    {
+      id: "abra_i2v",
+      label: "Google Abra I2V - Omini",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+    {
+      id: "veo_3_1_i2v_lite",
+      label: "VEO 3.1 Lite (Tier Two)",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+    {
+      id: "veo_3_1_i2v_fast",
+      label: "VEO 3.1 Fast (Tier One)",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+  ],
+  startend: [
+    {
+      id: "abra_i2v",
+      label: "Google Abra Start/End - Omini",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+    {
+      id: "veo_3_1_i2v_lite",
+      label: "VEO 3.1 Interpolation Lite (Tier Two)",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+    {
+      id: "veo_3_1_i2v_fast",
+      label: "VEO 3.1 Interpolation Fast (Tier One)",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+  ],
+  charsync: [
+    {
+      id: "abra_r2v",
+      label: "Google Abra R2V - Omini",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+    {
+      id: "veo_3_1_r2v_fast",
+      label: "VEO 3.1 Reference Fast",
+      durations: [4, 6, 8, 10],
+      resolutions: ["720p"],
+    },
+  ],
+  editvideo: [
+    {
+      id: "abra_edit",
+      label: "Google Abra Edit",
+      durations: [8],
+      resolutions: ["720p"],
+    },
+  ],
+};
+
+export function getVideoModelsForMode(mode: VideoMode): VideoModel[] {
+  return VIDEO_MODELS_BY_MODE[mode] || VIDEO_MODELS_BY_MODE.text;
+}
+
+export const DEFAULT_VIDEO_MODELS: VideoModel[] = VIDEO_MODELS_BY_MODE.text;
 export interface VideoGenerationRequest {
   aspect: "landscape" | "portrait";
   duration: number;
   endImage?: File;
   editVideo?: File;
-  generateAudio: boolean;
   mode: VideoMode;
   model: string;
   prompt: string;
   providerId: ProviderId;
   resolution: string;
+  slotId?: number;
   startImage?: File;
   characterImages?: File[];
 }
 export interface VideoGenerationResult {
+  downloadMediaName: string;
   jobId: string;
   slotId: number;
   src: string;
@@ -36,19 +146,84 @@ const record = (value: unknown): Record<string, unknown> =>
 const wait = (milliseconds: number) =>
   new Promise((resolve) => setTimeout(resolve, milliseconds));
 
+export function resolveVideoModelKey(
+  model: string,
+  duration: number = 8,
+  mode: VideoMode = "text",
+): string {
+  const dur = [4, 6, 8, 10].includes(duration) ? duration : 8;
+  const isAbra = !model || model.startsWith("abra") || model === "default";
+
+  if (mode === "editvideo") {
+    return "abra_edit";
+  }
+  if (mode === "charsync") {
+    if (isAbra) return `abra_r2v_${dur}s`;
+    return model.replace("t2v", "r2v");
+  }
+  if (mode === "image" || mode === "startend") {
+    if (isAbra) return `abra_i2v_${dur}s`;
+    if (model.includes("t2v")) return model.replace("t2v", "i2v");
+    return model;
+  }
+  if (isAbra) return `abra_t2v_${dur}s`;
+  return model;
+}
+
 async function uploadFlowImage(file: File, slotId: number): Promise<string> {
-  const filePath = getElectronApi().getFilePath(file);
+  let filePath = "";
+  try {
+    filePath = await getElectronApi().authorizeFilePath(file);
+  } catch {
+    filePath = "";
+  }
+
+  if (filePath) {
+    try {
+      const response = record(
+        await getElectronApi().uploadImageFromPath({
+          filePath,
+          fileName: file.name,
+          mimeType: file.type || "image/jpeg",
+          slotId,
+        }),
+      );
+      const media = record(record(response.data).media);
+      if (typeof media.name === "string" && media.name) {
+        return media.name;
+      }
+    } catch (pathErr) {
+      console.warn(
+        `[UPLOAD-FLOW] uploadImageFromPath failed for ${file.name}, falling back to memory buffer:`,
+        pathErr,
+      );
+    }
+  }
+
+  // Fallback: Read file bytes directly in renderer and upload via uploadImage
+  const buffer = await file.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(
+      null,
+      Array.from(bytes.subarray(i, i + chunkSize)),
+    );
+  }
+  const imageBytes = btoa(binary);
   const response = record(
-    await getElectronApi().uploadImageFromPath({
-      filePath,
+    await getElectronApi().uploadImage({
+      imageBytes,
       fileName: file.name,
       mimeType: file.type || "image/jpeg",
       slotId,
     }),
   );
   const media = record(record(response.data).media);
-  if (typeof media.name !== "string")
+  if (typeof media.name !== "string" || !media.name) {
     throw new Error(`Không thể tải ${file.name} lên Google Flow.`);
+  }
   return media.name;
 }
 
@@ -82,6 +257,7 @@ async function pollFlowVideo(
           slotId,
         });
         return {
+          downloadMediaName: String(item.name || mediaName),
           jobId: mediaName,
           slotId,
           src: `https://labs.google/fx/api/trpc/media.getMediaUrlRedirect?name=${encodeURIComponent(String(item.name || mediaName))}`,
@@ -114,6 +290,12 @@ export const videoApi = {
     aspect: "landscape" | "portrait",
     slotId = 0,
   ): Promise<string> {
+    const credits = record(await getElectronApi().getCredits({ slotId }));
+    if (!isKnownPaygateTier(credits.tier)) {
+      throw new Error(
+        "Không xác định được gói tài khoản Google Flow. Vui lòng đồng bộ lại tài khoản trước khi upscale video.",
+      );
+    }
     const response = record(
       await getElectronApi().upscaleVideo({
         mediaId,
@@ -191,8 +373,20 @@ export const videoApi = {
     const bridge = record(await getElectronApi().getCaptchaBridgeStatus());
     if (bridge.connected !== true)
       throw new Error("CAPTCHA bridge chưa kết nối.");
-    const slot = record(await getElectronApi().pickRandomSlot());
+    const slot =
+      typeof request.slotId === "number"
+        ? { slotId: request.slotId }
+        : record(await getElectronApi().pickRandomSlot());
     const slotId = typeof slot.slotId === "number" ? slot.slotId : 0;
+    // Refresh and cache the tier on the selected account slot before Main
+    // resolves tier-dependent model keys. Credit lookup is read-only and the
+    // Main handler degrades to null when the session cannot provide it.
+    const credits = record(await getElectronApi().getCredits({ slotId }));
+    if (isTierDependentRequest(request) && !isKnownPaygateTier(credits.tier)) {
+      throw new Error(
+        "Không xác định được gói tài khoản Google Flow. Vui lòng đồng bộ lại tài khoản trước khi tạo video.",
+      );
+    }
     const startMediaId = request.startImage
       ? await uploadFlowImage(request.startImage, slotId)
       : "";
@@ -204,10 +398,16 @@ export const videoApi = {
           request.characterImages.map((file) => uploadFlowImage(file, slotId)),
         )
       : [];
+    const effectiveModelKey = resolveVideoModelKey(
+      request.model,
+      request.duration,
+      request.mode,
+    );
     const payload = {
       prompt: request.prompt,
       captchaToken: `EXTENSION_PLACEHOLDER_${Date.now()}`,
-      videoModelKey: request.model,
+      videoModelKey: effectiveModelKey,
+      duration: request.duration,
       aspectRatio:
         request.aspect === "portrait"
           ? "VIDEO_ASPECT_RATIO_PORTRAIT"
@@ -218,9 +418,48 @@ export const videoApi = {
     let response: unknown;
     if (request.mode === "editvideo") {
       if (!request.editVideo) throw new Error("Cần chọn video đầu vào.");
+      let filePath = "";
+      if (
+        typeof (request.editVideo as unknown as { path?: string }).path ===
+        "string"
+      ) {
+        filePath = (request.editVideo as unknown as { path: string }).path;
+      }
+      if (
+        !filePath &&
+        typeof (request.editVideo as unknown as { url?: string }).url ===
+          "string"
+      ) {
+        filePath = (request.editVideo as unknown as { url: string }).url;
+      }
+      if (!filePath) {
+        try {
+          filePath = await getElectronApi().authorizeFilePath(
+            request.editVideo,
+          );
+        } catch {
+          filePath = "";
+        }
+      }
+      if (!filePath) {
+        try {
+          filePath = getElectronApi().getFilePath(request.editVideo);
+        } catch {
+          filePath = "";
+        }
+      }
+      if (filePath) {
+        const authorized = await getElectronApi().authorizeFilePath(filePath);
+        if (authorized) filePath = authorized;
+      }
+      if (!filePath) {
+        throw new Error(
+          `Không thể cấp quyền đọc file video "${request.editVideo.name}". Vui lòng chọn lại video đầu vào.`,
+        );
+      }
       const uploaded = record(
         await getElectronApi().uploadOmniVideo({
-          filePath: getElectronApi().getFilePath(request.editVideo),
+          filePath,
           slotId,
         }),
       );
@@ -271,4 +510,41 @@ export const videoApi = {
     if (!mediaName) throw new Error("Google Flow không trả về media ID video.");
     return pollFlowVideo(mediaName, slotId);
   },
+  onVideoDownloaded(
+    callback: (payload: {
+      itemId: string;
+      localPath: string;
+      thumbnailDataUrl?: string | null;
+    }) => void,
+  ): () => void {
+    return getElectronApi().onVideoDownloaded(callback);
+  },
+  onVideoDownloadFailed(
+    callback: (payload: { itemId: string; error: string }) => void,
+  ): () => void {
+    return getElectronApi().onVideoDownloadFailed(callback);
+  },
+  async resolveDownloadedVideo(mediaName: string): Promise<string | null> {
+    const resolved = await getElectronApi().resolveDownloadedVideo(mediaName);
+    return typeof resolved === "string" && resolved ? resolved : null;
+  },
+  async retryDownload(
+    mediaName: string,
+    itemId: string,
+    slotId = 0,
+  ): Promise<void> {
+    await getElectronApi().queueVideoDownload({ mediaName, itemId, slotId });
+  },
+  async showInFolder(filePath: string): Promise<void> {
+    await getElectronApi().showInFolder(filePath);
+  },
 };
+
+const isKnownPaygateTier = (
+  value: unknown,
+): value is "PAYGATE_TIER_ONE" | "PAYGATE_TIER_TWO" =>
+  value === "PAYGATE_TIER_ONE" || value === "PAYGATE_TIER_TWO";
+
+const isTierDependentRequest = (request: VideoGenerationRequest): boolean =>
+  request.mode === "editvideo" ||
+  (request.model.startsWith("veo_") && request.mode !== "text");

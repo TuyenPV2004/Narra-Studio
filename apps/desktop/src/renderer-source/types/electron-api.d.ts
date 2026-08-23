@@ -94,7 +94,8 @@ export interface NarraElectronApi {
     payload: Record<string, unknown>,
   ) => Promise<unknown>;
   saveFileDialog: (payload: Record<string, unknown>) => Promise<unknown>;
-  getFilePath: (file: File) => string;
+  authorizeFilePath: (file: File | string) => Promise<string>;
+  getFilePath: (file: File | string) => string;
   uploadImage: (payload: {
     fileName?: string;
     imageBytes: string;
@@ -151,6 +152,7 @@ export interface NarraElectronApi {
     mediaName: string;
     slotId?: number;
   }) => Promise<unknown>;
+  resolveDownloadedVideo: (mediaName: string) => Promise<unknown>;
   downloadVideo: (payload: {
     mediaName: string;
     slotId?: number;
@@ -231,6 +233,16 @@ export interface NarraElectronApi {
   getCredits: (payload?: { slotId: number }) => Promise<unknown>;
   createFlowProject: (payload?: Record<string, unknown>) => Promise<unknown>;
   onFlowProjectChanged: (callback: (payload: unknown) => void) => () => void;
+  onVideoDownloaded: (
+    callback: (payload: {
+      itemId: string;
+      localPath: string;
+      thumbnailDataUrl?: string | null;
+    }) => void,
+  ) => () => void;
+  onVideoDownloadFailed: (
+    callback: (payload: { itemId: string; error: string }) => void,
+  ) => () => void;
   aiAgentChat: (payload: Record<string, unknown>) => Promise<unknown>;
   aiAgentChatStream: (
     payload: Record<string, unknown>,

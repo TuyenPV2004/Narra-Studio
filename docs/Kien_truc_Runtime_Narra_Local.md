@@ -38,10 +38,22 @@ Narra Studio là ứng dụng Electron single-user. Renderer chính được bui
 
 ## Nguồn tham khảo bên ngoài
 
-- Repository [flowkit](https://github.com/crisng95/flowkit) và tài liệu [flowkit/PLAN.md](https://github.com/crisng95/flowkit/blob/main/PLAN.md) chỉ là nguồn tham khảo để tìm ý tưởng và đối chiếu hướng triển khai; chúng không phải source of truth của Narra Studio.
-- Không mặc định tin tưởng hoặc áp dụng nguyên trạng code, kiến trúc, endpoint, payload, khóa/model identifier, quy trình xác thực, CAPTCHA, header hay nhận định kỹ thuật từ các nguồn này.
-- Trước khi sử dụng bất kỳ thông tin nào từ flowkit, phải kiểm tra độc lập với yêu cầu mới nhất của người dùng, tài liệu kiến trúc này, source thực tế trong `apps/desktop/src` và hành vi runtime đã được xác minh.
-- Khi nguồn tham khảo mâu thuẫn với source of truth hoặc chưa thể kiểm chứng, không áp dụng vào Narra Studio; phải ghi rõ phần chưa xác minh và rủi ro liên quan.
+- Khi review, audit hoặc đề xuất hướng triển khai cho Google Flow, CAPTCHA, extension, session,
+  tạo ảnh/video hay kiến trúc liên quan, luôn đối chiếu với phiên bản hiện tại của repository
+  [flowkit](https://github.com/crisng95/flowkit). Bắt đầu từ
+  [flowkit/PLAN.md](https://github.com/crisng95/flowkit/blob/main/PLAN.md), sau đó kiểm tra source và tài liệu
+  liên quan trong repository để tránh dựa riêng vào kế hoạch.
+- Mục đích của việc đối chiếu là tìm bằng chứng, phương án thay thế, khoảng trống và trade-off để đưa ra hướng
+  review cùng đề xuất tốt nhất cho Narra Studio. Kết quả phải phân biệt rõ điểm tương đồng, khác biệt, phần có thể
+  áp dụng, phần không nên áp dụng và lý do.
+- Flowkit là nguồn tham khảo bắt buộc cho quá trình đối chiếu, không phải source of truth của Narra Studio.
+  Không mặc định tin tưởng, sao chép hoặc áp dụng nguyên trạng code, kiến trúc, endpoint, payload, header,
+  khóa/model identifier, quy trình xác thực, CAPTCHA hay nhận định kỹ thuật từ nguồn này.
+- Mọi thông tin lấy từ flowkit phải được kiểm tra độc lập với yêu cầu mới nhất của người dùng, tài liệu kiến trúc
+  này, source thực tế trong `apps/desktop/src` và hành vi runtime đã được xác minh. Khi có mâu thuẫn, source of
+  truth của Narra Studio được ưu tiên; báo cáo phải ghi rõ khác biệt, phần chưa xác minh và rủi ro liên quan.
+- Nếu không thể truy cập flowkit, phải nêu rõ giới hạn, tiếp tục bằng bằng chứng local tốt nhất hiện có và không
+  tuyên bố một đề xuất là “tốt nhất” khi chưa hoàn tất phần đối chiếu bắt buộc.
 
 ## Giới hạn kiểm chứng
 

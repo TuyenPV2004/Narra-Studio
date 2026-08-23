@@ -10,6 +10,7 @@ import { ImageGeneratorPage } from "@/pages/Image/ImageGeneratorPage";
 import { ImageEditorPage } from "@/pages/Image/ImageEditorPage";
 import { VoicePage } from "@/pages/Voice/VoicePage";
 import { VideoGeneratorPage } from "@/pages/Video/VideoGeneratorPage";
+import { VideoQueueProvider } from "@/pages/Video/useVideoQueue";
 import { MediaLibraryPage } from "@/pages/MediaLibrary/MediaLibraryPage";
 import { VideoEditorPage } from "@/pages/VideoEditor/VideoEditorPage";
 import { SceneMergePage } from "@/pages/SceneMerge/SceneMergePage";
@@ -24,7 +25,9 @@ export function App() {
   return (
     <ErrorBoundary>
       <LocaleProvider>
-        <SourceApplication />
+        <VideoQueueProvider>
+          <SourceApplication />
+        </VideoQueueProvider>
         <Toaster />
       </LocaleProvider>
     </ErrorBoundary>

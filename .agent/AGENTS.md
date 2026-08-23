@@ -15,6 +15,22 @@
 
 Thiết kế documentary/Remotion/SQLite/Codex pipeline cũ không còn là kiến trúc hiện hành.
 
+## Nguồn đối chiếu bắt buộc
+
+- Khi review, audit hoặc đề xuất hướng triển khai cho Google Flow, CAPTCHA, extension, session,
+  tạo ảnh/video hay kiến trúc liên quan, luôn đối chiếu với phiên bản hiện tại của repository
+  [flowkit](https://github.com/crisng95/flowkit), trước hết là
+  [flowkit/PLAN.md](https://github.com/crisng95/flowkit/blob/main/PLAN.md), rồi đến source và tài liệu
+  liên quan trong repository đó.
+- Mục đích đối chiếu là tìm bằng chứng, phương án thay thế, khoảng trống và trade-off để đưa ra nhận xét
+  cùng đề xuất tốt nhất cho Narra Studio. Khi báo cáo, nêu rõ điểm tương đồng, khác biệt, phần có thể áp dụng,
+  phần không nên áp dụng và lý do.
+- Flowkit là nguồn tham khảo bắt buộc, không phải source of truth của Narra Studio. Không sao chép hoặc áp dụng
+  nguyên trạng code, endpoint, payload, header, model identifier, quy trình xác thực hay CAPTCHA nếu chưa kiểm tra
+  với yêu cầu mới nhất, tài liệu kiến trúc, source hiện tại và hành vi runtime đã xác minh của Narra Studio.
+- Nếu không thể truy cập flowkit, phải nói rõ giới hạn đối chiếu, dùng bằng chứng local tốt nhất hiện có và không
+  tuyên bố một đề xuất là “tốt nhất” khi chưa hoàn tất phần đối chiếu bắt buộc.
+
 ## Superpowers
 
 - Khi plugin Superpowers khả dụng, kiểm tra và dùng skill phù hợp trước khi thực hiện tác vụ:
@@ -33,7 +49,7 @@ Thiết kế documentary/Remotion/SQLite/Codex pipeline cũ không còn là ki�
 ## Phạm vi sản phẩm
 
 - Narra Studio là ứng dụng Electron local, single-user, dựa trên runtime đã khôi phục và local hóa.
-- Google Flow automation, multi-account session, CAPTCHA bridge, anti-detect, AI Agent, Avis và xử lý media là các luồng cốt lõi phải được bảo toàn.
+- Google Flow automation, multi-account session, CAPTCHA bridge, anti-detect, AI Agent dùng custom provider profile và xử lý media là các luồng cốt lõi phải được bảo toàn.
 - Không khôi phục license, subscription, billing, telemetry, auto-update, community, marketplace, team server hoặc collaboration cloud.
 - Workspace/canvas dùng lưu trữ local. Không thêm backend cloud nếu người dùng chưa yêu cầu rõ ràng.
 
@@ -48,8 +64,8 @@ Thiết kế documentary/Remotion/SQLite/Codex pipeline cũ không còn là ki�
 ## Quy tắc code
 
 - Source desktop hiện hành nằm trong `apps/desktop/src`.
-- Renderer là bundle JavaScript đã biên dịch; thay đổi phải nhỏ, có mục tiêu và kiểm tra chính xác chuỗi/function liên quan.
-- Không xây lại giao diện Narra cũ hoặc đưa Vite/React source thử nghiệm trở lại.
+- Renderer production được build từ React/TypeScript source trong `apps/desktop/src/renderer-source` bằng Vite.
+- Thay đổi renderer phải thực hiện trong source React/TypeScript hiện hành; không khôi phục hoặc sửa lại recovered/compiled renderer cũ làm source runtime.
 - Cấu hình nhạy cảm đặt trong `.env`; `.env.example` chỉ chứa tên biến và giá trị mẫu không bí mật.
 - Giữ IPC Main/Preload đồng bộ và không làm mất các API Google Flow đang được renderer gọi.
 

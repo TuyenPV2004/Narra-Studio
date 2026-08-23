@@ -6,8 +6,8 @@ import {
   CircleX,
   Clock4,
   Copy,
-  Download,
   Eye,
+  FolderOpen,
   ImagePlus,
   ImageUp,
   Inbox,
@@ -656,28 +656,30 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                       {(item.file.size / 1024).toFixed(0)} KB
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    className="source-reference-action-btn"
-                    title="Xem ảnh phóng to"
-                    aria-label={`Xem ảnh tham chiếu ${item.file.name}`}
-                    onClick={() => setPreviewRefImage(item)}
-                  >
-                    <Eye
-                      size={15}
-                      className="source-action-icon--view"
-                      aria-hidden="true"
-                    />
-                  </button>
-                  <button
-                    type="button"
-                    className="source-prompt-delete-btn"
-                    aria-label={`Xóa ảnh tham chiếu ${item.file.name}`}
-                    onClick={() => removeReferenceImage(index)}
-                    title="Xóa ảnh này"
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                  <div className="source-reference-actions">
+                    <button
+                      type="button"
+                      className="source-reference-action-btn"
+                      title="Xem ảnh phóng to"
+                      aria-label={`Xem ảnh tham chiếu ${item.file.name}`}
+                      onClick={() => setPreviewRefImage(item)}
+                    >
+                      <Eye
+                        size={15}
+                        className="source-action-icon--view"
+                        aria-hidden="true"
+                      />
+                    </button>
+                    <button
+                      type="button"
+                      className="source-prompt-delete-btn"
+                      aria-label={`Xóa ảnh tham chiếu ${item.file.name}`}
+                      onClick={() => removeReferenceImage(index)}
+                      title="Xóa ảnh này"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  </div>
                 </div>
               ))}
               {referenceImages.length < MAX_REFERENCE_IMAGES && (
@@ -815,9 +817,13 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
         className="source-generation-results"
         aria-label="Kết quả hình ảnh"
       >
-        <header>
-          <h2>Hàng đợi và kết quả</h2>
-          <span>Số lượng: {tasks.length}</span>
+        <header className="source-results-header">
+          <div className="source-results-header__title-group">
+            <h2>Hàng đợi và kết quả</h2>
+            <span className="source-results-count-badge">
+              {tasks.length} ảnh
+            </span>
+          </div>
         </header>
         {tasks.length === 0 ? (
           <div className="source-generation-empty">
@@ -957,7 +963,7 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                     </div>
                     {typeof task.slotId === "number" && (
                       <span className="source-task-slot-badge">
-                        Slot {task.slotId}
+                        Slot {task.slotId + 1}
                       </span>
                     )}
                   </header>
@@ -1005,18 +1011,27 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                           />
                           Xem
                         </button>
-                        <a
-                          href={task.src}
-                          download={`narra-${task.id.slice(0, 8)}.png`}
-                          className="source-task-action-link"
-                        >
-                          <Download
-                            size={14}
-                            className="source-action-icon--download"
-                            aria-hidden="true"
-                          />
-                          Tải về
-                        </a>
+                        {task.savedFileUrl && (
+                          <button
+                            type="button"
+                            className="source-task-action-btn"
+                            onClick={() => {
+                              if (task.savedFileUrl) {
+                                void getElectronApi().showInFolder(
+                                  task.savedFileUrl,
+                                );
+                              }
+                            }}
+                            title={`Ảnh đã lưu trên máy: ${task.savedFileUrl}. Bấm để mở thư mục.`}
+                          >
+                            <FolderOpen
+                              size={14}
+                              className="source-action-icon--folder"
+                              aria-hidden="true"
+                            />
+                            Mở thư mục
+                          </button>
+                        )}
                       </>
                     )}
                     <button

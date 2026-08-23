@@ -308,7 +308,6 @@ export function WorkspacePanel({ providerId }: { providerId: ProviderId }) {
           aspect: "landscape",
           duration: 8,
           resolution: "720p",
-          generateAudio: false,
           mode: "text",
         });
       } else if (node.kind === "audio") {

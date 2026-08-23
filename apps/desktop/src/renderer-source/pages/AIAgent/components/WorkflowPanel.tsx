@@ -151,7 +151,6 @@ export function WorkflowPanel({
                   aspect: "landscape",
                   duration: 8,
                   resolution: "720p",
-                  generateAudio: false,
                   mode: "text",
                 });
           setRunItems((items) =>

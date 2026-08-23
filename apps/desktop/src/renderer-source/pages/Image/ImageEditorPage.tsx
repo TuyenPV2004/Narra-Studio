@@ -1,7 +1,7 @@
 import {
   Crop,
-  Download,
   FileCheck,
+  FolderOpen,
   Images,
   Info,
   Layers,
@@ -18,6 +18,7 @@ import {
   type ChangeEvent,
 } from "react";
 import { Button } from "@/components/ui/Button";
+import { getElectronApi } from "@/services/electron-api/client";
 import { formatImageError, imageApi } from "@/services/electron-api/image";
 import type { ProviderId } from "@/types/electron-api";
 import {
@@ -31,10 +32,11 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
   const [prompt, setPrompt] = useState("");
   const [imageReady, setImageReady] = useState(false);
   const [result, setResult] = useState<{
-    createdAt?: string;
+    createdAt?: string | undefined;
     mediaId: string | null;
-    promptUsed?: string;
-    slotId?: number;
+    promptUsed?: string | undefined;
+    savedPath?: string | undefined;
+    slotId?: number | undefined;
     src: string;
   }>();
   const [error, setError] = useState<string>();
@@ -95,13 +97,17 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
         dataUrl,
         prompt: prompt.trim(),
       });
+      const saveRes = await imageApi
+        .save(output.src, output.slotId)
+        .catch((saveErr) => {
+          console.warn("Không thể lưu ảnh local:", saveErr);
+          return null;
+        });
       setResult({
         ...output,
+        savedPath: saveRes?.saved ? saveRes.path : undefined,
         promptUsed: prompt.trim(),
         createdAt: new Date().toLocaleTimeString(),
-      });
-      await imageApi.save(output.src, output.slotId).catch((saveErr) => {
-        console.warn("Không thể lưu ảnh local:", saveErr);
       });
     } catch (value) {
       setError(formatImageError(value));
@@ -119,8 +125,15 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
         resolution,
         result.slotId ?? 0,
       );
+      const saveRes = await imageApi
+        .save(upscaledSrc, result.slotId ?? 0)
+        .catch((saveErr) => {
+          console.warn("Không thể lưu ảnh local:", saveErr);
+          return null;
+        });
       setResult({
         ...result,
+        savedPath: saveRes?.saved ? saveRes.path : result.savedPath,
         src: upscaledSrc,
       });
     } catch (value) {
@@ -154,8 +167,15 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
         coordinates,
         result.slotId ?? 0,
       );
+      const saveRes = await imageApi
+        .save(cropped.src, result.slotId ?? 0)
+        .catch((saveErr) => {
+          console.warn("Không thể lưu ảnh local:", saveErr);
+          return null;
+        });
       setResult({
         ...result,
+        savedPath: saveRes?.saved ? saveRes.path : result.savedPath,
         mediaId: cropped.mediaId,
         src: cropped.src,
       });
@@ -314,7 +334,7 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
               <div className="source-meta-item">
                 <span className="source-meta-label">Tài khoản:</span>
                 <span className="source-meta-value">
-                  Slot {result.slotId ?? 0}
+                  Slot {(result.slotId ?? 0) + 1}
                 </span>
               </div>
               {result.mediaId && (
@@ -332,18 +352,25 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
             </div>
           </div>
           <div className="source-edit-result-actions">
-            <a
-              href={result.src}
-              download={`edited-img-${Date.now()}.png`}
-              className="source-task-action-link"
-            >
-              <Download
-                size={15}
-                className="source-action-icon--download"
-                aria-hidden="true"
-              />
-              Tải ảnh về máy
-            </a>
+            {result.savedPath && (
+              <button
+                type="button"
+                className="source-task-action-btn"
+                onClick={() => {
+                  if (result.savedPath) {
+                    void getElectronApi().showInFolder(result.savedPath);
+                  }
+                }}
+                title={`Ảnh đã lưu trên máy: ${result.savedPath}. Bấm để mở thư mục.`}
+              >
+                <FolderOpen
+                  size={15}
+                  className="source-action-icon--folder"
+                  aria-hidden="true"
+                />
+                Mở thư mục
+              </button>
+            )}
             {providerId === "veo3" && result.mediaId && (
               <>
                 <fieldset className="source-image-crop-controls">
