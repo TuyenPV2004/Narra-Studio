@@ -5,6 +5,7 @@ import { LocaleProvider } from "@/i18n/LocaleProvider";
 import { useAppRuntime } from "@/hooks/useAppRuntime";
 import { Toaster } from "@/components/ui/Toast";
 import { ProviderSelectionPage } from "@/pages/ProviderHub/ProviderSelectionPage";
+import { ImageQueueProvider } from "@/pages/Image/useImageQueue";
 import { VideoQueueProvider } from "@/pages/Video/useVideoQueue";
 
 const SettingsPage = lazy(() =>
@@ -87,9 +88,11 @@ export function App() {
   return (
     <ErrorBoundary>
       <LocaleProvider>
-        <VideoQueueProvider>
-          <SourceApplication />
-        </VideoQueueProvider>
+        <ImageQueueProvider>
+          <VideoQueueProvider>
+            <SourceApplication />
+          </VideoQueueProvider>
+        </ImageQueueProvider>
         <Toaster />
       </LocaleProvider>
     </ErrorBoundary>

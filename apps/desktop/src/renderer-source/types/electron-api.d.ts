@@ -86,8 +86,8 @@ export interface NarraElectronApi {
     payload: Record<string, unknown>,
   ) => Promise<unknown>;
   saveFileDialog: (payload: Record<string, unknown>) => Promise<unknown>;
-  authorizeFilePath: (file: File | string) => Promise<string>;
-  getFilePath: (file: File | string) => string;
+  authorizeFilePath: (file: File) => Promise<string>;
+  getFilePath: (file: File) => string;
   uploadImage: (payload: {
     fileName?: string;
     imageBytes: string;

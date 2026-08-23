@@ -27,6 +27,8 @@ export interface ImageGenerationRequest {
 }
 export interface ImageModel {
   label: string;
+  maxImageInputs?: number;
+  supportedAspectRatios?: string[];
   value: string;
 }
 
@@ -92,11 +94,62 @@ const record = (value: unknown): Record<string, unknown> =>
     : {};
 const data = (value: unknown): Record<string, unknown> =>
   record(record(value).data);
+
+const imageModelLabels = new Map(
+  Object.values(DEFAULT_IMAGE_MODELS)
+    .flat()
+    .map((model) => [model.value, model.label]),
+);
+
+function generatedImageResult(value: unknown): {
+  mediaId: string | null;
+  src: string;
+} {
+  const response = record(value);
+  const media = Array.isArray(response.media) ? record(response.media[0]) : {};
+  const generated = record(record(media.image).generatedImage);
+  const mediaId =
+    typeof media.name === "string" && media.name
+      ? media.name
+      : typeof generated.mediaId === "string" && generated.mediaId
+        ? generated.mediaId
+        : null;
+  const remoteUrl =
+    typeof generated.fifeUrl === "string" && generated.fifeUrl
+      ? generated.fifeUrl
+      : typeof generated.imageUri === "string" && generated.imageUri
+        ? generated.imageUri
+        : "";
+  const src =
+    remoteUrl ||
+    (typeof generated.encodedImage === "string" && generated.encodedImage
+      ? `data:image/jpeg;base64,${generated.encodedImage}`
+      : "");
+  return { mediaId, src };
+}
+
+function uploadedMediaId(value: unknown): string {
+  const response = record(value);
+  const responseData = record(response.data);
+  const media = record(responseData.media);
+  const nestedMediaId = record(responseData.mediaId);
+  return typeof media.name === "string" && media.name
+    ? media.name
+    : typeof nestedMediaId.mediaId === "string" && nestedMediaId.mediaId
+      ? nestedMediaId.mediaId
+      : typeof responseData.name === "string" && responseData.name
+        ? responseData.name
+        : "";
+}
+
 export const imageApi = {
   async generate(
     request: ImageGenerationRequest & { slotId?: number },
   ): Promise<{ mediaId: string | null; slotId: number; src: string }> {
-    const slot = record(await getElectronApi().pickRandomSlot());
+    const slot =
+      typeof request.slotId === "number"
+        ? {}
+        : record(await getElectronApi().pickRandomSlot());
     const slotId =
       typeof request.slotId === "number"
         ? request.slotId
@@ -161,14 +214,14 @@ export const imageApi = {
             slotId,
           }),
         );
-        const uploadedMedia = record(record(uploaded.data).media);
-        if (typeof uploadedMedia.name !== "string") {
+        const mediaId = uploadedMediaId(uploaded);
+        if (!mediaId) {
           throw new Error("Google Flow không trả về mediaId hợp lệ.");
         }
-        referenceImageNames.push(uploadedMedia.name);
+        referenceImageNames.push(mediaId);
         uploadedItems.push({
           fileName: item.fileName,
-          mediaId: uploadedMedia.name,
+          mediaId,
         });
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
@@ -199,15 +252,14 @@ export const imageApi = {
         slotId,
       }),
     );
-    const media = Array.isArray(response.media)
-      ? record(response.media[0])
-      : {};
-    const image = record(media.image);
-    const generated = record(image.generatedImage);
-    const src = typeof generated.fifeUrl === "string" ? generated.fifeUrl : "";
+    const generated = generatedImageResult(response);
+    let src = generated.src;
+    if (!src && generated.mediaId) {
+      src = await imageApi.resolveMediaUrl(generated.mediaId, slotId);
+    }
     if (!src) throw new Error("VEO3 không trả về hình ảnh hợp lệ.");
     return {
-      mediaId: typeof media.name === "string" ? media.name : null,
+      mediaId: generated.mediaId,
       slotId,
       src,
     };
@@ -215,7 +267,10 @@ export const imageApi = {
   async editVeoImage(
     request: ImageEditRequest & { slotId?: number },
   ): Promise<{ mediaId: string | null; slotId: number; src: string }> {
-    const slot = record(await getElectronApi().pickRandomSlot());
+    const slot =
+      typeof request.slotId === "number"
+        ? {}
+        : record(await getElectronApi().pickRandomSlot());
     const slotId =
       typeof request.slotId === "number"
         ? request.slotId
@@ -232,14 +287,7 @@ export const imageApi = {
         slotId,
       }),
     );
-    const uploadData = record(upload.data);
-    const uploadedMedia = record(uploadData.media);
-    const baseMediaId =
-      typeof uploadedMedia.name === "string"
-        ? uploadedMedia.name
-        : typeof uploadData.name === "string"
-          ? uploadData.name
-          : "";
+    const baseMediaId = uploadedMediaId(upload);
     if (!baseMediaId)
       throw new Error("Google Flow không trả media ID cho ảnh đã tải lên.");
     const response = record(
@@ -250,13 +298,9 @@ export const imageApi = {
         slotId,
       }),
     );
-    const responseData = record(response.data);
-    const media = Array.isArray(responseData.media)
-      ? record(responseData.media[0])
-      : {};
-    const generated = record(record(media.image).generatedImage);
-    const mediaId = typeof media.name === "string" ? media.name : null;
-    let src = typeof generated.fifeUrl === "string" ? generated.fifeUrl : "";
+    const generated = generatedImageResult(record(response).data);
+    const mediaId = generated.mediaId;
+    let src = generated.src;
     if (!src && mediaId) {
       const resolved = await getElectronApi().resolveVideoUrl({
         url: `https://labs.google/fx/api/trpc/media.getMediaUrlRedirect?name=${mediaId}`,
@@ -358,6 +402,46 @@ export const imageApi = {
   },
   getModels(providerId: string = "veo3"): ImageModel[] {
     return DEFAULT_IMAGE_MODELS[providerId] || DEFAULT_IMAGE_MODELS.veo3 || [];
+  },
+  async getModelsForSlot(
+    slotId: number,
+    providerId: string = "veo3",
+  ): Promise<ImageModel[]> {
+    try {
+      const project = record(
+        await getElectronApi().getFlowProjectInitialData({ slotId }),
+      );
+      const pricing = Array.isArray(project.modelPricing)
+        ? project.modelPricing.map(record)
+        : [];
+      const discovered = new Map<string, ImageModel>();
+      for (const item of pricing) {
+        if (item.kind !== "image" || item.cost === "UNAVAILABLE") continue;
+        const value =
+          typeof item.usageKey === "string" ? item.usageKey.trim() : "";
+        if (!value || discovered.has(value)) continue;
+        const familyName =
+          typeof item.familyName === "string" ? item.familyName.trim() : "";
+        discovered.set(value, {
+          value,
+          label: imageModelLabels.get(value) || familyName || value,
+          ...(typeof item.maxImageInputs === "number"
+            ? { maxImageInputs: item.maxImageInputs }
+            : {}),
+          ...(Array.isArray(item.supportedAspectRatios)
+            ? {
+                supportedAspectRatios: item.supportedAspectRatios.filter(
+                  (aspect): aspect is string => typeof aspect === "string",
+                ),
+              }
+            : {}),
+        });
+      }
+      if (discovered.size > 0) return [...discovered.values()];
+    } catch {
+      // Project model metadata is optional; named defaults keep offline UI usable.
+    }
+    return imageApi.getModels(providerId);
   },
   async resolveMediaUrl(mediaId: string, slotId = 0): Promise<string> {
     const resolved = await getElectronApi().resolveVideoUrl({

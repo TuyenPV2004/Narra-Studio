@@ -7,6 +7,7 @@ import {
   Clock4,
   Copy,
   Eye,
+  EyeOff,
   FolderOpen,
   ImagePlus,
   ImageUp,
@@ -19,6 +20,7 @@ import {
   Trash2,
   Upload,
   X,
+  CircleUserRound,
 } from "lucide-react";
 import {
   useCallback,
@@ -29,6 +31,7 @@ import {
   type ChangeEvent,
 } from "react";
 import { Button } from "@/components/ui/Button";
+import { toast } from "@/components/ui/Toast";
 import {
   Dialog,
   DialogContent,
@@ -45,10 +48,14 @@ import {
 import { getElectronApi } from "@/services/electron-api/client";
 import {
   MAX_REFERENCE_IMAGES,
-  formatImageError,
   imageApi,
+  type ImageModel,
   type ReferenceImageSnapshot,
 } from "@/services/electron-api/image";
+import {
+  useImageQueue,
+  type ImageQueueTask,
+} from "@/pages/Image/useImageQueue";
 import type { ProviderId } from "@/types/electron-api";
 
 function SquareDimensions({
@@ -81,40 +88,28 @@ function SquareDimensions({
   );
 }
 
-type TaskStatus = "error" | "processing" | "queued" | "success";
-export type SaveStatus = "failed" | "not_saved" | "saved" | "saving";
-
-interface ImageTask {
-  aspect?: string | undefined;
-  error?: string | undefined;
-  id: string;
-  mediaId?: string | null | undefined;
-  model?: string | undefined;
-  prompt: string;
-  referenceImages?: ReferenceImageSnapshot[] | undefined;
-  savedFileUrl?: string | undefined;
-  saveError?: string | undefined;
-  saveStatus: SaveStatus;
-  slotId?: number | undefined;
-  src?: string | undefined;
-  status: TaskStatus;
+interface ImageAccountSlot {
+  displayName?: string | null;
+  email?: string | null;
+  id: number;
 }
 
 export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
-  const models = useMemo(() => imageApi.getModels(providerId), [providerId]);
+  const queue = useImageQueue();
+  const tasks = queue.tasks;
+  const running = tasks.some((task) => task.status === "processing");
   const [prompts, setPrompts] = useState<string[]>([""]);
+  const [models, setModels] = useState<ImageModel[]>(() =>
+    imageApi.getModels(providerId),
+  );
   const [model, setModel] = useState("NARWHAL");
   const [aspect, setAspect] = useState("IMAGE_ASPECT_RATIO_LANDSCAPE");
   const [quantity, setQuantity] = useState(1);
-  const [tasks, setTasks] = useState<ImageTask[]>([]);
-  const [running, setRunning] = useState(false);
-  const [progressCount, setProgressCount] = useState<{
-    current: number;
-    total: number;
-  } | null>(null);
+  const [accountSlots, setAccountSlots] = useState<ImageAccountSlot[]>([]);
+  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const [taskProgress, setTaskProgress] = useState(0);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  const [previewTask, setPreviewTask] = useState<ImageTask | null>(null);
+  const [previewTask, setPreviewTask] = useState<ImageQueueTask | null>(null);
   const [referenceImages, setReferenceImages] = useState<File[]>([]);
   const [referencePreviews, setReferencePreviews] = useState<
     { file: File; id: string; url: string }[]
@@ -125,6 +120,109 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
     url: string;
   } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const referenceLimit = useMemo(() => {
+    const configured = models.find(
+      (candidate) => candidate.value === model,
+    )?.maxImageInputs;
+    return typeof configured === "number" && configured >= 0
+      ? Math.min(MAX_REFERENCE_IMAGES, configured)
+      : MAX_REFERENCE_IMAGES;
+  }, [model, models]);
+  const aspectOptions = useMemo(() => {
+    const options = [
+      {
+        value: "IMAGE_ASPECT_RATIO_LANDSCAPE",
+        label: "16:9 (Ngang)",
+      },
+      { value: "IMAGE_ASPECT_RATIO_PORTRAIT", label: "9:16 (Dọc)" },
+      { value: "IMAGE_ASPECT_RATIO_SQUARE", label: "1:1 (Vuông)" },
+      {
+        value: "IMAGE_ASPECT_RATIO_LANDSCAPE_FOUR_THREE",
+        label: "4:3 (Ngang chuẩn)",
+      },
+      {
+        value: "IMAGE_ASPECT_RATIO_PORTRAIT_THREE_FOUR",
+        label: "3:4 (Dọc chuẩn)",
+      },
+    ];
+    const supported = models.find(
+      (candidate) => candidate.value === model,
+    )?.supportedAspectRatios;
+    if (!supported?.length) return options;
+    const filtered = options.filter((option) =>
+      supported.includes(option.value),
+    );
+    return filtered.length > 0 ? filtered : options;
+  }, [model, models]);
+
+  useEffect(() => {
+    if (!aspectOptions.some((option) => option.value === aspect)) {
+      setAspect(aspectOptions[0]?.value || "IMAGE_ASPECT_RATIO_LANDSCAPE");
+    }
+  }, [aspect, aspectOptions]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getElectronApi()
+      .getAllSlots()
+      .then((value) => {
+        if (cancelled || !Array.isArray(value)) return;
+        const connected = value.flatMap((item) => {
+          if (!item || typeof item !== "object") return [];
+          const slot = item as Record<string, unknown>;
+          if (
+            typeof slot.id !== "number" ||
+            slot.hasBearerToken !== true ||
+            typeof slot.projectId !== "string" ||
+            !slot.projectId
+          )
+            return [];
+          return [
+            {
+              id: slot.id,
+              email: typeof slot.email === "string" ? slot.email : null,
+              displayName:
+                typeof slot.displayName === "string" ? slot.displayName : null,
+            },
+          ];
+        });
+        setAccountSlots(connected);
+        setSelectedSlotId((current) =>
+          current !== null && connected.some((slot) => slot.id === current)
+            ? current
+            : (connected[0]?.id ?? null),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAccountSlots([]);
+          setSelectedSlotId(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (selectedSlotId === null) {
+      setModels(imageApi.getModels(providerId));
+      return;
+    }
+    void imageApi.getModelsForSlot(selectedSlotId, providerId).then((next) => {
+      if (cancelled) return;
+      setModels(next);
+      setModel((current) =>
+        next.some((candidate) => candidate.value === current)
+          ? current
+          : (next[0]?.value ?? "NARWHAL"),
+      );
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [providerId, selectedSlotId]);
 
   const successfulTasks = useMemo(
     () => tasks.filter((t) => Boolean(t.src) && t.status === "success"),
@@ -226,19 +324,11 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
       });
     }, 200);
     return () => clearInterval(interval);
-  }, [running, progressCount?.current, tasks]);
+  }, [running, tasks]);
 
   const displayBatchPercent = useMemo(() => {
-    if (progressCount && progressCount.total > 0) {
-      const base = ((progressCount.current - 1) / progressCount.total) * 100;
-      const slice = (1 / progressCount.total) * 100;
-      return Math.min(
-        95,
-        Math.max(5, Math.round(base + (taskProgress * slice) / 100)),
-      );
-    }
     return Math.min(95, Math.max(5, taskProgress));
-  }, [progressCount, taskProgress]);
+  }, [taskProgress]);
 
   useEffect(() => {
     const previews = referenceImages.map((file) => ({
@@ -282,9 +372,9 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
           (f) => !existingKeys.has(`${f.name}-${f.size}-${f.lastModified}`),
         );
         const combined = [...prev, ...filteredNew];
-        if (combined.length > MAX_REFERENCE_IMAGES) {
-          alert(`Chỉ được chọn tối đa ${MAX_REFERENCE_IMAGES} ảnh tham chiếu.`);
-          return combined.slice(0, MAX_REFERENCE_IMAGES);
+        if (combined.length > referenceLimit) {
+          alert(`Model này chỉ nhận tối đa ${referenceLimit} ảnh tham chiếu.`);
+          return combined.slice(0, referenceLimit);
         }
         return combined;
       });
@@ -313,123 +403,13 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
     setTimeout(() => setCopiedId(null), 1500);
   };
 
-  const deleteTask = (taskId: string) => {
-    setTasks((current) => current.filter((t) => t.id !== taskId));
-  };
-
-  const retrySaveTask = async (taskToSave: ImageTask) => {
-    if (!taskToSave.src) return;
-    setTasks((current) =>
-      current.map((t) =>
-        t.id === taskToSave.id
-          ? { ...t, saveError: undefined, saveStatus: "saving" }
-          : t,
-      ),
-    );
-    const saveResult = await imageApi.save(taskToSave.src, taskToSave.slotId);
-    setTasks((current) =>
-      current.map((t) =>
-        t.id === taskToSave.id
-          ? saveResult.saved
-            ? {
-                ...t,
-                saveError: undefined,
-                savedFileUrl: saveResult.path,
-                saveStatus: "saved",
-              }
-            : {
-                ...t,
-                saveError: saveResult.error,
-                saveStatus: "failed",
-              }
-          : t,
-      ),
-    );
-  };
-
-  const retryTask = async (taskToRetry: ImageTask) => {
-    setTasks((current) =>
-      current.map((t) =>
-        t.id === taskToRetry.id
-          ? {
-              ...t,
-              error: undefined,
-              saveError: undefined,
-              saveStatus: "not_saved",
-              status: "processing",
-            }
-          : t,
-      ),
-    );
-    try {
-      const taskAspect = taskToRetry.aspect || aspect;
-      const taskModel = taskToRetry.model || model;
-      const result = await imageApi.generate({
-        aspect: taskAspect,
-        model: taskModel,
-        prompt: taskToRetry.prompt,
-        providerId,
-        referenceImageSnapshots: taskToRetry.referenceImages,
-        resolution: "2k",
-        seed: Math.floor(Math.random() * 9_999_999),
-      });
-      setTasks((current) =>
-        current.map((t) =>
-          t.id === taskToRetry.id
-            ? {
-                ...t,
-                aspect: taskAspect,
-                mediaId: result.mediaId,
-                model: taskModel,
-                saveStatus: "saving",
-                slotId: result.slotId,
-                src: result.src,
-                status: "success",
-              }
-            : t,
-        ),
-      );
-      const saveResult = await imageApi.save(result.src, result.slotId);
-      setTasks((current) =>
-        current.map((t) =>
-          t.id === taskToRetry.id
-            ? saveResult.saved
-              ? {
-                  ...t,
-                  saveError: undefined,
-                  savedFileUrl: saveResult.path,
-                  saveStatus: "saved",
-                }
-              : {
-                  ...t,
-                  saveError: saveResult.error,
-                  saveStatus: "failed",
-                }
-            : t,
-        ),
-      );
-    } catch (error) {
-      setTasks((current) =>
-        current.map((t) =>
-          t.id === taskToRetry.id
-            ? {
-                ...t,
-                error: formatImageError(error),
-                status: "error",
-              }
-            : t,
-        ),
-      );
-    }
-  };
-
-  const run = useCallback(async () => {
+  const run = useCallback(() => {
     const usable = prompts.map((prompt) => prompt.trim()).filter(Boolean);
-    if (!usable.length || running) return;
+    if (!usable.length || selectedSlotId === null) return;
     const currentAspect = aspect;
     const currentModel = model;
     const currentSnapshots: ReferenceImageSnapshot[] = referenceImages
-      .slice(0, MAX_REFERENCE_IMAGES)
+      .slice(0, referenceLimit)
       .map((file) => ({
         id: `${file.name}-${file.size}-${file.lastModified}`,
         localPath: getElectronApi().getFilePath(file),
@@ -437,96 +417,46 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
         size: file.size,
         type: file.type || "image/png",
       }));
-    const queued: ImageTask[] = usable.flatMap((prompt) =>
+    const requests = usable.flatMap((prompt) =>
       Array.from({ length: quantity }, () => ({
         aspect: currentAspect,
-        id: crypto.randomUUID(),
         model: currentModel,
         prompt,
-        referenceImages:
+        providerId: "veo3" as const,
+        referenceImageSnapshots:
           currentSnapshots.length > 0 ? currentSnapshots : undefined,
-        saveStatus: "not_saved" as const,
-        status: "queued" as const,
+        resolution: "2k",
+        seed: Math.floor(Math.random() * 9_999_999),
+        slotId: selectedSlotId,
       })),
     );
-    setTasks((current) => [...queued, ...current]);
-    setPrompts([""]);
-    setRunning(true);
-    const totalCount = queued.length;
-    let completedCount = 0;
-
-    for (const queuedTask of queued) {
-      completedCount++;
-      setProgressCount({ current: completedCount, total: totalCount });
-      setTasks((current) =>
-        current.map((task) =>
-          task.id === queuedTask.id ? { ...task, status: "processing" } : task,
-        ),
-      );
-      try {
-        const taskAspect = queuedTask.aspect || currentAspect;
-        const taskModel = queuedTask.model || currentModel;
-        const result = await imageApi.generate({
-          aspect: taskAspect,
-          model: taskModel,
-          prompt: queuedTask.prompt,
-          providerId,
-          referenceImageSnapshots: queuedTask.referenceImages,
-          resolution: "2k",
-          seed: Math.floor(Math.random() * 9_999_999),
-        });
-        setTasks((current) =>
-          current.map((task) =>
-            task.id === queuedTask.id
-              ? {
-                  ...task,
-                  aspect: taskAspect,
-                  mediaId: result.mediaId,
-                  model: taskModel,
-                  saveStatus: "saving",
-                  slotId: result.slotId,
-                  src: result.src,
-                  status: "success",
-                }
-              : task,
-          ),
-        );
-        const saveResult = await imageApi.save(result.src, result.slotId);
-        setTasks((current) =>
-          current.map((task) =>
-            task.id === queuedTask.id
-              ? saveResult.saved
-                ? {
-                    ...task,
-                    saveError: undefined,
-                    savedFileUrl: saveResult.path,
-                    saveStatus: "saved",
-                  }
-                : {
-                    ...task,
-                    saveError: saveResult.error,
-                    saveStatus: "failed",
-                  }
-              : task,
-          ),
-        );
-      } catch (error) {
-        setTasks((current) =>
-          current.map((task) =>
-            task.id === queuedTask.id
-              ? {
-                  ...task,
-                  error: formatImageError(error),
-                  status: "error",
-                }
-              : task,
-          ),
-        );
-      }
+    const result = queue.enqueue(requests);
+    if (result.accepted === 0) {
+      toast.error("Hàng đợi ảnh đã đầy (tối đa 20 tác vụ đang hoạt động).");
+      return;
     }
-    setProgressCount(null);
-    setRunning(false);
-  }, [aspect, model, prompts, providerId, quantity, referenceImages, running]);
+    if (result.rejected > 0) {
+      setPrompts(
+        requests.slice(result.accepted).map((request) => request.prompt),
+      );
+      setQuantity(1);
+      toast.warning(
+        `Đã thêm ${result.accepted} tác vụ. Giữ lại ${result.rejected} prompt do hàng đợi đạt giới hạn.`,
+      );
+      return;
+    }
+    setPrompts([""]);
+    toast.success(`Đã thêm ${result.accepted} tác vụ vào hàng đợi ảnh.`);
+  }, [
+    aspect,
+    model,
+    prompts,
+    quantity,
+    queue,
+    referenceLimit,
+    referenceImages,
+    selectedSlotId,
+  ]);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.key === "Enter") {
@@ -614,13 +544,10 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
         </section>
         <section className="source-control-card">
           <div className="source-control-card__heading">
-            <h2>
-              <ImageUp size={16} aria-hidden="true" />
-              Ảnh tham chiếu (Tùy chọn)
-            </h2>
+            <h2>Ảnh tham chiếu (Tùy chọn)</h2>
             {referenceImages.length > 0 && (
               <span>
-                Chọn {referenceImages.length}/{MAX_REFERENCE_IMAGES}
+                Chọn {referenceImages.length}/{referenceLimit}
               </span>
             )}
           </div>
@@ -682,7 +609,7 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                   </div>
                 </div>
               ))}
-              {referenceImages.length < MAX_REFERENCE_IMAGES && (
+              {referenceImages.length < referenceLimit && (
                 <Button
                   type="button"
                   variant="secondary"
@@ -719,6 +646,27 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
           </h2>
           <div className="source-control-field">
             <span className="source-control-label-text">
+              <CircleUserRound size={16} aria-hidden="true" />
+              Tài khoản
+            </span>
+            <Select
+              value={selectedSlotId === null ? "" : String(selectedSlotId)}
+              onValueChange={(value) => setSelectedSlotId(Number(value))}
+            >
+              <SelectTrigger aria-label="Tài khoản">
+                <SelectValue placeholder="Chưa có tài khoản khả dụng" />
+              </SelectTrigger>
+              <SelectContent>
+                {accountSlots.map((slot) => (
+                  <SelectItem key={slot.id} value={String(slot.id)}>
+                    Slot {slot.id + 1}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="source-control-field">
+            <span className="source-control-label-text">
               <Brain size={16} aria-hidden="true" />
               Model
             </span>
@@ -745,28 +693,7 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                 <SelectValue placeholder="Chọn tỷ lệ" />
               </SelectTrigger>
               <SelectContent>
-                {[
-                  {
-                    value: "IMAGE_ASPECT_RATIO_LANDSCAPE",
-                    label: "16:9 (Ngang)",
-                  },
-                  {
-                    value: "IMAGE_ASPECT_RATIO_PORTRAIT",
-                    label: "9:16 (Dọc)",
-                  },
-                  {
-                    value: "IMAGE_ASPECT_RATIO_SQUARE",
-                    label: "1:1 (Vuông)",
-                  },
-                  {
-                    value: "IMAGE_ASPECT_RATIO_LANDSCAPE_FOUR_THREE",
-                    label: "4:3 (Ngang chuẩn)",
-                  },
-                  {
-                    value: "IMAGE_ASPECT_RATIO_PORTRAIT_THREE_FOUR",
-                    label: "3:4 (Dọc chuẩn)",
-                  },
-                ].map((option) => (
+                {aspectOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}
                   </SelectItem>
@@ -802,7 +729,15 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
         </small>
         <div className="source-generation-actions-row">
           <Button
-            disabled={running || !prompts.some((prompt) => prompt.trim())}
+            disabled={
+              tasks.filter(
+                (task) =>
+                  task.status === "queued" || task.status === "processing",
+              ).length >= 20 ||
+              selectedSlotId === null ||
+              referenceImages.length > referenceLimit ||
+              !prompts.some((prompt) => prompt.trim())
+            }
             onClick={() => void run()}
             className="source-generate-main-btn"
           >
@@ -987,7 +922,7 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                       <button
                         type="button"
                         className="source-task-save-retry-btn"
-                        onClick={() => void retrySaveTask(task)}
+                        onClick={() => void queue.retrySave(task.id)}
                         title="Thử lưu lại vào thư mục local"
                       >
                         <RotateCcw size={12} aria-hidden="true" />
@@ -1051,7 +986,13 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                       <button
                         type="button"
                         className="source-task-action-btn"
-                        onClick={() => void retryTask(task)}
+                        onClick={() => {
+                          if (!queue.retry(task.id)) {
+                            toast.error(
+                              "Không thể thử lại vì hàng đợi ảnh đã đầy.",
+                            );
+                          }
+                        }}
                         title="Thử lại"
                       >
                         <RotateCcw
@@ -1065,15 +1006,40 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                     <button
                       type="button"
                       className="source-task-action-btn source-task-action-btn--delete"
-                      onClick={() => deleteTask(task.id)}
-                      title="Xóa tác vụ này"
+                      onClick={() => {
+                        queue.removeTask(task.id);
+                        if (task.status === "processing") {
+                          toast.info(
+                            "Đã ẩn tác vụ khỏi danh sách; generation trên máy chủ vẫn tiếp tục.",
+                          );
+                        } else if (task.status === "queued") {
+                          toast.info("Đã bỏ tác vụ khỏi hàng đợi ảnh.");
+                        }
+                      }}
+                      title={
+                        task.status === "processing"
+                          ? "Ẩn khỏi danh sách (không hủy generation trên máy chủ)"
+                          : task.status === "queued"
+                            ? "Bỏ tác vụ khỏi hàng đợi chờ"
+                            : "Xóa tác vụ này"
+                      }
                     >
-                      <Trash2
-                        size={14}
-                        className="source-action-icon--delete"
-                        aria-hidden="true"
-                      />
-                      Xóa
+                      {task.status === "processing" ? (
+                        <EyeOff size={14} aria-hidden="true" />
+                      ) : task.status === "queued" ? (
+                        <X size={14} aria-hidden="true" />
+                      ) : (
+                        <Trash2
+                          size={14}
+                          className="source-action-icon--delete"
+                          aria-hidden="true"
+                        />
+                      )}
+                      {task.status === "processing"
+                        ? "Ẩn"
+                        : task.status === "queued"
+                          ? "Bỏ hàng đợi"
+                          : "Xóa"}
                     </button>
                   </footer>
                 </div>

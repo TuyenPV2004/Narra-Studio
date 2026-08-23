@@ -13,6 +13,49 @@ const ALLOWED_MEDIA_EXTENSIONS = new Set([
   '.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.opus',
 ]);
 
+function isValidImageBuffer(buffer) {
+  if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 4) return false;
+  if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4e && buffer[3] === 0x47) return true;
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return true;
+  if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38) return true;
+  return buffer.length >= 12 &&
+    buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+    buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50;
+}
+
+function isAllowedGoogleMediaHost(hostname) {
+  if (!hostname || typeof hostname !== 'string') return false;
+  const lower = hostname.toLowerCase();
+  return lower === 'labs.google' ||
+    lower === 'flow-content.google' ||
+    lower === 'aisandbox-pa.googleapis.com' ||
+    lower === 'storage.googleapis.com' ||
+    lower.endsWith('.google') ||
+    lower.endsWith('.labs.google') ||
+    lower.endsWith('.googleusercontent.com') ||
+    lower.endsWith('.googleapis.com') ||
+    lower.endsWith('.ggpht.com');
+}
+
+function validateGoogleMediaUrl(rawUrl) {
+  if (typeof rawUrl !== 'string' || !rawUrl.trim()) {
+    throw new Error('URL media không hợp lệ.');
+  }
+  let parsed;
+  try {
+    parsed = new URL(rawUrl);
+  } catch {
+    throw new Error('Định dạng URL media không hợp lệ.');
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Chỉ chấp nhận URL media dùng HTTPS.');
+  }
+  if (!isAllowedGoogleMediaHost(parsed.hostname)) {
+    throw new Error(`Host media không được phép: ${parsed.hostname}`);
+  }
+  return parsed;
+}
+
 function resolveLocalFilePath(filePath, options = {}) {
   if (!filePath || typeof filePath !== 'string') return '';
   const fileURLToPath = options.fileURLToPath || nativeFileURLToPath;
@@ -117,6 +160,9 @@ function validateMediaDeleteTarget(filePath, context = {}) {
 
 module.exports = {
   ALLOWED_MEDIA_EXTENSIONS,
+  isAllowedGoogleMediaHost,
+  isValidImageBuffer,
+  validateGoogleMediaUrl,
   resolveLocalFilePath,
   getAllowedMediaDirectories,
   isPathInsideRealDirectory,

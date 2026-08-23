@@ -1,5 +1,7 @@
 'use strict';
 
+const { grantLocalFileCapability } = require('../../runtime/localFileCapabilities');
+
 /**
  * Video project files on disk (list/save/load/delete), media file pickers,
  * and file deletion.
@@ -113,7 +115,10 @@ ipcMain.handle('select-video-files', async () => {
     ],
   });
   if (result.canceled || !result.filePaths.length) return null;
-  const urls = result.filePaths.map(p => pathToFileURL(p).toString());
+  const urls = result.filePaths
+    .map(grantLocalFileCapability)
+    .filter(Boolean)
+    .map(p => pathToFileURL(p).toString());
   // Return array if multi, string if single (backward compat)
   return urls.length === 1 ? urls[0] : urls;
 });
@@ -142,7 +147,10 @@ ipcMain.handle('select-media-files', async () => {
     ],
   });
   if (result.canceled || !result.filePaths.length) return null;
-  const urls = result.filePaths.map(p => pathToFileURL(p).toString());
+  const urls = result.filePaths
+    .map(grantLocalFileCapability)
+    .filter(Boolean)
+    .map(p => pathToFileURL(p).toString());
   return urls.length === 1 ? urls[0] : urls;
 });
 

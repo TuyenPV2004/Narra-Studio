@@ -360,10 +360,10 @@ try {
       `(() => { const input = document.querySelector('.source-prompt-row textarea'); const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set; setter.call(input, 'Smoke prompt'); input.dispatchEvent(new Event('input', {bubbles: true})); })()`,
     );
     await client.waitFor(
-      `document.querySelector('.source-generation-controls > .narra-button')?.disabled === false`,
+      `document.querySelector('.source-prompt-add-btn')?.disabled === false`,
     );
     await client.evaluate(
-      `document.querySelector('.source-control-card .narra-button')?.click()`,
+      `document.querySelector('.source-prompt-add-btn')?.click()`,
     );
     await client.waitFor(
       `document.querySelectorAll('.source-prompt-row').length === 2`,
@@ -375,7 +375,7 @@ try {
       `document.querySelectorAll('.source-prompt-row').length === 1`,
     );
     interaction = await client.evaluate(
-      `({promptCount: document.querySelectorAll('.source-prompt-row').length, generateEnabled: document.querySelector('.source-generation-controls > .narra-button')?.disabled === false})`,
+      `({promptCount: document.querySelectorAll('.source-prompt-row').length, generateDisabledWithoutAccount: document.querySelector('.source-generate-main-btn')?.disabled === true})`,
     );
   } else if (requestedPage === "image-editor") {
     await client.evaluate(`(() => {
@@ -842,7 +842,8 @@ try {
           ? await client.evaluate(`(() => ({
     visible: Boolean(document.querySelector('.source-image-page')?.getClientRects().length),
     promptCount: document.querySelectorAll('.source-prompt-row').length,
-    generateDisabled: document.querySelector('.source-generation-controls > .narra-button')?.disabled,
+    accountSelectorVisible: Boolean(document.querySelector('[aria-label="Tài khoản"]')?.getClientRects().length),
+    generateDisabled: document.querySelector('.source-generate-main-btn')?.disabled,
     emptyVisible: Boolean(document.querySelector('.source-generation-empty')?.getClientRects().length),
   }))()`)
           : requestedPage === "video-pro"
@@ -983,9 +984,11 @@ const assertions = {
           ]))) &&
     (requestedPage !== "image-ultra" ||
       (runtime.targetPage.promptCount === 1 &&
+        runtime.targetPage.accountSelectorVisible &&
+        runtime.targetPage.generateDisabled === true &&
         runtime.targetPage.emptyVisible &&
         runtime.interaction?.promptCount === 1 &&
-        runtime.interaction?.generateEnabled === true)) &&
+        runtime.interaction?.generateDisabledWithoutAccount === true)) &&
     (requestedPage !== "image-editor" ||
       (runtime.interaction?.canvasReady &&
         runtime.interaction?.flattenedImage &&

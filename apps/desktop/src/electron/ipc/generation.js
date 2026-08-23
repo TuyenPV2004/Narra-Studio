@@ -2,49 +2,20 @@
 
 const runtimeEndpoints = require("../../config/runtime-endpoints.json");
 const {
+  isAllowedGoogleMediaHost,
+  isValidImageBuffer,
+  validateGoogleMediaUrl,
+} = require("../runtime/mediaSecurity");
+const {
+  grantLocalFileCapability,
+  hasLocalFileCapability,
+} = require("../runtime/localFileCapabilities");
+const {
   requirePaygateTier,
   resolveVideoModelKey,
 } = require("./video-model-policy");
 
 // ── Validation Helpers ───────────────────────────────────────────────
-function isValidImageBuffer(buffer) {
-  if (!buffer || buffer.length < 4) return false;
-  // PNG: 89 50 4E 47
-  if (
-    buffer[0] === 0x89 &&
-    buffer[1] === 0x50 &&
-    buffer[2] === 0x4e &&
-    buffer[3] === 0x47
-  )
-    return true;
-  // JPEG: FF D8 FF
-  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff)
-    return true;
-  // GIF: 47 49 46 38
-  if (
-    buffer[0] === 0x47 &&
-    buffer[1] === 0x49 &&
-    buffer[2] === 0x46 &&
-    buffer[3] === 0x38
-  )
-    return true;
-  // WEBP: 52 49 46 46 ... 57 45 42 50
-  if (
-    buffer.length >= 12 &&
-    buffer[0] === 0x52 &&
-    buffer[1] === 0x49 &&
-    buffer[2] === 0x46 &&
-    buffer[3] === 0x46 &&
-    buffer[8] === 0x57 &&
-    buffer[9] === 0x45 &&
-    buffer[10] === 0x42 &&
-    buffer[11] === 0x50
-  ) {
-    return true;
-  }
-  return false;
-}
-
 function isValidVideoBuffer(buffer) {
   if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 12) return false;
 
@@ -175,75 +146,10 @@ module.exports = function registerGenerationIpc(dependencies) {
     getChromeRuntime,
   } = dependencies;
 
-  const AUTHORIZED_LOCAL_FILE_TTL_MS = 30 * 60 * 1000;
-  const MAX_AUTHORIZED_LOCAL_FILES = 256;
-  const authorizedLocalFilePaths = new Map();
-
-  function normalizeCapabilityKey(filePath) {
-    if (typeof filePath !== "string" || !filePath) return "";
-    const normalized = path.normalize(filePath);
-    return process.platform === "win32" ? normalized.toLowerCase() : normalized;
-  }
-
-  function grantLocalFileCapability(canonicalPath) {
-    const key = normalizeCapabilityKey(canonicalPath);
-    if (!key) return canonicalPath;
-    const expiresAt = Date.now() + AUTHORIZED_LOCAL_FILE_TTL_MS;
-    authorizedLocalFilePaths.delete(key);
-    authorizedLocalFilePaths.set(key, expiresAt);
-    while (authorizedLocalFilePaths.size > MAX_AUTHORIZED_LOCAL_FILES) {
-      authorizedLocalFilePaths.delete(
-        authorizedLocalFilePaths.keys().next().value,
-      );
-    }
-    return canonicalPath;
-  }
-
-  function hasLocalFileCapability(canonicalPath) {
-    const key = normalizeCapabilityKey(canonicalPath);
-    if (!key) return false;
-    const expiresAt = authorizedLocalFilePaths.get(key);
-    if (!expiresAt || expiresAt <= Date.now()) {
-      authorizedLocalFilePaths.delete(key);
-      return false;
-    }
-    authorizedLocalFilePaths.set(
-      key,
-      Date.now() + AUTHORIZED_LOCAL_FILE_TTL_MS,
-    );
-    return true;
-  }
-
-  function resolveLocalPathString(inputPath) {
-    if (typeof inputPath !== "string" || !inputPath.trim()) return "";
-    let resolvedPath = inputPath.trim();
-    try {
-      if (resolvedPath.startsWith("file://")) {
-        resolvedPath = fileURLToPath(resolvedPath);
-      }
-    } catch (_) {
-      resolvedPath = resolvedPath.replace(/^file:[/\\]{2,3}/, "");
-      resolvedPath = decodeURIComponent(resolvedPath);
-      if (process.platform === "win32" && /^\/[A-Za-z]:/.test(resolvedPath)) {
-        resolvedPath = resolvedPath.slice(1);
-      }
-    }
-    if (resolvedPath.includes("%")) {
-      try {
-        resolvedPath = decodeURIComponent(resolvedPath);
-      } catch {}
-    }
-    return path.normalize(resolvedPath);
-  }
-
   ipcMain.on("authorize-user-selected-file", (event, filePath) => {
     event.returnValue = "";
     try {
-      const target = resolveLocalPathString(filePath);
-      if (!target) return;
-      const canonicalPath = fs.realpathSync(target);
-      if (!fs.statSync(canonicalPath).isFile()) return;
-      event.returnValue = grantLocalFileCapability(canonicalPath);
+      event.returnValue = grantLocalFileCapability(filePath);
     } catch {
       // Fail closed: a path that Electron/Main cannot canonicalize is not
       // eligible for any later upload request from the renderer.
@@ -253,13 +159,8 @@ module.exports = function registerGenerationIpc(dependencies) {
   ipcMain.handle(
     "authorize-user-selected-file-async",
     async (_event, filePath) => {
-      const target = resolveLocalPathString(filePath);
-      if (!target) return "";
       try {
-        const canonicalPath = await fs.promises.realpath(target);
-        const stats = await fs.promises.stat(canonicalPath);
-        if (!stats.isFile()) return "";
-        return grantLocalFileCapability(canonicalPath);
+        return grantLocalFileCapability(filePath);
       } catch {
         return "";
       }
@@ -825,6 +726,11 @@ module.exports = function registerGenerationIpc(dependencies) {
       const stats = fs.statSync(realPath);
       if (!stats.isFile()) {
         throw new Error(`Đường dẫn không phải là một file hợp lệ: ${realPath}`);
+      }
+      if (!hasLocalFileCapability(realPath)) {
+        throw new Error(
+          "File ảnh chưa được người dùng cấp quyền qua hộp chọn file.",
+        );
       }
       if (stats.size > MAX_IMAGE_FILE_SIZE_BYTES) {
         throw new Error(
@@ -2296,25 +2202,7 @@ module.exports = function registerGenerationIpc(dependencies) {
       throw new Error("Chỉ chấp nhận giao thức HTTPS an toàn.");
     }
 
-    const isAllowedHost = (hostname) => {
-      if (!hostname || typeof hostname !== "string") return false;
-      const lower = hostname.toLowerCase();
-      return (
-        lower === "labs.google" ||
-        lower === "flow-content.google" ||
-        lower === "aisandbox-pa.googleapis.com" ||
-        lower === "storage.googleapis.com" ||
-        lower.endsWith(".google") ||
-        lower.endsWith(".labs.google") ||
-        lower.endsWith(".googleusercontent.com") ||
-        lower.endsWith(".googleapis.com") ||
-        lower.endsWith(".ggpht.com")
-      );
-    };
-
-    if (!isAllowedHost(parsed.hostname)) {
-      throw new Error(`Host không được phép truy cập: ${parsed.hostname}`);
-    }
+    validateGoogleMediaUrl(parsed.href);
 
     const targetPartition = `persist:slot-${slotId ?? 0}`;
     return new Promise((resolve, reject) => {
@@ -2334,7 +2222,7 @@ module.exports = function registerGenerationIpc(dependencies) {
           if (redirParsed.protocol !== "https:") {
             return reject(new Error("Redirect protocol không an toàn."));
           }
-          if (!isAllowedHost(redirParsed.hostname)) {
+          if (!isAllowedGoogleMediaHost(redirParsed.hostname)) {
             return reject(
               new Error(
                 `Redirect host không được phép: ${redirParsed.hostname}`,

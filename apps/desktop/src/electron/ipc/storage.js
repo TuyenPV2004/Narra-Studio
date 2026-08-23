@@ -2,6 +2,16 @@
 
 const { downloadRemoteMediaToFile } = require('../runtime/workspaceBackupMedia');
 const { brand } = require('../runtime/brand');
+const { isValidImageBuffer, validateGoogleMediaUrl } = require('../runtime/mediaSecurity');
+
+const MAX_SAVED_IMAGE_BYTES = 25 * 1024 * 1024;
+const ALLOWED_SAVED_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/octet-stream',
+]);
 
 module.exports = function registerStorageIpc(dependencies) {
   const {
@@ -937,7 +947,10 @@ ipcMain.handle('save-image-locally', async (_, { src, fileName, slotId = 0 } = {
   const imagesDir = getImageOutputDir();
   if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
 
-  const ext = (fileName || 'image.png').split('.').pop() || 'png';
+  const requestedExt = path.extname(fileName || '').slice(1).toLowerCase();
+  const ext = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(requestedExt)
+    ? requestedExt
+    : 'png';
   const uniqueName = getNextFilename(imagesDir, ext);
   const filepath = path.join(imagesDir, uniqueName);
 
@@ -946,31 +959,68 @@ ipcMain.handle('save-image-locally', async (_, { src, fileName, slotId = 0 } = {
   }
 
   if (src.startsWith('data:')) {
-    // base64 data URL
-    const base64Data = src.replace(/^data:image\/\w+;base64,/, '');
-    fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
-  } else if (src.startsWith('http')) {
+    const match = /^data:(image\/(?:jpeg|png|webp|gif));base64,([a-zA-Z0-9+/=]+)$/.exec(src);
+    if (!match) throw new Error('Data URL ảnh không hợp lệ hoặc không được hỗ trợ.');
+    const buffer = Buffer.from(match[2], 'base64');
+    if (buffer.length === 0 || buffer.length > MAX_SAVED_IMAGE_BYTES) {
+      throw new Error('Dung lượng ảnh lưu local vượt quá giới hạn 25MB.');
+    }
+    if (!isValidImageBuffer(buffer)) {
+      throw new Error('Dữ liệu lưu local không phải hình ảnh hợp lệ.');
+    }
+    fs.writeFileSync(filepath, buffer);
+  } else if (src.startsWith('https:')) {
+    validateGoogleMediaUrl(src);
     // Download from URL using Electron session downloadURL with matching slot partition
     const targetPartition = `persist:slot-${slotId ?? 0}`;
     const ses = session.fromPartition(targetPartition);
     await new Promise((resolve, reject) => {
       let done = false;
+      let activeItem = null;
+      let timeoutId = null;
       const finish = (err) => {
         if (done) return;
         done = true;
+        if (timeoutId) clearTimeout(timeoutId);
         if (err) reject(err); else resolve(null);
       };
 
       // Use will-download to intercept and save
       const handler = (event, item) => {
+        const initialChain = typeof item.getURLChain === 'function' ? item.getURLChain() : [];
+        const initialUrl = typeof item.getURL === 'function' ? item.getURL() : '';
+        if (initialChain.length > 0 ? !initialChain.includes(src) : initialUrl && initialUrl !== src) return;
+        activeItem = item;
         item.setSavePath(filepath);
+        item.on('updated', () => {
+          if (item.getReceivedBytes() > MAX_SAVED_IMAGE_BYTES) item.cancel();
+        });
         item.on('done', (e, state) => {
           ses.removeListener('will-download', handler);
           if (state === 'completed') {
-            console.log(`[IMAGE] Downloaded: ${filepath} (${item.getTotalBytes()} bytes)`);
-            finish(null);
+            try {
+              const urlChain = typeof item.getURLChain === 'function' ? item.getURLChain() : [src];
+              urlChain.forEach(validateGoogleMediaUrl);
+              const mimeType = typeof item.getMimeType === 'function' ? item.getMimeType().toLowerCase() : '';
+              const buffer = fs.readFileSync(filepath);
+              if (buffer.length === 0 || buffer.length > MAX_SAVED_IMAGE_BYTES) {
+                throw new Error('Dung lượng ảnh tải về vượt quá giới hạn 25MB.');
+              }
+              if (mimeType && !ALLOWED_SAVED_IMAGE_MIME_TYPES.has(mimeType)) {
+                throw new Error(`MIME ảnh tải về không được hỗ trợ: ${mimeType}`);
+              }
+              if (!isValidImageBuffer(buffer)) {
+                throw new Error('Nội dung tải về không phải hình ảnh hợp lệ.');
+              }
+              console.log(`[IMAGE] Downloaded: ${filepath} (${buffer.length} bytes)`);
+              finish(null);
+            } catch (error) {
+              try { fs.unlinkSync(filepath); } catch {}
+              finish(error);
+            }
           } else {
             console.error(`[IMAGE] Download failed: ${state}`);
+            try { fs.unlinkSync(filepath); } catch {}
             finish(new Error(`Download ${state}`));
           }
         });
@@ -981,15 +1031,14 @@ ipcMain.handle('save-image-locally', async (_, { src, fileName, slotId = 0 } = {
       ses.downloadURL(src);
 
       // Safety timeout
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         ses.removeListener('will-download', handler);
+        try { activeItem?.cancel(); } catch {}
+        try { fs.unlinkSync(filepath); } catch {}
         finish(new Error('Download timeout 60s'));
       }, 60000);
     });
-  } else {
-    // Already a local file path
-    return src;
-  }
+  } else throw new Error('Nguồn ảnh phải là HTTPS hoặc data URL hợp lệ.');
 
   return pathToFileURL(filepath).toString();
 });

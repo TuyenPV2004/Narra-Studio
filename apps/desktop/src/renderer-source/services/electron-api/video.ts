@@ -448,10 +448,6 @@ export const videoApi = {
           filePath = "";
         }
       }
-      if (filePath) {
-        const authorized = await getElectronApi().authorizeFilePath(filePath);
-        if (authorized) filePath = authorized;
-      }
       if (!filePath) {
         throw new Error(
           `Không thể cấp quyền đọc file video "${request.editVideo.name}". Vui lòng chọn lại video đầu vào.`,

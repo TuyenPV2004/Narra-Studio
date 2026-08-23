@@ -2,7 +2,26 @@
 
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
+const os = require("node:os");
 const path = require("node:path");
+const mediaSecurityPath = path.resolve(
+  __dirname,
+  "../apps/desktop/src/electron/runtime/mediaSecurity.js",
+);
+const mediaSecurityContent = fs.readFileSync(mediaSecurityPath, "utf8");
+const {
+  isAllowedGoogleMediaHost,
+  validateGoogleMediaUrl,
+} = require(mediaSecurityPath);
+const {
+  grantLocalFileCapability,
+  hasLocalFileCapability,
+} = require(
+  path.resolve(
+    __dirname,
+    "../apps/desktop/src/electron/runtime/localFileCapabilities.js",
+  )
+);
 
 // ── 1. Test Image Magic Byte Detection Logic ─────────────────────────
 const isValidImageBuffer = (buffer) => {
@@ -133,6 +152,33 @@ assert.equal(isAllowedHost("googleusercontent.com.attacker.com"), false);
 assert.equal(isAllowedHost("example.com"), false);
 assert.equal(isAllowedHost(""), false);
 assert.equal(isAllowedHost(null), false);
+assert.equal(isAllowedGoogleMediaHost("storage.googleapis.com"), true);
+assert.equal(isAllowedGoogleMediaHost("127.0.0.1"), false);
+assert.equal(
+  validateGoogleMediaUrl("https://labs.google/fx/api/trpc/media").protocol,
+  "https:",
+);
+assert.throws(
+  () => validateGoogleMediaUrl("http://127.0.0.1/image.png"),
+  /HTTPS/,
+);
+assert.throws(
+  () => validateGoogleMediaUrl("https://example.com/image.png"),
+  /không được phép/,
+);
+const capabilityTestDir = fs.mkdtempSync(
+  path.join(os.tmpdir(), "narra-image-capability-"),
+);
+const capabilityTestFile = path.join(capabilityTestDir, "selected.png");
+try {
+  fs.writeFileSync(capabilityTestFile, pngBuffer);
+  assert.equal(hasLocalFileCapability(capabilityTestFile), false);
+  const canonicalCapabilityPath = grantLocalFileCapability(capabilityTestFile);
+  assert.equal(path.isAbsolute(canonicalCapabilityPath), true);
+  assert.equal(hasLocalFileCapability(capabilityTestFile), true);
+} finally {
+  fs.rmSync(capabilityTestDir, { recursive: true, force: true });
+}
 
 // ── 3. Test Protocol Validation (HTTPS only) ──────────────────────────
 const isSafeUrl = (urlStr) => {
@@ -205,9 +251,9 @@ assert.equal(
   "generation.js must define MAX_IMAGE_BASE64_LENGTH",
 );
 assert.equal(
-  genJsContent.includes("isAllowedHost"),
+  mediaSecurityContent.includes("isAllowedGoogleMediaHost"),
   true,
-  "generation.js must contain isAllowedHost",
+  "Shared media security policy must contain the Google media host allowlist",
 );
 assert.equal(
   genJsContent.includes("resolve-video-url"),
@@ -435,7 +481,7 @@ assert.equal(
   "generation.js must check max reference image count",
 );
 
-// ── 10. Verify SaveStatus Discriminated Union & UI Invariants ──────────
+// ── 10. Verify Image Queue & UI Invariants ─────────────────────────────
 const imageTsPath = path.resolve(
   __dirname,
   "../apps/desktop/src/renderer-source/services/electron-api/image.ts",
@@ -478,6 +524,11 @@ const imageGenPagePath = path.resolve(
   "../apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
 );
 const imageGenPageContent = fs.readFileSync(imageGenPagePath, "utf8");
+const imageQueuePath = path.resolve(
+  __dirname,
+  "../apps/desktop/src/renderer-source/pages/Image/useImageQueue.ts",
+);
+const imageQueueContent = fs.readFileSync(imageQueuePath, "utf8");
 
 assert.equal(
   imageGenPageContent.includes("displayBatchPercent"),
@@ -485,9 +536,9 @@ assert.equal(
   "ImageGeneratorPage must use displayBatchPercent for batch progress",
 );
 assert.equal(
-  imageGenPageContent.includes("saveStatus: SaveStatus;"),
+  imageQueueContent.includes("saveStatus: ImageSaveStatus;"),
   true,
-  "ImageTask must declare non-optional saveStatus",
+  "Image queue task must declare non-optional saveStatus",
 );
 assert.equal(
   imageGenPageContent.includes('saveStatus || "saved"'),
@@ -498,6 +549,50 @@ assert.equal(
   imageGenPageContent.includes('"cancelled"'),
   false,
   "TaskStatus must not contain dead code 'cancelled'",
+);
+assert.equal(
+  appContent.includes("<ImageQueueProvider>"),
+  true,
+  "App must keep the Image queue mounted across page navigation",
+);
+assert.equal(
+  imageGenPageContent.includes("useImageQueue()"),
+  true,
+  "ImageGeneratorPage must consume the app-scoped Image queue",
+);
+assert.equal(
+  imageQueueContent.includes("MAX_ACTIVE_IMAGE_TASKS = 20"),
+  true,
+  "Image queue must cap active tasks at 20",
+);
+assert.equal(
+  imageQueueContent.includes("tasksRef.current = next"),
+  true,
+  "Image queue must synchronously reserve and remove tasks",
+);
+assert.equal(
+  imageQueueContent.includes(".generate(next.request)"),
+  true,
+  "Image queue retry must reuse the original request snapshot",
+);
+assert.equal(
+  imageGenPageContent.includes("Bỏ hàng đợi") &&
+    imageGenPageContent.includes("không hủy generation trên máy chủ"),
+  true,
+  "Image task removal labels must distinguish queued and processing work",
+);
+assert.equal(
+  imageTsContent.includes("generated.imageUri") &&
+    imageTsContent.includes("generated.encodedImage") &&
+    imageTsContent.includes("generated.mediaId"),
+  true,
+  "Image response parsing must support documented URL, base64, and media ID aliases",
+);
+assert.equal(
+  imageTsContent.includes('typeof request.slotId === "number"') &&
+    imageTsContent.includes("getModelsForSlot"),
+  true,
+  "Image adapter must honor explicit slots and discover account-scoped model policy",
 );
 
 // ── 11. Behavioral Runtime Mock Tests for Slot Isolation & Mismatch ───
@@ -1607,7 +1702,50 @@ registerGenerationIpc({
   assert.equal(
     genJsContent.includes("hasLocalFileCapability(realPath)"),
     true,
-    "Video upload must require a path capability granted from a real browser File",
+    "Image and video uploads must require a local file capability",
+  );
+  assert.equal(
+    genJsContent.indexOf("hasLocalFileCapability(realPath)") !==
+      genJsContent.lastIndexOf("hasLocalFileCapability(realPath)"),
+    true,
+    "Both image and video path uploads must enforce the capability",
+  );
+  assert.equal(
+    storageJsContent.includes("validateGoogleMediaUrl(src)") &&
+      storageJsContent.includes("MAX_SAVED_IMAGE_BYTES") &&
+      storageJsContent.includes("isValidImageBuffer(buffer)"),
+    true,
+    "Local image saving must enforce HTTPS allowlist, size, and image content validation",
+  );
+  const authorizePreloadBlock = preloadContent.slice(
+    preloadContent.indexOf("authorizeFilePath: (file) =>"),
+    preloadContent.indexOf("openDevTools:"),
+  );
+  assert.equal(
+    authorizePreloadBlock.includes('typeof file === "string"') ||
+      authorizePreloadBlock.includes('typeof file.path === "string"'),
+    false,
+    "Renderer must not self-authorize an arbitrary path string or path-shaped object",
+  );
+  const localCapabilityContent = fs.readFileSync(
+    path.resolve(
+      __dirname,
+      "../apps/desktop/src/electron/runtime/localFileCapabilities.js",
+    ),
+    "utf8",
+  );
+  const mediaProjectsContent = fs.readFileSync(
+    path.resolve(
+      __dirname,
+      "../apps/desktop/src/electron/ipc/media/projects.js",
+    ),
+    "utf8",
+  );
+  assert.equal(
+    localCapabilityContent.includes("grantLocalFileCapability") &&
+      mediaProjectsContent.includes(".map(grantLocalFileCapability)"),
+    true,
+    "Main-process file dialogs must grant capabilities through the shared registry",
   );
   assert.equal(
     /ipcRenderer\s*\.\s*invoke\(\s*["']authorize-user-selected-file-async["']/.test(
@@ -1691,7 +1829,7 @@ registerGenerationIpc({
     "The Main video download queue must have an explicit capacity",
   );
   assert.equal(
-    genJsContent.includes("MAX_AUTHORIZED_LOCAL_FILES"),
+    localCapabilityContent.includes("MAX_AUTHORIZED_LOCAL_FILES"),
     true,
     "Local file capabilities must have an explicit bound",
   );

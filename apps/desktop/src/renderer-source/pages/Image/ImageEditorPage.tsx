@@ -1,5 +1,6 @@
 import {
   Crop,
+  CircleUserRound,
   FileCheck,
   FolderOpen,
   Images,
@@ -18,6 +19,13 @@ import {
   type ChangeEvent,
 } from "react";
 import { Button } from "@/components/ui/Button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
 import { getElectronApi } from "@/services/electron-api/client";
 import { formatImageError, imageApi } from "@/services/electron-api/image";
 import type { ProviderId } from "@/types/electron-api";
@@ -41,6 +49,8 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
   }>();
   const [error, setError] = useState<string>();
   const [running, setRunning] = useState(false);
+  const [accountSlotIds, setAccountSlotIds] = useState<number[]>([]);
+  const [selectedSlotId, setSelectedSlotId] = useState<number | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [annotationCount, setAnnotationCount] = useState(0);
   const [annotationTool, setAnnotationTool] = useState<AnnotationTool>("pen");
@@ -57,6 +67,39 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
     [],
   );
   void providerId;
+  useEffect(() => {
+    let cancelled = false;
+    void getElectronApi()
+      .getAllSlots()
+      .then((value) => {
+        if (cancelled || !Array.isArray(value)) return;
+        const ids = value.flatMap((item) => {
+          if (!item || typeof item !== "object") return [];
+          const slot = item as Record<string, unknown>;
+          return typeof slot.id === "number" &&
+            slot.hasBearerToken === true &&
+            typeof slot.projectId === "string" &&
+            slot.projectId
+            ? [slot.id]
+            : [];
+        });
+        setAccountSlotIds(ids);
+        setSelectedSlotId((current) =>
+          current !== null && ids.includes(current)
+            ? current
+            : (ids[0] ?? null),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setAccountSlotIds([]);
+          setSelectedSlotId(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   useEffect(() => {
     if (!file) {
       setPreview("");
@@ -88,7 +131,14 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
   };
 
   const edit = async () => {
-    if (!file || !imageReady || !prompt.trim() || !canvasRef.current) return;
+    if (
+      !file ||
+      !imageReady ||
+      !prompt.trim() ||
+      !canvasRef.current ||
+      selectedSlotId === null
+    )
+      return;
     setRunning(true);
     setError(undefined);
     try {
@@ -96,6 +146,7 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
       const output = await imageApi.editVeoImage({
         dataUrl,
         prompt: prompt.trim(),
+        slotId: selectedSlotId,
       });
       const saveRes = await imageApi
         .save(output.src, output.slotId)
@@ -302,8 +353,35 @@ export function ImageEditorPage({ providerId }: { providerId: ProviderId }) {
               placeholder="Mô tả thay đổi cần thực hiện (ví dụ: thay đổi bầu trời thành hoàng hôn, xóa đối tượng trong vùng chọn...)"
             />
           </label>
+          <div className="source-control-field">
+            <span className="source-control-label-text">
+              <CircleUserRound size={16} aria-hidden="true" />
+              Tài khoản
+            </span>
+            <Select
+              value={selectedSlotId === null ? "" : String(selectedSlotId)}
+              onValueChange={(value) => setSelectedSlotId(Number(value))}
+            >
+              <SelectTrigger aria-label="Tài khoản chỉnh sửa ảnh">
+                <SelectValue placeholder="Chưa có tài khoản khả dụng" />
+              </SelectTrigger>
+              <SelectContent>
+                {accountSlotIds.map((slotId) => (
+                  <SelectItem key={slotId} value={String(slotId)}>
+                    Slot {slotId + 1}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <Button
-            disabled={!file || !imageReady || !prompt.trim() || running}
+            disabled={
+              !file ||
+              !imageReady ||
+              !prompt.trim() ||
+              running ||
+              selectedSlotId === null
+            }
             onClick={() => void edit()}
           >
             <Sparkles size={16} aria-hidden="true" />

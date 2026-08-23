@@ -535,14 +535,12 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
       if (res) {
         const urlStr = Array.isArray(res) ? res[0] : res;
         if (typeof urlStr === "string" && urlStr.trim()) {
-          const authorizedPath =
-            await getElectronApi().authorizeFilePath(urlStr);
           const rawName = urlStr.split(/[/\\]/).pop() || "video.mp4";
           const cleanName = decodeURIComponent(rawName);
           setEditVideo({
             name: cleanName,
             size: 0,
-            path: authorizedPath || urlStr,
+            path: urlStr,
             url: urlStr,
           } as unknown as File);
           return;

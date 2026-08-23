@@ -10,11 +10,6 @@ contextBridge.exposeInMainWorld("api", {
         } catch {
           filePath = "";
         }
-        if (!filePath && typeof file.path === "string") {
-          filePath = file.path;
-        }
-      } else if (typeof file === "string") {
-        filePath = file;
       }
       if (!filePath || typeof filePath !== "string" || !filePath.trim()) {
         return Promise.resolve("");
@@ -39,11 +34,6 @@ contextBridge.exposeInMainWorld("api", {
         } catch {
           filePath = "";
         }
-        if (!filePath && typeof file.path === "string") {
-          filePath = file.path;
-        }
-      } else if (typeof file === "string") {
-        filePath = file;
       }
       if (!filePath || typeof filePath !== "string" || !filePath.trim()) {
         return "";
