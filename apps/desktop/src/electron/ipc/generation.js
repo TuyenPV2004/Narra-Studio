@@ -162,7 +162,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     isDryRunActive,
     makeApiRequest,
     RECAPTCHA_SITE_KEY,
-    findFlowWebview,
     findChromePath,
     httpGetJson,
     createCdpClient,
@@ -172,8 +171,7 @@ module.exports = function registerGenerationIpc(dependencies) {
     makeApiRequestViaChrome,
     reloadFlowWebviewForSlot,
     reloadChromeCdpLabs,
-    makeApiRequestViaWebview,
-    setActiveWebviewSlot,
+    makeApiRequestWithCaptcha,
     getChromeRuntime,
   } = dependencies;
 
@@ -479,7 +477,7 @@ module.exports = function registerGenerationIpc(dependencies) {
       console.log(
         `[SLOT-${slot.id}][API] Getting fresh CAPTCHA via webview...`,
       );
-      return makeApiRequestViaWebview(url, body, slot.id);
+      return makeApiRequestWithCaptcha(url, body, slot.id);
     },
   );
 
@@ -552,7 +550,7 @@ module.exports = function registerGenerationIpc(dependencies) {
         `[SLOT-${slotId}][API] Edit image with base: ${baseMediaId}, prompt: "${prompt}", aspect: ${normalizeImageAspect(aspectRatio)}`,
       );
       const url = `https://aisandbox-pa.googleapis.com/v1/projects/${projectId}/flowMedia:batchGenerateImages`;
-      return makeApiRequestViaWebview(url, body, slotId);
+      return makeApiRequestWithCaptcha(url, body, slotId);
     },
   );
 
@@ -596,7 +594,7 @@ module.exports = function registerGenerationIpc(dependencies) {
         `[SLOT-${slotId}][API] Upscale image mediaId=${mediaId} resolution=${targetResolution}`,
       );
       const url = "https://aisandbox-pa.googleapis.com/v1/flow/upsampleImage";
-      return makeApiRequestViaWebview(url, body, slotId);
+      return makeApiRequestWithCaptcha(url, body, slotId);
     },
   );
 
@@ -615,7 +613,7 @@ module.exports = function registerGenerationIpc(dependencies) {
     );
     const url =
       "https://aisandbox-pa.googleapis.com/v1/video:generatePinholeGif";
-    return makeApiRequestViaWebview(url, body, slotId);
+    return makeApiRequestWithCaptcha(url, body, slotId);
   });
 
   // ── Upscale Video (1080p / 4K) ────────────────────────────────────────
@@ -674,7 +672,7 @@ module.exports = function registerGenerationIpc(dependencies) {
       );
       const url =
         "https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoUpsampleVideo";
-      return makeApiRequestViaWebview(url, body, slotId, "VIDEO_GENERATION");
+      return makeApiRequestWithCaptcha(url, body, slotId, "VIDEO_GENERATION");
     },
   );
 
@@ -884,43 +882,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Upload Image via Webview (có reCAPTCHA, trả về CDN URL) ──────────
-  ipcMain.handle(
-    "upload-image-via-webview",
-    async (_, { filePath, imageBytes, fileName, mimeType, slotId = 0 }) => {
-      const slot = getSlot(slotId);
-      if (!slot?.bearerToken)
-        throw new Error(`Slot ${slotId} chưa có Bearer token!`);
-      const projectId = slot.projectId;
-      if (!projectId)
-        throw new Error(
-          `Slot ${slotId} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`,
-        );
-
-      let base64 = imageBytes;
-      if (filePath && !base64) {
-        const buffer = fs.readFileSync(filePath);
-        base64 = buffer.toString("base64");
-      }
-
-      const body = {
-        clientContext: { projectId, tool: "PINHOLE" },
-        fileName:
-          fileName || (filePath ? path.basename(filePath) : "image.jpg"),
-        imageBytes: base64,
-        isHidden: false,
-        isUserUploaded: true,
-        mimeType: mimeType || "image/jpeg",
-      };
-
-      console.log(
-        `[SLOT-${slotId}][API-WEBVIEW] Upload image via webview: ${body.fileName}`,
-      );
-      const url = "https://aisandbox-pa.googleapis.com/v1/flow/uploadImage";
-      return makeApiRequestViaWebview(url, body, slotId);
-    },
-  );
-
   // ── Generate Video (legacy — used by VideoPage) ──────────────────────
   ipcMain.handle(
     "generate-video",
@@ -995,7 +956,7 @@ module.exports = function registerGenerationIpc(dependencies) {
       );
       const url =
         "https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoText";
-      return makeApiRequestViaWebview(url, body, slot.id, "VIDEO_GENERATION");
+      return makeApiRequestWithCaptcha(url, body, slot.id, "VIDEO_GENERATION");
     },
   );
 
@@ -1065,7 +1026,7 @@ module.exports = function registerGenerationIpc(dependencies) {
       );
       const url =
         "https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoText";
-      return makeApiRequestViaWebview(url, body, slot.id, "VIDEO_GENERATION");
+      return makeApiRequestWithCaptcha(url, body, slot.id, "VIDEO_GENERATION");
     },
   );
 
@@ -1140,7 +1101,7 @@ module.exports = function registerGenerationIpc(dependencies) {
       );
       const url =
         "https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoStartImage";
-      return makeApiRequestViaWebview(url, body, slot.id, "VIDEO_GENERATION");
+      return makeApiRequestWithCaptcha(url, body, slot.id, "VIDEO_GENERATION");
     },
   );
 
@@ -1220,7 +1181,7 @@ module.exports = function registerGenerationIpc(dependencies) {
       );
       const url =
         "https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoStartAndEndImage";
-      return makeApiRequestViaWebview(url, body, slot.id, "VIDEO_GENERATION");
+      return makeApiRequestWithCaptcha(url, body, slot.id, "VIDEO_GENERATION");
     },
   );
 
@@ -1297,7 +1258,7 @@ module.exports = function registerGenerationIpc(dependencies) {
       );
       const url =
         "https://aisandbox-pa.googleapis.com/v1/video:batchAsyncGenerateVideoReferenceImages";
-      return makeApiRequestViaWebview(url, body, slot.id, "VIDEO_GENERATION");
+      return makeApiRequestWithCaptcha(url, body, slot.id, "VIDEO_GENERATION");
     },
   );
 
@@ -1449,7 +1410,7 @@ module.exports = function registerGenerationIpc(dependencies) {
         ],
       };
 
-      const response = await makeApiRequestViaWebview(
+      const response = await makeApiRequestWithCaptcha(
         "https://aisandbox-pa.googleapis.com/v1/flow:batchGenerateAudio",
         body,
         slot.id,
@@ -1610,113 +1571,12 @@ module.exports = function registerGenerationIpc(dependencies) {
           `[SLOT-${slot.id}][API] EditVideo videoInput:`,
           JSON.stringify(request.videoInput),
         );
-      return makeApiRequestViaWebview(url, body, slot.id, "VIDEO_GENERATION");
+      return makeApiRequestWithCaptcha(url, body, slot.id, "VIDEO_GENERATION");
     },
   );
 
-  // ── Upload Omni Video (local file → mediaId) ─────────────────────────
-  // Strategy: execute the upload INSIDE the webview via executeJavaScript.
-  // All Node.js-based approaches (net.request, https.request) fail with 500
-  // ── Debug: intercept browser's own upload-video fetch calls ──
-  ipcMain.handle("spy-upload", async (_, { slotId = 0 }) => {
-    const wv = findFlowWebview(slotId);
-    if (!wv) throw new Error("WebView not found");
-
-    console.log("[SPY-UPLOAD] Injecting fetch interceptor into webview...");
-    await wv.executeJavaScript(`
-    (function() {
-      if (window.__uploadSpyActive) { console.log('[SPY] Already active'); return; }
-      window.__uploadSpyActive = true;
-      window.__uploadSpyLogs = [];
-      const origFetch = window.fetch;
-      window.fetch = async function(...args) {
-        const [url, opts] = args;
-        const urlStr = typeof url === 'string' ? url : url.url;
-
-        // Only intercept upload-video calls
-        if (urlStr && urlStr.includes('upload-video')) {
-          const method = (opts && opts.method) || 'GET';
-          const headers = {};
-          if (opts && opts.headers) {
-            if (opts.headers instanceof Headers) {
-              opts.headers.forEach((v, k) => { headers[k] = v; });
-            } else {
-              Object.assign(headers, opts.headers);
-            }
-          }
-
-          // Get body size
-          let bodySize = 0;
-          if (opts && opts.body) {
-            if (opts.body instanceof Blob) bodySize = opts.body.size;
-            else if (opts.body instanceof ArrayBuffer) bodySize = opts.body.byteLength;
-            else if (opts.body instanceof Uint8Array) bodySize = opts.body.byteLength;
-            else if (typeof opts.body === 'string') bodySize = opts.body.length;
-            else bodySize = -1;
-          }
-
-          const entry = {
-            ts: new Date().toISOString(),
-            method,
-            url: urlStr.substring(0, 120),
-            headers,
-            bodySize,
-          };
-
-          console.log('[SPY-UPLOAD] >>>', method, urlStr.substring(0, 80),
-            'cmd=' + (headers['X-Upload-Command'] || headers['x-upload-command'] || '?'),
-            'offset=' + (headers['X-Upload-Offset'] || headers['x-upload-offset'] || '?'),
-            'bodySize=' + bodySize);
-
-          const res = await origFetch.apply(this, args);
-
-          // Clone response to read body without consuming
-          const clone = res.clone();
-          let resBody = '';
-          try { resBody = await clone.text(); } catch(e) { resBody = '[read error]'; }
-
-          // Log response headers
-          const resHeaders = {};
-          res.headers.forEach((v, k) => { resHeaders[k] = v; });
-
-          entry.status = res.status;
-          entry.resHeaders = resHeaders;
-          entry.resBody = resBody.substring(0, 500);
-          window.__uploadSpyLogs.push(entry);
-
-          console.log('[SPY-UPLOAD] <<<', res.status, resBody.substring(0, 300));
-
-          return res;
-        }
-
-        return origFetch.apply(this, args);
-      };
-      console.log('[SPY] ✅ Fetch interceptor installed. Now upload a video via browser UI.');
-    })()
-  `);
-
-    console.log(
-      "[SPY-UPLOAD] ✅ Interceptor installed. Upload a video via labs.google UI, then call get-spy-logs.",
-    );
-    return {
-      ok: true,
-      message: "Interceptor installed. Upload video via browser UI now.",
-    };
-  });
-
-  // ── Retrieve captured spy logs ──
-  ipcMain.handle("get-spy-logs", async (_, { slotId = 0 }) => {
-    const wv = findFlowWebview(slotId);
-    if (!wv) throw new Error("WebView not found");
-
-    const logs = await wv.executeJavaScript(
-      `JSON.parse(JSON.stringify(window.__uploadSpyLogs || []))`,
-    );
-    console.log("[SPY-UPLOAD] Collected logs:", JSON.stringify(logs, null, 2));
-    return logs;
-  });
-
-  // on finalize — the browser's native fetch in the webview context works
+  // Upload Omni Video (local file → mediaId). The direct request is preferred;
+  // a short-lived same-origin BrowserWindow is used only when Google rejects it.
   // Upload video to Google via /fx/api/upload-video proxy (resumable chunked upload).
   // All 3 steps run inside webview executeJavaScript (same-origin, cookies automatic).
   // Chunk-by-chunk base64 transfer to avoid single massive string.
@@ -2113,52 +1973,48 @@ module.exports = function registerGenerationIpc(dependencies) {
       }
     }
 
-    // Strategy 2: use the existing WebView, or create a short-lived hidden
-    // browser bridge with the selected slot's isolated session. The Video page
-    // does not mount a <webview>, so uploads must not require the user to open
-    // another tab first.
+    // Strategy 2: create a short-lived browser bridge with the selected slot's
+    // isolated session. The upload endpoint requires a same-origin browser
+    // context, but it does not require an Electron <webview>.
     let uploadBridgeWindow = null;
-    let wv = findFlowWebview(slotId);
     const closeUploadBridge = () => {
       if (uploadBridgeWindow && !uploadBridgeWindow.isDestroyed()) {
         uploadBridgeWindow.close();
       }
     };
-    if (!wv || wv.isDestroyed?.()) {
-      const cleanUserAgent = slot.userAgent || buildCleanUserAgent();
-      slotSession.setUserAgent?.(cleanUserAgent);
-      uploadBridgeWindow = new BrowserWindow({
-        width: 1,
-        height: 1,
-        show: false,
-        title: `Google Flow upload — Slot ${slot.id + 1}`,
-        webPreferences: {
-          partition: slot.partition || `persist:slot-${slot.id}`,
-          nodeIntegration: false,
-          contextIsolation: true,
-          backgroundThrottling: false,
-        },
-      });
-      wv = uploadBridgeWindow.webContents;
-      wv.setUserAgent?.(cleanUserAgent);
-      try {
-        await wv.loadURL(
-          `https://labs.google/fx/tools/flow/project/${encodeURIComponent(projectId)}`,
-        );
-      } catch (error) {
-        closeUploadBridge();
-        if (tempCompressedPath) {
-          try {
-            await fs.promises.unlink(tempCompressedPath);
-          } catch (_) {}
-        }
-        throw new Error(
-          `Không thể khởi tạo phiên tải video cho Slot ${slotId}: ${error.message}`,
-        );
+    const cleanUserAgent = slot.userAgent || buildCleanUserAgent();
+    slotSession.setUserAgent?.(cleanUserAgent);
+    uploadBridgeWindow = new BrowserWindow({
+      width: 1,
+      height: 1,
+      show: false,
+      title: `Google Flow upload — Slot ${slot.id + 1}`,
+      webPreferences: {
+        partition: slot.partition || `persist:slot-${slot.id}`,
+        nodeIntegration: false,
+        contextIsolation: true,
+        backgroundThrottling: false,
+      },
+    });
+    const wv = uploadBridgeWindow.webContents;
+    wv.setUserAgent?.(cleanUserAgent);
+    try {
+      await wv.loadURL(
+        `https://labs.google/fx/tools/flow/project/${encodeURIComponent(projectId)}`,
+      );
+    } catch (error) {
+      closeUploadBridge();
+      if (tempCompressedPath) {
+        try {
+          await fs.promises.unlink(tempCompressedPath);
+        } catch (_) {}
       }
+      throw new Error(
+        `Không thể khởi tạo phiên tải video cho Slot ${slotId}: ${error.message}`,
+      );
     }
 
-    // ── Step 1 (WebView): Start upload session ──
+    // ── Step 1 (same-origin BrowserWindow): Start upload session ──
     let startResult;
     try {
       startResult = await wv.executeJavaScript(`

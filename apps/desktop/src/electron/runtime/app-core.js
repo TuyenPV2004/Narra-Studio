@@ -247,53 +247,10 @@ async function fetchSlotSession(slotId) {
     return { ok: false, kind: 'network-error', error: e.message };
   }
 
-  // 3. Fallback to webview executeJavaScript
-  try {
-    const wv = findFlowWebview(slotId);
-    if (wv) {
-      const result = await wv.executeJavaScript(`
-        (async () => {
-          try {
-            const r = await fetch('https://labs.google/fx/api/auth/session', {
-              credentials: 'include',
-              headers: { 'accept': 'application/json' }
-            });
-            const d = await r.json().catch(() => null);
-            return { status: r.status, data: d };
-          } catch(e) {
-            return { error: e.message };
-          }
-        })()
-      `).catch(() => null);
-
-      if (result) {
-        const classified = classifySessionFetchResult({
-          status: result.status,
-          data: result.data,
-          error: result.error ? new Error(result.error) : null,
-        });
-
-        if (classified.kind === 'authenticated' && classified.user) {
-          const user = classified.user;
-          if (user.email) slot.email = user.email;
-          if (user.name) slot.displayName = user.name;
-          if (user.avatar) slot.avatar = user.avatar;
-          console.log(`[SLOT-${slotId}][PROFILE] ✅ Fetched via webview: email=${user.email}, name=${user.name}`);
-          if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
-            runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...user });
-          }
-          return { ok: true, kind: 'authenticated', user, status: result.status || 200 };
-        }
-
-        return { ok: false, ...classified };
-      }
-    }
-  } catch (e) { }
-
   return { ok: false, kind: 'unauthenticated' };
 }
 
-async function clearSlotSessionData(slotId, { reloadWebview = true } = {}) {
+async function clearSlotSessionData(slotId) {
   const slot = getSlot(slotId);
   const ses = session.fromPartition(slot.partition);
 
@@ -335,12 +292,6 @@ async function clearSlotSessionData(slotId, { reloadWebview = true } = {}) {
   slot.lastCaptured = null;
   slot.status = 'empty';
 
-  if (reloadWebview) {
-    try {
-      const wv = findFlowWebview(slotId);
-      if (wv) wv.loadURL('https://labs.google/fx/tools/flow');
-    } catch (e) {}
-  }
 }
 
 // ── Silent Session Hydration & Restoration ───────────────────────────
@@ -459,7 +410,6 @@ function createWindow() {
       preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true,
       webSecurity: false,
       // Performance tweaks
       backgroundThrottling: true,
@@ -607,59 +557,6 @@ function setupRequestInterception() {
 
   console.log('[AUTH] Request interception active - monitoring all slot partitions');
 
-  // Poll webview URL để extract projectId khi user navigate vào project (không cần API request).
-  // PERF: giãn từ 3s → 6s (URL đổi rất hiếm, chỉ khi user vào/ra project) và LƯU handle
-  // để clear khi cửa sổ đóng / setup chạy lại — trước đây interval chạy mãi không cleanup.
-  const projectIdPollTimer = setInterval(() => {
-    try {
-      const wv = findFlowWebview();
-      if (!wv) return;
-      const url = wv.getURL();
-      if (url && url.includes('/project/')) {
-        const m = url.match(/\/project\/([a-zA-Z0-9_-]+)/);
-        if (m && m[1] && m[1] !== capturedAuth.projectId) {
-          capturedAuth.projectId = m[1];
-          console.log('[AUTH] ✅ ProjectId extracted from webview URL:', capturedAuth.projectId);
-          if (capturedAuth.bearerToken && runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
-            runtime.mainWindow.webContents.send('auto-entered-project');
-          }
-        }
-      }
-    } catch (e) { }
-  }, 6000);
-  webviewBackgroundTimers.push(projectIdPollTimer);
-
-  // Auto-diagnose page structure after webview loads
-  setTimeout(async () => {
-    try {
-      const wv = findFlowWebview();
-      if (!wv) { console.log('[DIAGNOSE] WebView not found yet'); return; }
-      const result = await wv.executeJavaScript(`
-        (function() {
-          var textareas = Array.from(document.querySelectorAll('textarea')).map(function(t) {
-            return { tag: 'textarea', id: t.id, className: (t.className||'').substring(0,120), placeholder: t.placeholder, ariaLabel: t.getAttribute('aria-label') };
-          });
-          var buttons = Array.from(document.querySelectorAll('button')).map(function(b) {
-            return { text: (b.textContent||'').trim().substring(0,60), id: b.id, className: (b.className||'').substring(0,120), ariaLabel: b.getAttribute('aria-label'), disabled: b.disabled, tagName: b.tagName };
-          });
-          var editables = Array.from(document.querySelectorAll('[contenteditable="true"]')).map(function(e) {
-            return { tag: e.tagName, id: e.id, className: (e.className||'').substring(0,120), role: e.getAttribute('role'), ariaLabel: e.getAttribute('aria-label') };
-          });
-          var recaptchaScripts = Array.from(document.querySelectorAll('script[src*="recaptcha"]')).map(function(s) { return s.src; });
-          return { textareas: textareas, buttons: buttons.filter(function(b){ return b.text.length > 0; }).slice(0,25), editables: editables, recaptchaScripts: recaptchaScripts, url: window.location.href };
-        })()
-      `);
-      console.log('[DIAGNOSE] ===== PAGE STRUCTURE =====');
-      console.log('[DIAGNOSE] URL:', result.url);
-      console.log('[DIAGNOSE] Textareas:', JSON.stringify(result.textareas, null, 2));
-      console.log('[DIAGNOSE] Editables:', JSON.stringify(result.editables, null, 2));
-      console.log('[DIAGNOSE] reCAPTCHA scripts:', JSON.stringify(result.recaptchaScripts));
-      console.log('[DIAGNOSE] Buttons with text:');
-      result.buttons.forEach((b, i) => console.log(`  [${i}] "${b.text}" | id=${b.id} | aria=${b.ariaLabel} | disabled=${b.disabled}`));
-      console.log('[DIAGNOSE] ===== END =====');
-    } catch (e) { console.log('[DIAGNOSE] Error:', e.message); }
-  }, 10000);
-
   // ── Auto-inject upload-video spy into webview ──
   // Automatically installs fetch interceptor to capture the browser's upload protocol
   async function autoInjectUploadSpy() {
@@ -749,9 +646,6 @@ function setupRequestInterception() {
   // Inject after 12s (after diagnose), then re-inject periodically (in case page reloads).
   // PERF: giãn re-inject 30s → 60s và lưu handle để cleanup. Guard __uploadSpyActive
   // khiến lần re-inject thường là no-op nên 60s vẫn đủ bắt trường hợp page reload.
-  const spyInjectTimeout = setTimeout(() => { autoInjectUploadSpy(); attachSpyConsoleListener(); }, 12000);
-  const spyInjectInterval = setInterval(() => { autoInjectUploadSpy(); attachSpyConsoleListener(); }, 60000);
-  webviewBackgroundTimers.push(spyInjectTimeout, spyInjectInterval);
 
   // Auto-enter a project after login (so user doesn't have to manually click)
   let autoEnterAttempted = false;
@@ -882,11 +776,6 @@ function setupRequestInterception() {
   // Try auto-enter at 12s, 20s, 30s (user may still be logging in).
   // Guard autoEnterAttempted khiến các lần sau là no-op; lưu handle để cleanup nếu
   // cửa sổ đóng trước khi kịp chạy.
-  webviewBackgroundTimers.push(
-    setTimeout(tryAutoEnterProject, 12000),
-    setTimeout(tryAutoEnterProject, 20000),
-    setTimeout(tryAutoEnterProject, 30000),
-  );
 }
 
 function teardownRequestInterception() {

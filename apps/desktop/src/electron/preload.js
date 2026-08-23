@@ -88,23 +88,7 @@ contextBridge.exposeInMainWorld("api", {
   getCaptchaBridgeStatus: () => ipcRenderer.invoke("get-captcha-bridge-status"),
   testCaptchaExtension: () => ipcRenderer.invoke("test-captcha-extension"),
   openExtensionFolder: () => ipcRenderer.invoke("open-extension-folder"),
-  diagnoseWebview: () => ipcRenderer.invoke("diagnose-webview"),
-  reloadAndWaitWebview: () => ipcRenderer.invoke("reload-and-wait-webview"),
-  debugSlotClick: (p) => ipcRenderer.invoke("debug-slot-click", p),
-  debugUploadClick: () => ipcRenderer.invoke("debug-upload-click"),
-  debugStartEndDom: () => ipcRenderer.invoke("debug-startend-dom"),
-  selectModelOnWebview: (p) => ipcRenderer.invoke("select-model-on-webview", p),
-  selectQuantityOnWebview: (p) =>
-    ipcRenderer.invoke("select-quantity-on-webview", p),
-  selectAspectOnWebview: (p) =>
-    ipcRenderer.invoke("select-aspect-on-webview", p),
-  uploadReferenceOnWebview: (p) =>
-    ipcRenderer.invoke("upload-reference-on-webview", p),
-  uploadStartImageOnWebview: (p) =>
-    ipcRenderer.invoke("upload-start-image-on-webview", p),
   setManualAuth: (d) => ipcRenderer.invoke("set-manual-auth", d),
-  generateViaPage: (p) => ipcRenderer.invoke("generate-via-page", p),
-  waitPageGenResult: (p) => ipcRenderer.invoke("wait-page-gen-result", p),
   generateImage: (p) => ipcRenderer.invoke("generate-image", p),
   generateVideo: (p) => ipcRenderer.invoke("generate-video", p),
   generateVideoStartImage: (p) =>
@@ -117,8 +101,6 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("generate-video-edit-video", p),
   generateFlowVoicePreview: (p) =>
     ipcRenderer.invoke("generate-flow-voice-preview", p),
-  spyUpload: (p) => ipcRenderer.invoke("spy-upload", p),
-  getSpyLogs: (p) => ipcRenderer.invoke("get-spy-logs", p),
   uploadOmniVideo: (p) => ipcRenderer.invoke("upload-omni-video", p),
   pollVideoStatus: (p) => ipcRenderer.invoke("poll-video-status", p),
   resolveVideoUrl: (p) => ipcRenderer.invoke("resolve-video-url", p),
@@ -129,8 +111,6 @@ contextBridge.exposeInMainWorld("api", {
   uploadImage: (p) => ipcRenderer.invoke("upload-image", p),
   uploadImageFromPath: (p) => ipcRenderer.invoke("upload-image-from-path", p),
   downloadMediaToTemp: (p) => ipcRenderer.invoke("download-media-to-temp", p),
-  uploadImageViaWebview: (p) =>
-    ipcRenderer.invoke("upload-image-via-webview", p),
   editImage: (p) => ipcRenderer.invoke("edit-image", p),
   upscaleImage: (p) => ipcRenderer.invoke("upscale-image", p),
   generatePinholeGif: (p) => ipcRenderer.invoke("generate-pinhole-gif", p),
@@ -367,7 +347,6 @@ contextBridge.exposeInMainWorld("api", {
   // Ngôn ngữ giao diện — lưu trong flow-settings.json, renderer cache lại ở localStorage
   getUiLanguage: () => ipcRenderer.invoke("get-ui-language"),
   setUiLanguage: (language) => ipcRenderer.invoke("set-ui-language", language),
-  autoEnterProject: () => ipcRenderer.invoke("auto-enter-project"),
   syncSession: () => ipcRenderer.invoke("sync-session"),
   getAllSlots: () => ipcRenderer.invoke("get-all-slots"),
   pickRandomSlot: () => ipcRenderer.invoke("pick-random-slot"),
@@ -376,11 +355,7 @@ contextBridge.exposeInMainWorld("api", {
   openLoginWindow: (p) => ipcRenderer.invoke("open-login-window", p),
   logoutSlot: (p) => ipcRenderer.invoke("logout-slot", p),
   openIncognitoLogin: (p) => ipcRenderer.invoke("open-incognito-login", p),
-  switchWebviewSlot: (p) => ipcRenderer.invoke("switch-webview-slot", p),
-  onWebviewSwitchSlot: (cb) => {
-    ipcRenderer.on("webview-switch-slot", (_, data) => cb(data));
-    return () => ipcRenderer.removeAllListeners("webview-switch-slot");
-  },
+  openFlowSession: (p) => ipcRenderer.invoke("open-flow-session", p),
   onSlotLoginDone: (cb) => {
     ipcRenderer.on("slot-login-done", (_, data) => cb(data));
     return () => ipcRenderer.removeAllListeners("slot-login-done");

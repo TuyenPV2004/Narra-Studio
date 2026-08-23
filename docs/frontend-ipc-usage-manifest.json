@@ -19,15 +19,15 @@
   "rendererRoot": "apps/desktop/src/renderer-source",
   "preloadFile": "apps/desktop/src/electron/preload.js",
   "summary": {
-    "usedMethods": 167,
-    "usedApiMethods": 167,
+    "usedMethods": 162,
+    "usedApiMethods": 162,
     "usedElectronApiMethods": 0,
-    "exposedPreloadMethods": 245,
+    "exposedPreloadMethods": 228,
     "missingFromPreload": 0,
     "missingFromPreloadDistinctMethodCount": 0,
     "missingFromPreloadCallSiteCount": 0,
-    "exposedButUnused": 78,
-    "dynamicImports": 0,
+    "exposedButUnused": 66,
+    "dynamicImports": 15,
     "missingDynamicImports": 0
   },
   "methods": [
@@ -290,8 +290,9 @@
       "global": "api",
       "method": "authorizeFilePath",
       "businessArea": "Desktop / Local utility",
-      "callCount": 2,
+      "callCount": 10,
       "files": [
+        "apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
         "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
@@ -645,21 +646,6 @@
     },
     {
       "global": "api",
-      "method": "generateViaPage",
-      "businessArea": "Other frontend runtime",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
       "method": "generateVideo",
       "businessArea": "Media / Generation",
       "callCount": 1,
@@ -767,10 +753,9 @@
       "global": "api",
       "method": "getCaptchaBridgeStatus",
       "businessArea": "CAPTCHA / Extension",
-      "callCount": 4,
+      "callCount": 2,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/captcha.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
         "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
@@ -814,7 +799,8 @@
       "callCount": 3,
       "files": [
         "apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1255,6 +1241,21 @@
     },
     {
       "global": "api",
+      "method": "openFlowSession",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
       "method": "openIncognitoLogin",
       "businessArea": "Google Flow / Session",
       "callCount": 1,
@@ -1646,21 +1647,6 @@
     },
     {
       "global": "api",
-      "method": "selectAspectOnWebview",
-      "businessArea": "Google Flow / Session",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
       "method": "selectAudioFile",
       "businessArea": "Media / Generation",
       "callCount": 2,
@@ -1701,21 +1687,6 @@
     },
     {
       "global": "api",
-      "method": "selectModelOnWebview",
-      "businessArea": "Google Flow / Session",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
       "method": "selectOutputFolder",
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
@@ -1725,21 +1696,6 @@
       "preload": {
         "exposed": true,
         "parameters": []
-      }
-    },
-    {
-      "global": "api",
-      "method": "selectQuantityOnWebview",
-      "businessArea": "Google Flow / Session",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
       }
     },
     {
@@ -1759,8 +1715,9 @@
       "global": "api",
       "method": "selectVideoFiles",
       "businessArea": "Media / Generation",
-      "callCount": 2,
+      "callCount": 3,
       "files": [
+        "apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
         "apps/desktop/src/renderer-source/services/electron-api/media.ts",
         "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
       ],
@@ -1803,8 +1760,10 @@
       "global": "api",
       "method": "showInFolder",
       "businessArea": "Desktop / Local utility",
-      "callCount": 3,
+      "callCount": 5,
       "files": [
+        "apps/desktop/src/renderer-source/pages/Image/ImageEditorPage.tsx",
+        "apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
         "apps/desktop/src/renderer-source/services/electron-api/editor.ts",
         "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts",
         "apps/desktop/src/renderer-source/services/electron-api/video.ts"
@@ -1813,21 +1772,6 @@
         "exposed": true,
         "parameters": [
           "filePath"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "switchWebviewSlot",
-      "businessArea": "Google Flow / Session",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
         ]
       }
     },
@@ -2327,9 +2271,10 @@
       "global": "api",
       "method": "uploadImage",
       "businessArea": "Media / Generation",
-      "callCount": 1,
+      "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
+        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2391,21 +2336,6 @@
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/video.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
-      "method": "waitPageGenResult",
-      "businessArea": "Other frontend runtime",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2505,12 +2435,7 @@
   "exposedButUnused": [
     "aiTranscribeAudio",
     "aiTranscribeCancel",
-    "autoEnterProject",
     "captureRegion",
-    "debugSlotClick",
-    "debugStartEndDom",
-    "debugUploadClick",
-    "diagnoseWebview",
     "downloadMediaToTemp",
     "downloadVoiceAsset",
     "extractThumbnail",
@@ -2521,7 +2446,6 @@
     "getLipSyncSettings",
     "getLocalLipSyncStatus",
     "getLocalTtsStatus",
-    "getSpyLogs",
     "getUiLanguage",
     "imageGridSegment",
     "imageThumbnail",
@@ -2534,7 +2458,6 @@
     "onSttProgress",
     "onTeamPresence",
     "onVoiceAssetProgress",
-    "onWebviewSwitchSlot",
     "openDevTools",
     "openLoginWindow",
     "prepareLocalLipSyncEngine",
@@ -2542,7 +2465,6 @@
     "providersList",
     "readLocalAudioFile",
     "readSkillFolder",
-    "reloadAndWaitWebview",
     "saveFile",
     "saveLipSyncSettings",
     "saveMediaLibrary",
@@ -2551,7 +2473,6 @@
     "selectFile",
     "selectImageFolder",
     "setUiLanguage",
-    "spyUpload",
     "syncSession",
     "teamNodeAuditAppend",
     "teamNodeAuditList",
@@ -2577,13 +2498,101 @@
     "ttsMinimaxVoices",
     "ttsModels",
     "ttsSharedVoices",
-    "ttsVoiceChanger",
-    "uploadImageViaWebview",
-    "uploadReferenceOnWebview",
-    "uploadStartImageOnWebview"
+    "ttsVoiceChanger"
   ],
   "dynamicImports": {
-    "entries": [],
+    "entries": [
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/AIAgent/AIAgentSourcePage",
+        "target": "apps/desktop/src/renderer-source/pages/AIAgent/AIAgentSourcePage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/CapcutEditor/CapcutEditorPage",
+        "target": "apps/desktop/src/renderer-source/pages/CapcutEditor/CapcutEditorPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/CaptchaSetup/CaptchaSetupPage",
+        "target": "apps/desktop/src/renderer-source/pages/CaptchaSetup/CaptchaSetupPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/Dashboard/DashboardPage",
+        "target": "apps/desktop/src/renderer-source/pages/Dashboard/DashboardPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/GoogleFlow/GoogleFlowPage",
+        "target": "apps/desktop/src/renderer-source/pages/GoogleFlow/GoogleFlowPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/Guide/GuidePage",
+        "target": "apps/desktop/src/renderer-source/pages/Guide/GuidePage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/Image/ImageEditorPage",
+        "target": "apps/desktop/src/renderer-source/pages/Image/ImageEditorPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/Image/ImageGeneratorPage",
+        "target": "apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/MediaLibrary/MediaLibraryPage",
+        "target": "apps/desktop/src/renderer-source/pages/MediaLibrary/MediaLibraryPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/ProviderAccount/ProviderConnectionsPage",
+        "target": "apps/desktop/src/renderer-source/pages/ProviderAccount/ProviderConnectionsPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/SceneMerge/SceneMergePage",
+        "target": "apps/desktop/src/renderer-source/pages/SceneMerge/SceneMergePage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/Settings/SettingsPage",
+        "target": "apps/desktop/src/renderer-source/pages/Settings/SettingsPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/Video/VideoGeneratorPage",
+        "target": "apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/VideoEditor/VideoEditorPage",
+        "target": "apps/desktop/src/renderer-source/pages/VideoEditor/VideoEditorPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "specifier": "@/pages/Voice/VoicePage",
+        "target": "apps/desktop/src/renderer-source/pages/Voice/VoicePage.tsx",
+        "exists": true
+      }
+    ],
     "missing": []
   }
 }

@@ -17,6 +17,7 @@ const read = (relative) =>
 const tokens = read("styles/tokens.css");
 const base = read("styles/base.css");
 const components = read("styles/components.css");
+const app = read("app/App.tsx");
 const shell = read("app/AppShell.tsx");
 const sidebar = read("components/Sidebar/Sidebar.tsx");
 const header = read("components/Header/Header.tsx");
@@ -90,6 +91,17 @@ assert.match(sidebar, /<aside\b/);
 assert.match(sidebar, /<nav\b/);
 assert.match(sidebar, /aria-current=/);
 assert.match(header, /<header\b/);
+assert.match(app, /<Suspense\b/);
+assert.equal(
+  [...app.matchAll(/import\("@\/pages\//g)].length >= 15,
+  true,
+  "Feature pages must remain route-level dynamic imports to protect the initial bundle",
+);
+assert.doesNotMatch(
+  app,
+  /^import \{ VideoGeneratorPage \} from/m,
+  "The Video page must not return to the initial static bundle",
+);
 assert.match(settings, /<Tabs\b/);
 assert.doesNotMatch(
   settings,

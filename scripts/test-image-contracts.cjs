@@ -693,7 +693,7 @@ registerGenerationIpc({
   getNextFilename: () => "file.png",
   generateUUID: () => "mock-uuid-1234",
   makeApiRequest: async () => ({}),
-  makeApiRequestViaWebview: async (url, body, slotId, type) => {
+  makeApiRequestWithCaptcha: async (url, body, slotId, type) => {
     lastApiRequest = { url, body, slotId, type };
     return {};
   },
@@ -907,16 +907,21 @@ registerGenerationIpc({
     "sync-session must pass slot.id (2) to refreshCapturedCookies",
   );
 
-  // 11. Verify findFlowWebview does not fallback across slots when slotId is given
+  // 11. Electron renderer must not enable or depend on the legacy <webview> UI.
   const appCoreJsPath = path.resolve(
     __dirname,
     "../apps/desktop/src/electron/runtime/app-core.js",
   );
   const appCoreJsContent = fs.readFileSync(appCoreJsPath, "utf8");
   assert.equal(
-    appCoreJsContent.includes("if (slotId !== null) return null;"),
-    true,
-    "findFlowWebview must not fallback to other slots when slotId is specified",
+    appCoreJsContent.includes("webviewTag: true"),
+    false,
+    "The main renderer must not enable Electron webviewTag",
+  );
+  assert.equal(
+    appCoreJsContent.includes("[DIAGNOSE] WebView not found yet"),
+    false,
+    "The obsolete WebView diagnostic timer must not run",
   );
 
   // 12. Video Model Key Resolution Contract & Mode Mapping Tests
@@ -1706,6 +1711,54 @@ registerGenerationIpc({
     videoTsContent.includes("generateAudio?: boolean"),
     false,
     "Video generation contract must not expose the unsupported generateAudio option",
+  );
+
+  const flowRegistryContent = fs.readFileSync(
+    path.resolve(__dirname, "../apps/desktop/src/electron/ipc/flow.js"),
+    "utf8",
+  );
+  const imageServiceContent = fs.readFileSync(
+    path.resolve(
+      __dirname,
+      "../apps/desktop/src/renderer-source/services/electron-api/image.ts",
+    ),
+    "utf8",
+  );
+  const flowServiceContent = fs.readFileSync(
+    path.resolve(
+      __dirname,
+      "../apps/desktop/src/renderer-source/services/electron-api/flow.ts",
+    ),
+    "utf8",
+  );
+  assert.equal(
+    /registerFlow(?:WebviewUpload|PageGeneration|Selectors)Ipc/.test(
+      flowRegistryContent,
+    ),
+    false,
+    "Production Flow IPC must not register legacy WebView page automation",
+  );
+  assert.equal(
+    /generateViaFlowPage|selectModelOnWebview|waitPageGenResult/.test(
+      imageServiceContent,
+    ),
+    false,
+    "Image generation must not fall back to an unmounted Flow WebView",
+  );
+  assert.equal(
+    imageServiceContent.includes("getElectronApi().generateImage({"),
+    true,
+    "Image generation must use the unified Main API path",
+  );
+  assert.equal(
+    genJsContent.includes('"upload-image-via-webview"'),
+    false,
+    "Main must not register the unused legacy image upload handler",
+  );
+  assert.equal(
+    flowServiceContent.includes("createFlowProject({ slotId })"),
+    true,
+    "Creating a Flow project must preserve the selected account slot",
   );
 
   const imagePagePath = path.resolve(

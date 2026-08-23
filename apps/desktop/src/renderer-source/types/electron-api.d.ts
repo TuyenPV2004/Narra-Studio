@@ -70,14 +70,6 @@ export interface NarraElectronApi {
     seed?: number;
     slotId?: number;
   }) => Promise<unknown>;
-  selectModelOnWebview: (payload: { model: string }) => Promise<unknown>;
-  selectQuantityOnWebview: (payload: { quantity: number }) => Promise<unknown>;
-  selectAspectOnWebview: (payload: { aspect: string }) => Promise<unknown>;
-  generateViaPage: (payload: Record<string, unknown>) => Promise<unknown>;
-  waitPageGenResult: (payload: {
-    requestId?: string;
-    timeoutMs: number;
-  }) => Promise<unknown>;
   saveImageLocally: (payload: {
     fileName?: string;
     slotId?: number;
@@ -223,7 +215,7 @@ export interface NarraElectronApi {
   openIncognitoLogin: (payload: { slotId: number }) => Promise<unknown>;
   logoutSlot: (payload: { slotId: number }) => Promise<unknown>;
   syncSlotSession: (payload: { slotId: number }) => Promise<unknown>;
-  switchWebviewSlot: (payload: { slotId: number }) => Promise<unknown>;
+  openFlowSession: (payload: { slotId: number }) => Promise<unknown>;
   onSlotLoginDone: (callback: (payload: unknown) => void) => () => void;
   onSlotEmailUpdated: (callback: (payload: unknown) => void) => () => void;
   onSlotSessionUpdated: (callback: (payload: unknown) => void) => () => void;
@@ -231,7 +223,7 @@ export interface NarraElectronApi {
   onAutoEnteredProject: (callback: () => void) => () => void;
   getDashboardStats: () => Promise<unknown>;
   getCredits: (payload?: { slotId: number }) => Promise<unknown>;
-  createFlowProject: (payload?: Record<string, unknown>) => Promise<unknown>;
+  createFlowProject: (payload: { slotId: number }) => Promise<unknown>;
   onFlowProjectChanged: (callback: (payload: unknown) => void) => () => void;
   onVideoDownloaded: (
     callback: (payload: {

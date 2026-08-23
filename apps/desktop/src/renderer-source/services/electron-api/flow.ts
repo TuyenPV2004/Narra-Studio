@@ -34,8 +34,8 @@ const requireSuccessful = async <T>(operation: Promise<T>): Promise<T> => {
   return result;
 };
 export const flowApi = {
-  createProject() {
-    return requireSuccessful(getElectronApi().createFlowProject());
+  createProject(slotId: number) {
+    return requireSuccessful(getElectronApi().createFlowProject({ slotId }));
   },
   async listSlots(): Promise<FlowSlot[]> {
     const response = await getElectronApi().getAllSlots();
@@ -77,8 +77,8 @@ export const flowApi = {
   sync(slotId: number) {
     return requireSuccessful(getElectronApi().syncSlotSession({ slotId }));
   },
-  switchSlot(slotId: number) {
-    return requireSuccessful(getElectronApi().switchWebviewSlot({ slotId }));
+  openSession(slotId: number) {
+    return requireSuccessful(getElectronApi().openFlowSession({ slotId }));
   },
   subscribeSlotsChanged(callback: () => void): () => void {
     const cleanups = [

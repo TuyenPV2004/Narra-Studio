@@ -92,102 +92,10 @@ const record = (value: unknown): Record<string, unknown> =>
     : {};
 const data = (value: unknown): Record<string, unknown> =>
   record(record(value).data);
-const findImageUrl = (value: unknown, depth = 0): string | undefined => {
-  if (depth > 5) return undefined;
-  if (
-    typeof value === "string" &&
-    (value.startsWith("https://") || value.startsWith("data:image/"))
-  )
-    return value;
-  if (!value || typeof value !== "object") return undefined;
-  const item = value as Record<string, unknown>;
-  for (const key of ["fifeUrl", "imageUrl", "url", "thumbnailUrl"]) {
-    const candidate = item[key];
-    if (
-      typeof candidate === "string" &&
-      (candidate.startsWith("https://") || candidate.startsWith("data:image/"))
-    )
-      return candidate;
-  }
-  for (const nested of Object.values(item)) {
-    const candidate = findImageUrl(nested, depth + 1);
-    if (candidate) return candidate;
-  }
-  return undefined;
-};
-
-const generateViaFlowPage = async (
-  request: ImageGenerationRequest,
-): Promise<{ mediaId: string | null; src: string }> => {
-  await getElectronApi()
-    .selectModelOnWebview({ model: request.model })
-    .catch(() => undefined);
-  await getElectronApi()
-    .selectQuantityOnWebview({ quantity: 1 })
-    .catch(() => undefined);
-  await getElectronApi()
-    .selectAspectOnWebview({ aspect: request.aspect })
-    .catch(() => undefined);
-  const referenceFilePaths =
-    request.referenceImageSnapshots &&
-    request.referenceImageSnapshots.length > 0
-      ? request.referenceImageSnapshots
-          .slice(0, MAX_REFERENCE_IMAGES)
-          .map((s) => s.localPath)
-          .filter(Boolean)
-      : (request.referenceImages && request.referenceImages.length > 0
-          ? request.referenceImages
-          : request.referenceImage
-            ? [request.referenceImage]
-            : []
-        )
-          .slice(0, MAX_REFERENCE_IMAGES)
-          .map((file) => getElectronApi().getFilePath(file))
-          .filter(Boolean);
-  const submitted = data(
-    await getElectronApi().generateViaPage({
-      prompt: request.prompt,
-      type: "image",
-      aspect: request.aspect,
-      referenceFilePaths,
-      referenceImageUrls: [],
-    }),
-  );
-  const requestId =
-    typeof submitted.requestId === "string" ? submitted.requestId : undefined;
-  const response = data(
-    await getElectronApi().waitPageGenResult({
-      timeoutMs: 300_000,
-      ...(requestId ? { requestId } : {}),
-    }),
-  );
-  const src = findImageUrl(response);
-  if (!src) throw new Error("Google Flow không trả về hình ảnh hợp lệ.");
-  const media = Array.isArray(response.media) ? record(response.media[0]) : {};
-  const workflow = Array.isArray(response.workflows)
-    ? record(response.workflows[0])
-    : {};
-  const primaryMediaId = record(workflow.metadata).primaryMediaId;
-  return {
-    mediaId:
-      typeof media.name === "string"
-        ? media.name
-        : typeof primaryMediaId === "string"
-          ? primaryMediaId
-          : null,
-    src,
-  };
-};
-
 export const imageApi = {
   async generate(
     request: ImageGenerationRequest & { slotId?: number },
   ): Promise<{ mediaId: string | null; slotId: number; src: string }> {
-    const bridge = record(await getElectronApi().getCaptchaBridgeStatus());
-    if (bridge.connected !== true) {
-      const pageResult = await generateViaFlowPage(request);
-      return { ...pageResult, slotId: request.slotId ?? 0 };
-    }
     const slot = record(await getElectronApi().pickRandomSlot());
     const slotId =
       typeof request.slotId === "number"
@@ -307,9 +215,6 @@ export const imageApi = {
   async editVeoImage(
     request: ImageEditRequest & { slotId?: number },
   ): Promise<{ mediaId: string | null; slotId: number; src: string }> {
-    const bridge = record(await getElectronApi().getCaptchaBridgeStatus());
-    if (bridge.connected !== true)
-      throw new Error("CAPTCHA bridge chưa kết nối.");
     const slot = record(await getElectronApi().pickRandomSlot());
     const slotId =
       typeof request.slotId === "number"

@@ -61,7 +61,6 @@ module.exports = function registerAiIpc(dependencies) {
     isDryRunActive,
     makeApiRequest,
     RECAPTCHA_SITE_KEY,
-    findFlowWebview,
     findChromePath,
     httpGetJson,
     createCdpClient,
@@ -71,8 +70,6 @@ module.exports = function registerAiIpc(dependencies) {
     makeApiRequestViaChrome,
     reloadFlowWebviewForSlot,
     reloadChromeCdpLabs,
-    makeApiRequestViaWebview,
-    setActiveWebviewSlot,
     getChromeRuntime,
     openAiProvider,
   } = dependencies;

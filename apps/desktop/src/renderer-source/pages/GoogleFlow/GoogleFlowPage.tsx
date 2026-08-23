@@ -302,7 +302,7 @@ export function GoogleFlowPage() {
                       aria-label={`Mở phiên Slot ${slot.id + 1}`}
                       onClick={() =>
                         void action(slot.id, "switch", () =>
-                          flowApi.switchSlot(slot.id),
+                          flowApi.openSession(slot.id),
                         )
                       }
                     >
@@ -327,10 +327,9 @@ export function GoogleFlowPage() {
                         className="source-flow-btn-create-project"
                         disabled={activeAction?.slotId === slot.id}
                         onClick={() =>
-                          void action(slot.id, "create", async () => {
-                            await flowApi.switchSlot(slot.id);
-                            return flowApi.createProject();
-                          })
+                          void action(slot.id, "create", () =>
+                            flowApi.createProject(slot.id),
+                          )
                         }
                       >
                         <FolderPlus size={15} />
@@ -349,7 +348,7 @@ export function GoogleFlowPage() {
                       aria-label={`Mở phiên Slot ${slot.id + 1}`}
                       onClick={() =>
                         void action(slot.id, "switch", () =>
-                          flowApi.switchSlot(slot.id),
+                          flowApi.openSession(slot.id),
                         )
                       }
                     >
@@ -418,7 +417,7 @@ export function GoogleFlowPage() {
                       disabled={activeAction?.slotId === slot.id}
                       onClick={() =>
                         void action(slot.id, "switch", () =>
-                          flowApi.switchSlot(slot.id),
+                          flowApi.openSession(slot.id),
                         )
                       }
                     >
