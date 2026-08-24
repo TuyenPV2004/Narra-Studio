@@ -14,6 +14,12 @@ const record = (value: unknown): Record<string, unknown> =>
     ? (value as Record<string, unknown>)
     : {};
 
+export function cleanMediaDisplayName(rawName: string): string {
+  if (!rawName) return "";
+  // Remove 10-14 digit unix timestamp suffixes like "-1787593310597" or "_1787593310597" before file extension
+  return rawName.replace(/[-_]\d{10,14}(?=\.[^.]+$|$)/, "");
+}
+
 export const normalizeMediaItem = (
   item: Record<string, unknown>,
   type: LocalMedia["type"],
@@ -30,10 +36,11 @@ export const normalizeMediaItem = (
       : `file:///${rawPath.replace(/\\/g, "/")}`);
   const fallbackName =
     rawPath.split(/[\\/]/).pop() || fileUrl.split(/[\\/]/).pop() || type;
-  const name =
+  const rawName =
     typeof item.name === "string" && item.name.trim()
       ? item.name.trim()
       : fallbackName;
+  const name = cleanMediaDisplayName(rawName);
 
   return {
     name,

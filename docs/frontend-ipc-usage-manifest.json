@@ -2517,7 +2517,7 @@
     },
     {
       "global": "api",
-      "method": "xttsPrepare",
+      "method": "xttsReleaseReferences",
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
@@ -2525,7 +2525,9 @@
       ],
       "preload": {
         "exposed": true,
-        "parameters": []
+        "parameters": [
+          "p"
+        ]
       }
     },
     {

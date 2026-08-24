@@ -1044,7 +1044,11 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                       {task.status === "processing" ? (
                         <EyeOff size={14} aria-hidden="true" />
                       ) : task.status === "queued" ? (
-                        <X size={14} aria-hidden="true" />
+                        <X
+                          size={14}
+                          className="source-action-icon--cancel"
+                          aria-hidden="true"
+                        />
                       ) : (
                         <Trash2
                           size={14}

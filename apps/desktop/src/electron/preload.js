@@ -90,8 +90,9 @@ contextBridge.exposeInMainWorld("api", {
   generateVideoEditVideo: (p) =>
     ipcRenderer.invoke("generate-video-edit-video", p),
   xttsStatus: () => ipcRenderer.invoke("xtts-status"),
-  xttsPrepare: () => ipcRenderer.invoke("xtts-prepare"),
   xttsImportReference: (p) => ipcRenderer.invoke("xtts-import-reference", p),
+  xttsReleaseReferences: (p) =>
+    ipcRenderer.invoke("xtts-release-references", p),
   xttsGenerate: (p) => ipcRenderer.invoke("xtts-generate", p),
   xttsCancel: (p) => ipcRenderer.invoke("xtts-cancel", p),
   xttsShowInFolder: (p) => ipcRenderer.invoke("xtts-show-in-folder", p),

@@ -68,7 +68,7 @@ def load_model():
     emit({"type": "lifecycle", "event": "worker_model_loaded", **details})
     return model, details
 
-def validate_request(request, speakers):
+def validate_request(request, speakers, languages):
     text = request.get("text")
     try:
         request["requestId"] = str(uuid.UUID(str(request.get("requestId", ""))))
@@ -78,7 +78,7 @@ def validate_request(request, speakers):
         raise ValueError("Invalid XTTS-v2 request")
     if request.get("mode") not in ("preset", "clone"):
         raise ValueError("Mode must be preset or clone")
-    if request.get("language") not in SUPPORTED_LANGUAGES:
+    if request.get("language") not in languages:
         raise ValueError("Unsupported XTTS-v2 language")
     if request["mode"] == "preset" and request.get("speaker") not in speakers:
         raise ValueError("Unknown XTTS-v2 preset speaker")
@@ -153,8 +153,8 @@ def concatenate_wavs(chunk_paths, output_path):
         temporary.unlink(missing_ok=True)
         raise
 
-def generate(model, request, speakers):
-    validate_request(request, speakers)
+def generate(model, request, details):
+    validate_request(request, details["speakers"], details["languages"])
     started = time.monotonic()
     output_path = Path(request["outputPath"]).resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -212,7 +212,7 @@ def serve():
         try:
             request = json.loads(line)
             emit({"type": "lifecycle", "event": "request_received", "requestId": request.get("requestId"), "mode": request.get("mode"), "language": request.get("language"), "speed": request.get("speed"), "textChars": len(request.get("text", ""))})
-            emit(generate(model, request, details["speakers"]))
+            emit(generate(model, request, details))
         except Exception as error:
             request_id = request.get("requestId") if isinstance(request, dict) else ""
             emit({"type": "diagnostic", "event": "xtts_generation_failed", "requestId": request_id, "stage": "generate_audio", "errorType": type(error).__name__, "traceback": traceback.format_exc()})
@@ -221,18 +221,14 @@ def serve():
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--check", action="store_true")
-    parser.add_argument("--download", action="store_true")
     parser.add_argument("--serve", action="store_true")
     args = parser.parse_args()
     if args.check:
         emit(runtime_info())
-    elif args.download:
-        _, details = load_model()
-        emit({"ok": True, "installed": True, "modelName": MODEL_NAME, **details})
     elif args.serve:
         serve()
     else:
-        parser.error("Choose --check, --download, or --serve")
+        parser.error("Choose --check or --serve")
 
 if __name__ == "__main__":
     main()

@@ -1,4 +1,4 @@
-import { Pause, Play, Volume2, VolumeX } from "lucide-react";
+import { Pause, Play, RotateCcw, RotateCw } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface VoiceAudioCardProps {
@@ -19,9 +19,6 @@ function formatAudioTime(seconds: number): string {
 
 export function VoiceAudioCard({
   src,
-  filename,
-  title,
-  subtitle,
   className = "",
   compact = false,
 }: VoiceAudioCardProps) {
@@ -29,13 +26,14 @@ export function VoiceAudioCard({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [isMuted, setIsMuted] = useState(false);
+  const [playbackError, setPlaybackError] = useState("");
 
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
 
     const handleLoadedMetadata = () => {
+      setPlaybackError("");
       if (Number.isFinite(audio.duration)) {
         setDuration(audio.duration);
       }
@@ -51,12 +49,17 @@ export function VoiceAudioCard({
       setIsPlaying(false);
       setCurrentTime(0);
     };
+    const handleError = () => {
+      setIsPlaying(false);
+      setPlaybackError("Không thể phát âm thanh.");
+    };
 
     audio.addEventListener("loadedmetadata", handleLoadedMetadata);
     audio.addEventListener("timeupdate", handleTimeUpdate);
     audio.addEventListener("play", handlePlay);
     audio.addEventListener("pause", handlePause);
     audio.addEventListener("ended", handleEnded);
+    audio.addEventListener("error", handleError);
 
     return () => {
       audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
@@ -64,20 +67,42 @@ export function VoiceAudioCard({
       audio.removeEventListener("play", handlePlay);
       audio.removeEventListener("pause", handlePause);
       audio.removeEventListener("ended", handleEnded);
+      audio.removeEventListener("error", handleError);
     };
   }, [src]);
 
   const togglePlay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
+
     if (isPlaying) {
       audio.pause();
     } else {
-      void audio.play().catch(() => {
+      setPlaybackError("");
+      audio.play().catch((error) => {
         setIsPlaying(false);
+        setPlaybackError(
+          "Không thể phát tệp âm thanh này: " +
+            (error instanceof Error ? error.message : String(error)),
+        );
       });
     }
   }, [isPlaying]);
+
+  const seekRelative = useCallback(
+    (delta: number) => {
+      const audio = audioRef.current;
+      if (!audio) return;
+      const targetDuration = duration || audio.duration || 0;
+      const targetTime = Math.max(
+        0,
+        Math.min(targetDuration, audio.currentTime + delta),
+      );
+      audio.currentTime = targetTime;
+      setCurrentTime(targetTime);
+    },
+    [duration],
+  );
 
   const handleSeek = useCallback(
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -90,15 +115,7 @@ export function VoiceAudioCard({
     [],
   );
 
-  const toggleMute = useCallback(() => {
-    const audio = audioRef.current;
-    if (!audio) return;
-    audio.muted = !isMuted;
-    setIsMuted(!isMuted);
-  }, [isMuted]);
-
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
-  const displayName = title || filename || "Bản ghi âm thanh";
 
   return (
     <div
@@ -107,37 +124,18 @@ export function VoiceAudioCard({
     >
       <audio ref={audioRef} src={src} preload="metadata" />
 
-      {/* Top Info & Waveform */}
-      <div className="source-voice-music-card__cover">
-        <div className="source-voice-music-card__info">
-          <span className="source-voice-music-card__title" title={displayName}>
-            {displayName}
-          </span>
-          {subtitle && (
-            <span className="source-voice-music-card__subtitle">
-              {subtitle}
-            </span>
-          )}
-        </div>
-
-        {/* Waveform Equalizer animation bars */}
-        <div
-          className={`source-voice-equalizer ${isPlaying ? "is-active" : ""}`}
-          aria-hidden="true"
+      {/* Top Row: Rewind 10s -> Play/Pause -> Forward 10s */}
+      <div className="source-voice-music-card__top">
+        <button
+          type="button"
+          className="source-voice-music-card__skip-btn"
+          onClick={() => seekRelative(-10)}
+          aria-label="Lùi 10 giây"
+          title="Lùi 10s"
         >
-          <span className="source-voice-equalizer__bar" />
-          <span className="source-voice-equalizer__bar" />
-          <span className="source-voice-equalizer__bar" />
-          <span className="source-voice-equalizer__bar" />
-          <span className="source-voice-equalizer__bar" />
-          <span className="source-voice-equalizer__bar" />
-          <span className="source-voice-equalizer__bar" />
-          <span className="source-voice-equalizer__bar" />
-        </div>
-      </div>
+          <RotateCcw size={14} aria-hidden="true" />
+        </button>
 
-      {/* Interactive Controls: Play -> Scrubber -> Time -> Mute in a single horizontal row */}
-      <div className="source-voice-music-card__controls">
         <button
           type="button"
           className="source-voice-music-card__play-btn"
@@ -157,6 +155,23 @@ export function VoiceAudioCard({
           )}
         </button>
 
+        <button
+          type="button"
+          className="source-voice-music-card__skip-btn"
+          onClick={() => seekRelative(10)}
+          aria-label="Tiến 10 giây"
+          title="Tiến 10s"
+        >
+          <RotateCw size={14} aria-hidden="true" />
+        </button>
+      </div>
+
+      {/* Bottom Timeline: Time Left -> Scrubber -> Time Right */}
+      <div className="source-voice-music-card__timeline">
+        <span className="source-voice-music-card__time">
+          {formatAudioTime(currentTime)}
+        </span>
+
         <input
           type="range"
           min={0}
@@ -174,23 +189,15 @@ export function VoiceAudioCard({
         />
 
         <span className="source-voice-music-card__time">
-          {formatAudioTime(currentTime)} / {formatAudioTime(duration)}
+          {formatAudioTime(duration)}
         </span>
-
-        <button
-          type="button"
-          className="source-voice-music-card__mute-btn"
-          onClick={toggleMute}
-          aria-label={isMuted ? "Bật âm thanh" : "Tắt tiếng"}
-          title={isMuted ? "Bật âm thanh" : "Tắt tiếng"}
-        >
-          {isMuted ? (
-            <VolumeX size={15} aria-hidden="true" />
-          ) : (
-            <Volume2 size={15} aria-hidden="true" />
-          )}
-        </button>
       </div>
+
+      {playbackError && (
+        <p className="source-voice-playback-error" role="alert">
+          {playbackError}
+        </p>
+      )}
     </div>
   );
 }

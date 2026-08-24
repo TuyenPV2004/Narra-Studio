@@ -22,7 +22,7 @@ Narra Studio là ứng dụng Electron single-user. Renderer chính được bui
 - Tác vụ chạy trong subprocess không dùng shell, có thể hủy thật bằng cách kết thúc process và giữ trạng thái queue ở cấp ứng dụng khi chuyển trang.
 - Model là `tts_models/multilingual/multi-dataset/xtts_v2` từ Coqui TTS. Danh sách speaker dựng sẵn và ngôn ngữ được đọc từ checkpoint sau khi tải.
 - Worker dùng nguyên cơ chế thiết bị của model: toàn bộ model chuyển sang CUDA khi `torch.cuda.is_available()` trả về `true`, nếu không toàn bộ model chạy trên CPU; Narra không chia model hoặc offload giữa GPU và CPU. Worker tự giải phóng sau thời gian rảnh để không giữ VRAM.
-- Văn bản dài dùng tùy chọn chính thức `split_sentences=True`; chế độ clone chỉ nhận file audio đã được nhập vào thư viện local của Narra.
+- Văn bản dài được Narra chia thành các đoạn ổn định để checkpoint và tiếp tục sau gián đoạn; mỗi đoạn gọi XTTS-v2 với `split_sentences=False`, sau đó các WAV cùng định dạng được nối theo đúng thứ tự. Chế độ clone chỉ nhận file audio đã được nhập vào thư viện local của Narra.
 - Máy không có CUDA vẫn dùng profile CPU. UI phải hiển thị profile thực tế; không được âm thầm báo hybrid khi PyTorch chỉ là bản CPU.
 
 ## Thành phần đã xóa

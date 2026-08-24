@@ -5,17 +5,12 @@ const MAX_REFERENCE_BYTES = 50 * 1024 * 1024;
 const MAX_REFERENCE_FILES = 5;
 const MAX_REFERENCE_TOTAL_BYTES = 100 * 1024 * 1024;
 const MAX_TEXT_CHARS = 20_000;
-const MODEL_DOWNLOAD_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 const WORKER_READY_TIMEOUT_MS = 10 * 60 * 1000;
 const WORKER_IDLE_TIMEOUT_MS = 2 * 60 * 1000;
-const COQUI_TTS_PACKAGE = 'coqui-tts==0.27.5';
-const TORCH_VERSION = '2.11.0';
-const CUDA_WHEEL_INDEX = 'https://download.pytorch.org/whl/cu128';
-const SUPPORTED_LANGUAGES = new Set(['en', 'es', 'fr', 'de', 'it', 'pt', 'pl', 'tr', 'ru', 'nl', 'cs', 'ar', 'zh-cn', 'ja', 'hu', 'ko', 'hi']);
 const activeJobs = new Map();
 
 function logVoiceEvent(message, level = 'log') {
-  const allowed = ['event', 'requestId', 'device', 'torchVersion', 'cudaAvailable', 'cudaName', 'loadMs', 'speakerCount', 'mode', 'language', 'speed', 'textChars', 'elapsedMs', 'outputBytes', 'sampleRate', 'audioFrames', 'segmentIndex', 'totalSegments', 'completedSegments', 'resumedSegments', 'segmentChars'];
+  const allowed = ['event', 'requestId', 'device', 'torchVersion', 'cudaAvailable', 'cudaName', 'loadMs', 'speakerCount', 'mode', 'language', 'speed', 'textChars', 'elapsedMs', 'outputBytes', 'sampleRate', 'audioFrames', 'segmentIndex', 'totalSegments', 'completedSegments', 'resumedSegments', 'segmentChars', 'removedCount', 'skippedCount'];
   const details = {};
   for (const field of allowed) if (message[field] !== undefined) details[field] = message[field];
   console[level]('[XTTS-V2]', details);
@@ -83,10 +78,6 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
       else reject(new Error(stderr.trim() || stdout.trim() || `Process exited with ${code}`));
     });
   });
-
-  async function hasNvidiaGpu() {
-    try { return Boolean((await run('nvidia-smi', ['--query-gpu=name', '--format=csv,noheader'], { timeout: 15_000 })).trim()); } catch { return false; }
-  }
 
   const stopWorker = error => {
     const proc = worker;
@@ -202,28 +193,6 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
   }
 
   ipcMain.handle('xtts-status', status);
-  ipcMain.handle('xtts-prepare', async () => {
-    if (activeJobs.size) throw new Error('Hãy dừng tác vụ XTTS-v2 trước khi cập nhật runtime.');
-    stopWorker(new Error('XTTS-v2 runtime is being updated.'));
-    const root = runtimeRoot();
-    fs.mkdirSync(root, { recursive: true });
-    if (!fs.existsSync(pythonPath())) {
-      if (process.env.NARRA_XTTS_PYTHON) throw new Error('NARRA_XTTS_PYTHON không trỏ tới Python hợp lệ.');
-      try { await run(process.platform === 'win32' ? 'py' : 'python3', ['-m', 'venv', path.join(root, '.venv')], { cwd: root, timeout: 600_000 }); }
-      catch { throw new Error('Không tìm thấy Python tương thích (3.10 đến 3.14).'); }
-    }
-    try {
-      await run(pythonPath(), ['-m', 'pip', 'install', '--disable-pip-version-check', '--upgrade', 'pip'], { cwd: root, timeout: 600_000 });
-      const torchArgs = ['-m', 'pip', 'install', '--disable-pip-version-check', `torch==${TORCH_VERSION}`, `torchaudio==${TORCH_VERSION}`];
-      if (await hasNvidiaGpu()) torchArgs.push('--index-url', CUDA_WHEEL_INDEX);
-      await run(pythonPath(), torchArgs, { cwd: root, timeout: 1_800_000 });
-      await run(pythonPath(), ['-m', 'pip', 'install', '--disable-pip-version-check', 'torchcodec', 'transformers>=4.57,<5', COQUI_TTS_PACKAGE], { cwd: root, timeout: 1_800_000 });
-      await run(pythonPath(), [workerPath, '--download'], { cwd: root, env: workerEnv(), timeout: MODEL_DOWNLOAD_TIMEOUT_MS });
-    } catch (error) {
-      throw new Error(`Không thể cài XTTS-v2: ${String(error.message || error).slice(-1000)}`);
-    }
-    return status();
-  });
 
   ipcMain.handle('xtts-import-reference', async (_, { limit } = {}) => {
     const allowedCount = Math.max(1, Math.min(MAX_REFERENCE_FILES, Number(limit) || MAX_REFERENCE_FILES));
@@ -261,6 +230,40 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
     }
   });
 
+  ipcMain.handle('xtts-release-references', async (_, { referencePaths } = {}) => {
+    if (!Array.isArray(referencePaths) || referencePaths.length > 200) {
+      throw new Error('Danh sách giọng mẫu cần xóa không hợp lệ.');
+    }
+    if (!referencePaths.length || !fs.existsSync(referenceDir())) {
+      return { removed: 0 };
+    }
+    const root = fs.realpathSync(referenceDir());
+    const activeReferences = new Set();
+    for (const job of activeJobs.values()) {
+      for (const activePath of job.referencePaths || []) {
+        if (fs.existsSync(activePath)) activeReferences.add(fs.realpathSync(activePath));
+      }
+    }
+    let removed = 0;
+    let skipped = 0;
+    for (const rawPath of new Set(referencePaths)) {
+      if (typeof rawPath !== 'string' || !rawPath || !fs.existsSync(rawPath)) continue;
+      const resolved = fs.realpathSync(rawPath);
+      const relative = path.relative(root, resolved);
+      if (!relative || relative.startsWith('..') || path.isAbsolute(relative) || !fs.statSync(resolved).isFile()) {
+        throw new Error('Giọng mẫu không thuộc thư viện XTTS-v2 của Narra.');
+      }
+      if (activeReferences.has(resolved)) {
+        skipped += 1;
+        continue;
+      }
+      await fs.promises.rm(resolved, { force: true });
+      removed += 1;
+    }
+    logVoiceEvent({ event: 'reference_release_completed', removedCount: removed, skippedCount: skipped });
+    return { removed };
+  });
+
   ipcMain.handle('xtts-generate', async (_, payload = {}) => {
     const requestId = String(payload.requestId || '');
     const text = String(payload.text || '').trim();
@@ -269,10 +272,10 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
     const speaker = String(payload.speaker || '');
     const speed = Number(payload.speed ?? 1);
     if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId) || !text || text.length > MAX_TEXT_CHARS) throw new Error('Yêu cầu XTTS-v2 không hợp lệ.');
-    if (!SUPPORTED_LANGUAGES.has(language)) throw new Error('Ngôn ngữ không được XTTS-v2 hỗ trợ.');
     if (!Number.isFinite(speed) || speed < 0.5 || speed > 2) throw new Error('Tốc độ phải từ 0.5 đến 2.0.');
     const currentStatus = await status();
-    if (!currentStatus.installed) throw new Error('XTTS-v2 chưa tải đủ model. Hãy bấm “Cài XTTS-v2” trước.');
+    if (!currentStatus.installed) throw new Error('XTTS-v2 chưa tải đủ runtime hoặc model. Hãy kiểm tra log XTTS-V2.');
+    if (!currentStatus.languages?.includes(language)) throw new Error('Ngôn ngữ không được checkpoint XTTS-v2 hỗ trợ.');
     if (mode === 'preset' && !currentStatus.speakers?.includes(speaker)) throw new Error('Giọng dựng sẵn không tồn tại trong XTTS-v2.');
     let referencePaths = [];
     if (mode === 'clone') {
@@ -301,11 +304,24 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
     let resolveJob;
     let rejectJob;
     const result = new Promise((resolve, reject) => { resolveJob = resolve; rejectJob = reject; });
-    activeJobs.set(requestId, { resolve: resolveJob, reject: rejectJob });
+    activeJobs.set(requestId, {
+      resolve: resolveJob,
+      reject: rejectJob,
+      referencePaths,
+    });
     let outputPath = '';
     try {
       fs.mkdirSync(outputDir(), { recursive: true });
-      outputPath = path.join(outputDir(), `${safeName(payload.taskName)}-${Date.now()}.wav`);
+      const safe = safeName(payload.taskName) || 'voice';
+      let targetPath = path.join(outputDir(), `${safe}.wav`);
+      if (fs.existsSync(targetPath)) {
+        let counter = 1;
+        while (fs.existsSync(path.join(outputDir(), `${safe} (${counter}).wav`))) {
+          counter += 1;
+        }
+        targetPath = path.join(outputDir(), `${safe} (${counter}).wav`);
+      }
+      outputPath = targetPath;
       const proc = await Promise.race([ensureWorker(), result]);
       if (!activeJobs.has(requestId)) throw new Error('Tác vụ XTTS-v2 đã bị hủy.');
       proc.stdin.write(`${JSON.stringify({ requestId, text, mode, language, speaker, referencePaths, speed, outputPath })}\n`, error => {

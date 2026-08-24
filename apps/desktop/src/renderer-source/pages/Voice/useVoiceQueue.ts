@@ -20,12 +20,44 @@ export interface VoiceQueueTask {
   localPath?: string;
   progress?: {
     completedSegments: number;
+    event: string;
     resumedSegments: number;
+    segmentIndex: number;
     totalSegments: number;
   };
   request?: XttsVoiceRequest;
   snapshot: Omit<XttsVoiceRequest, "requestId">;
+  startedAt?: number | undefined;
   status: "error" | "processing" | "queued" | "success";
+}
+
+function findOldestQueuedTask(tasks: VoiceQueueTask[]) {
+  for (let index = tasks.length - 1; index >= 0; index -= 1) {
+    const task = tasks[index];
+    if (task?.status === "queued" && task.request) return task;
+  }
+  return undefined;
+}
+
+function taskReferencePaths(task: VoiceQueueTask) {
+  const paths = task.snapshot.referencePaths ?? [];
+  return task.snapshot.referencePath
+    ? [...paths, task.snapshot.referencePath]
+    : paths;
+}
+
+function releaseUnusedReferences(
+  removedTasks: VoiceQueueTask[],
+  remainingTasks: VoiceQueueTask[],
+) {
+  const retained = new Set(remainingTasks.flatMap(taskReferencePaths));
+  const releasable = [
+    ...new Set(removedTasks.flatMap(taskReferencePaths)),
+  ].filter((referencePath) => !retained.has(referencePath));
+  if (!releasable.length) return;
+  void voiceApi.releaseReferences(releasable).catch(() => {
+    console.warn("[XTTS-V2] Không thể giải phóng một số file giọng mẫu.");
+  });
 }
 
 const restore = (): VoiceQueueTask[] => {
@@ -53,6 +85,7 @@ const restore = (): VoiceQueueTask[] => {
         ...(interrupted
           ? {
               status: "error" as const,
+              startedAt: undefined,
               error:
                 "Tác vụ bị gián đoạn. Bấm Thử lại để tiếp tục từ đoạn đã hoàn thành.",
             }
@@ -79,7 +112,9 @@ function useVoiceQueueState() {
                   ...task,
                   progress: {
                     completedSegments: progress.completedSegments,
+                    event: progress.event,
                     resumedSegments: progress.resumedSegments,
+                    segmentIndex: progress.segmentIndex,
                     totalSegments: progress.totalSegments,
                   },
                 }
@@ -99,12 +134,14 @@ function useVoiceQueueState() {
 
   useEffect(() => {
     if (processing.current) return;
-    const next = tasks.find((task) => task.status === "queued" && task.request);
+    const next = findOldestQueuedTask(tasks);
     if (!next?.request) return;
     processing.current = true;
     setTasks((current) =>
       current.map((task) =>
-        task.id === next.id ? { ...task, status: "processing" } : task,
+        task.id === next.id
+          ? { ...task, status: "processing", startedAt: Date.now() }
+          : task,
       ),
     );
     void voiceApi
@@ -122,6 +159,7 @@ function useVoiceQueueState() {
                   return {
                     ...rest,
                     status: "success",
+                    startedAt: undefined,
                     fileUrl: result.fileUrl,
                     filename: result.filename,
                     localPath: result.localPath,
@@ -140,6 +178,7 @@ function useVoiceQueueState() {
                   return {
                     ...rest,
                     status: "error",
+                    startedAt: undefined,
                     error:
                       error instanceof Error ? error.message : String(error),
                   };
@@ -184,6 +223,7 @@ function useVoiceQueueState() {
             id: task.id,
             snapshot: task.snapshot,
             request: { ...task.snapshot, requestId: task.id },
+            startedAt: undefined,
             status: "queued",
           }
         : task,
@@ -195,21 +235,28 @@ function useVoiceQueueState() {
 
   const remove = useCallback(async (task: VoiceQueueTask) => {
     if (task.status !== "success") await voiceApi.cancel(task.id);
-    setTasks((current) =>
-      current.filter((candidate) => candidate.id !== task.id),
+    const remaining = tasksRef.current.filter(
+      (candidate) => candidate.id !== task.id,
     );
+    tasksRef.current = remaining;
+    setTasks(remaining);
+    releaseUnusedReferences([task], remaining);
   }, []);
 
   const clearFinished = useCallback(() => {
-    const failedIds = tasksRef.current
+    const removed = tasksRef.current.filter(
+      (task) => task.status === "success" || task.status === "error",
+    );
+    const remaining = tasksRef.current.filter(
+      (task) => task.status === "queued" || task.status === "processing",
+    );
+    const failedIds = removed
       .filter((task) => task.status === "error")
       .map((task) => task.id);
     void Promise.allSettled(failedIds.map((id) => voiceApi.cancel(id)));
-    setTasks((current) =>
-      current.filter(
-        (task) => task.status === "queued" || task.status === "processing",
-      ),
-    );
+    tasksRef.current = remaining;
+    setTasks(remaining);
+    releaseUnusedReferences(removed, remaining);
   }, []);
 
   return { clearFinished, enqueue, remove, retry, tasks };

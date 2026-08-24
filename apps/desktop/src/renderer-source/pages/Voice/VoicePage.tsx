@@ -6,11 +6,13 @@ import {
   Copy,
   FolderOpen,
   Inbox,
+  Mars,
   MicAudioLines,
   RefreshCw,
   Trash2,
   Upload,
-  Volume2,
+  User,
+  Venus,
   X,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -23,31 +25,176 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/Select";
+import { CountryFlag } from "@/components/ui/CountryFlag";
 import {
   XTTS_DEFAULT_SPEAKERS,
   XTTS_LANGUAGES,
+  XTTS_PRESET_VOICES,
   voiceApi,
+  type XttsPresetVoice,
   type XttsVoiceMode,
   type XttsVoiceReference,
   type XttsVoiceStatus,
 } from "@/services/electron-api";
 import { getElectronApi } from "@/services/electron-api/client";
-import { useVoiceQueue } from "@/pages/Voice/useVoiceQueue";
+import {
+  useVoiceQueue,
+  type VoiceQueueTask,
+} from "@/pages/Voice/useVoiceQueue";
 import { VoiceAudioCard } from "@/components/audio/VoiceAudioCard";
+import { readStorageJson, writeStorageValue } from "@/storage/safe-storage";
+import { storageKeys } from "@/storage/keys";
+
+const presetVoiceByName = new Map<string, XttsPresetVoice>(
+  XTTS_PRESET_VOICES.map((voice) => [voice.name, voice]),
+);
+const languageById = new Map<string, { id: string; label: string }>(
+  XTTS_LANGUAGES.map((item) => [item.id, item]),
+);
+
+interface VoiceDraft {
+  language: string;
+  mode: XttsVoiceMode;
+  references: XttsVoiceReference[];
+  speaker: string;
+  speed: number;
+  taskName: string;
+  text: string;
+}
+
+function readVoiceDraft(): VoiceDraft {
+  const stored = readStorageJson<Partial<VoiceDraft>>(
+    storageKeys.voiceDraft,
+    {},
+  );
+  const references = Array.isArray(stored.references)
+    ? stored.references
+        .filter((item): item is XttsVoiceReference =>
+          Boolean(
+            item &&
+            typeof item.id === "string" &&
+            typeof item.name === "string" &&
+            typeof item.localPath === "string" &&
+            typeof item.fileUrl === "string",
+          ),
+        )
+        .slice(0, 5)
+    : [];
+  const speed = Number(stored.speed);
+  return {
+    language: typeof stored.language === "string" ? stored.language : "en",
+    mode: stored.mode === "clone" ? "clone" : "preset",
+    references,
+    speaker:
+      typeof stored.speaker === "string"
+        ? stored.speaker
+        : (XTTS_DEFAULT_SPEAKERS[0] ?? ""),
+    speed: Number.isFinite(speed) && speed >= 0.5 && speed <= 2 ? speed : 1,
+    taskName:
+      typeof stored.taskName === "string" ? stored.taskName.slice(0, 80) : "",
+    text: typeof stored.text === "string" ? stored.text.slice(0, 20000) : "",
+  };
+}
+
+function formatElapsed(milliseconds: number) {
+  const totalSeconds = Math.max(0, Math.floor(milliseconds / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function taskProgressLabel(
+  progress:
+    | {
+        completedSegments: number;
+        event: string;
+        resumedSegments: number;
+        segmentIndex: number;
+        totalSegments: number;
+      }
+    | undefined,
+  startedAt: number | undefined,
+  now: number,
+) {
+  const elapsed = startedAt ? ` · ${formatElapsed(now - startedAt)}` : "";
+  if (!progress?.totalSegments) return `Đang nạp model local${elapsed}`;
+  const resume = progress.resumedSegments
+    ? ` · tiếp tục từ ${progress.resumedSegments} đoạn`
+    : "";
+  if (progress.event === "segment_started" && progress.segmentIndex > 0) {
+    return `Đang xử lý đoạn ${progress.segmentIndex}/${progress.totalSegments}${resume}${elapsed}`;
+  }
+  return `Đã tạo ${progress.completedSegments}/${progress.totalSegments} đoạn${resume}${elapsed}`;
+}
+
+function PresetVoiceLabel({ voice }: { voice: XttsPresetVoice }) {
+  const isFemale = voice.gender === "female";
+  const GenderIcon = isFemale ? Venus : Mars;
+  const genderLabel = isFemale ? "nữ" : "nam";
+
+  return (
+    <span
+      className="source-voice-preset-option"
+      aria-label={`${voice.name}, giọng ${genderLabel}, phù hợp ${voice.useCases.join(", ")}`}
+      title={`${voice.name} – ${voice.useCases.join(", ")}`}
+    >
+      <GenderIcon
+        size={16}
+        className={`source-voice-preset-option__gender source-voice-preset-option__gender--${voice.gender}`}
+        aria-hidden="true"
+      />
+      <span className="source-voice-preset-option__name">{voice.name}</span>
+      <span
+        className="source-voice-preset-option__separator"
+        aria-hidden="true"
+      >
+        –
+      </span>
+      <span className="source-voice-preset-option__uses">
+        {voice.useCases.join(", ")}
+      </span>
+    </span>
+  );
+}
 
 export function VoicePage() {
   const queue = useVoiceQueue();
-  const [text, setText] = useState("");
-  const [taskName, setTaskName] = useState("");
-  const [mode, setMode] = useState<XttsVoiceMode>("preset");
-  const [speaker, setSpeaker] = useState<string>(XTTS_DEFAULT_SPEAKERS[0]);
-  const [references, setReferences] = useState<XttsVoiceReference[]>([]);
-  const [language, setLanguage] = useState("en");
-  const [speed, setSpeed] = useState(1);
+  const initialDraft = useMemo(readVoiceDraft, []);
+  const [text, setText] = useState(initialDraft.text);
+  const [taskName, setTaskName] = useState(initialDraft.taskName);
+  const [mode, setMode] = useState<XttsVoiceMode>(initialDraft.mode);
+  const [speaker, setSpeaker] = useState(initialDraft.speaker);
+  const [references, setReferences] = useState<XttsVoiceReference[]>(
+    initialDraft.references,
+  );
+  const [language, setLanguage] = useState(initialDraft.language);
+  const [speed, setSpeed] = useState(initialDraft.speed);
   const [status, setStatus] = useState<XttsVoiceStatus | null>(null);
   const [checking, setChecking] = useState(true);
-  const [preparing, setPreparing] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [presetGender, setPresetGender] = useState<"all" | "female" | "male">(
+    "all",
+  );
+  const [now, setNow] = useState(Date.now());
+
+  const releaseDraftReferences = useCallback(
+    (items: XttsVoiceReference[]) => {
+      const retained = new Set(
+        queue.tasks.flatMap((task) => [
+          ...(task.snapshot.referencePaths ?? []),
+          ...(task.snapshot.referencePath ? [task.snapshot.referencePath] : []),
+        ]),
+      );
+      const releasable = items
+        .map((item) => item.localPath)
+        .filter((localPath) => !retained.has(localPath));
+      if (!releasable.length) return;
+      void voiceApi.releaseReferences(releasable).catch(() => {
+        toast.error("Không thể xóa file giọng mẫu khỏi thư viện local.");
+      });
+    },
+    [queue.tasks],
+  );
 
   const speakersList = useMemo(
     () =>
@@ -56,6 +203,54 @@ export function VoicePage() {
         : XTTS_DEFAULT_SPEAKERS,
     [status?.speakers],
   );
+  const languagesList = useMemo(() => {
+    const ids = status?.languages?.length
+      ? status.languages
+      : XTTS_LANGUAGES.map((item) => item.id);
+    return ids.map((id) => languageById.get(id) ?? { id, label: id });
+  }, [status?.languages]);
+  const filteredSpeakers = useMemo(() => {
+    return speakersList.filter((name) => {
+      const voice = presetVoiceByName.get(name);
+      if (presetGender !== "all" && voice?.gender !== presetGender)
+        return false;
+      return true;
+    });
+  }, [presetGender, speakersList]);
+  const selectedPresetVoice = presetVoiceByName.get(speaker);
+  const hasProcessingTask = queue.tasks.some(
+    (task) => task.status === "processing",
+  );
+  const queuedPositionById = useMemo(() => {
+    const positions = new Map<string, number>();
+    queue.tasks
+      .filter((task) => task.status === "queued")
+      .reverse()
+      .forEach((task, index) => positions.set(task.id, index + 1));
+    return positions;
+  }, [queue.tasks]);
+
+  useEffect(() => {
+    writeStorageValue(
+      storageKeys.voiceDraft,
+      JSON.stringify({
+        language,
+        mode,
+        references,
+        speaker,
+        speed,
+        taskName,
+        text,
+      } satisfies VoiceDraft),
+    );
+  }, [language, mode, references, speaker, speed, taskName, text]);
+
+  useEffect(() => {
+    if (!hasProcessingTask) return;
+    setNow(Date.now());
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [hasProcessingTask]);
 
   const copyText = useCallback(async (content: string, id: string) => {
     try {
@@ -107,18 +302,19 @@ export function VoicePage() {
     }
   }, [speaker, status?.speakers]);
 
-  const prepare = useCallback(async () => {
-    setPreparing(true);
-    try {
-      const nextStatus = await voiceApi.prepare();
-      setStatus(nextStatus);
-      toast.success("Đã cài đặt XTTS-v2.");
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : String(error));
-    } finally {
-      setPreparing(false);
+  useEffect(() => {
+    if (!languagesList.some((item) => item.id === language)) {
+      setLanguage(languagesList[0]?.id ?? "en");
     }
-  }, []);
+  }, [language, languagesList]);
+
+  useEffect(() => {
+    if (!hasProcessingTask) return;
+    void voiceApi
+      .status()
+      .then(setStatus)
+      .catch(() => undefined);
+  }, [hasProcessingTask]);
 
   const chooseReference = useCallback(async () => {
     try {
@@ -139,6 +335,65 @@ export function VoicePage() {
     }
   }, [references.length]);
 
+  const removeReference = useCallback(
+    (reference: XttsVoiceReference) => {
+      setReferences((current) =>
+        current.filter((item) => item.localPath !== reference.localPath),
+      );
+      releaseDraftReferences([reference]);
+    },
+    [releaseDraftReferences],
+  );
+
+  const changeMode = useCallback(
+    (value: string) => {
+      const nextMode: XttsVoiceMode = value === "clone" ? "clone" : "preset";
+      if (nextMode === "preset" && references.length > 0) {
+        releaseDraftReferences(references);
+        setReferences([]);
+        toast.info("Đã bỏ các file mẫu không còn dùng cho chế độ dựng sẵn.");
+      }
+      setMode(nextMode);
+    },
+    [references, releaseDraftReferences],
+  );
+
+  const showTaskInFolder = useCallback(async (localPath: string) => {
+    try {
+      await voiceApi.showInFolder(localPath);
+    } catch (error) {
+      toast.error(
+        "Không thể mở file giọng đọc: " +
+          (error instanceof Error ? error.message : String(error)),
+      );
+    }
+  }, []);
+
+  const retryTask = useCallback(
+    (taskId: string) => {
+      if (!queue.retry(taskId)) {
+        toast.error("Hàng đợi đã đầy (tối đa 20 tác vụ).");
+        return;
+      }
+      toast.success("Đã đưa tác vụ vào cuối hàng đợi chờ.");
+    },
+    [queue],
+  );
+
+  const removeTask = useCallback(
+    async (task: VoiceQueueTask) => {
+      try {
+        await queue.remove(task);
+      } catch (error) {
+        toast.error(
+          "Không thể dừng hoặc xóa tác vụ: " +
+            (error instanceof Error ? error.message : String(error)),
+        );
+      }
+    },
+    [queue],
+  );
+
   const canGenerate =
     Boolean(status?.installed && taskName.trim() && text.trim()) &&
     (mode !== "preset" || Boolean(speaker)) &&
@@ -151,9 +406,9 @@ export function VoicePage() {
       text: text.trim(),
       mode,
       language,
-      ...(speaker ? { speaker } : {}),
+      ...(mode === "preset" && speaker ? { speaker } : {}),
       speed,
-      ...(references.length > 0
+      ...(mode === "clone" && references.length > 0
         ? { referencePaths: references.map((item) => item.localPath) }
         : {}),
     });
@@ -163,6 +418,7 @@ export function VoicePage() {
     }
     setText("");
     setTaskName("");
+    setReferences([]);
     toast.success("Đã thêm tác vụ XTTS-v2 vào hàng đợi.");
   }, [
     canGenerate,
@@ -189,22 +445,19 @@ export function VoicePage() {
         <div>
           <h1 id="voice-title">Giọng nói</h1>
           <p>
-            Tạo giọng đọc local bằng XTTS-v2 — không dùng credit Google Flow.
+            Chuyển đổi văn bản thành giọng đọc tự nhiên và nhân bản giọng nói
+            với AI.
           </p>
         </div>
       </header>
 
       {!status?.installed && !checking && (
-        <div className="source-generation-error" role="status">
+        <div className="source-generation-error" role="alert">
           <p>
-            XTTS-v2 chưa sẵn sàng. Trình cài sẽ tải model và runtime Python
-            local; toàn bộ model chạy trên CUDA khi khả dụng, nếu không sẽ chạy
-            trên CPU.
+            XTTS-v2 chưa sẵn sàng. Hãy khởi động lại ứng dụng và kiểm tra log
+            XTTS-V2 để xác định runtime hoặc model còn thiếu.
+            {status?.reason ? " Runtime đã trả về trạng thái lỗi." : ""}
           </p>
-          <Button onClick={() => void prepare()} disabled={preparing}>
-            <RefreshCw size={15} className={preparing ? "spin" : ""} />
-            {preparing ? "Đang cài đặt..." : "Cài XTTS-v2"}
-          </Button>
         </div>
       )}
 
@@ -242,17 +495,13 @@ export function VoicePage() {
           </div>
         </section>
 
-        <aside className="source-voice-settings" aria-label="Cài đặt XTTS-v2">
-          <div className="source-control-card__heading">
-            <h2>XTTS-v2 local</h2>
-          </div>
+        <aside className="source-voice-settings" aria-label="Cài đặt giọng nói">
           <div className="source-voice-field">
-            <span className="source-voice-field__label">Chế độ</span>
-            <Select
-              value={mode}
-              onValueChange={(value) => setMode(value as XttsVoiceMode)}
-            >
-              <SelectTrigger>
+            <span id="voice-mode-label" className="source-voice-field__label">
+              Chế độ <span className="source-required-mark">*</span>
+            </span>
+            <Select value={mode} onValueChange={changeMode}>
+              <SelectTrigger aria-labelledby="voice-mode-label">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -263,17 +512,63 @@ export function VoicePage() {
           </div>
           {mode === "preset" && (
             <div className="source-voice-field">
-              <span className="source-voice-field__label">Giọng dựng sẵn</span>
-              <Select value={speaker} onValueChange={setSpeaker}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Chọn giọng dựng sẵn" />
-                </SelectTrigger>
-                <SelectContent>
-                  {speakersList.map((name: string) => (
-                    <SelectItem key={name} value={name}>
-                      {name}
-                    </SelectItem>
+              <span
+                id="voice-preset-label"
+                className="source-voice-field__label"
+              >
+                Giọng dựng sẵn <span className="source-required-mark">*</span>
+              </span>
+              <div className="source-voice-preset-tools">
+                <div
+                  className="source-voice-gender-filter"
+                  role="group"
+                  aria-label="Lọc giới tính giọng dựng sẵn"
+                >
+                  {(
+                    [
+                      ["all", "Tất cả"],
+                      ["female", "Nữ"],
+                      ["male", "Nam"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      aria-pressed={presetGender === value}
+                      onClick={() => setPresetGender(value)}
+                    >
+                      {label}
+                    </button>
                   ))}
+                </div>
+              </div>
+              <Select value={speaker} onValueChange={setSpeaker}>
+                <SelectTrigger
+                  className="source-voice-preset-trigger"
+                  aria-labelledby="voice-preset-label"
+                >
+                  <SelectValue placeholder="Chọn giọng dựng sẵn">
+                    {selectedPresetVoice ? (
+                      <PresetVoiceLabel voice={selectedPresetVoice} />
+                    ) : (
+                      speaker || undefined
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="source-voice-preset-content">
+                  {filteredSpeakers.map((name: string) => {
+                    const voice = presetVoiceByName.get(name);
+                    return (
+                      <SelectItem key={name} value={name}>
+                        {voice ? <PresetVoiceLabel voice={voice} /> : name}
+                      </SelectItem>
+                    );
+                  })}
+                  {filteredSpeakers.length === 0 && (
+                    <div className="source-voice-preset-empty">
+                      Không có giọng phù hợp.
+                    </div>
+                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -290,6 +585,10 @@ export function VoicePage() {
                   ? `Thêm giọng mẫu (${references.length}/5)`
                   : "Chọn giọng mẫu (tối đa 5)"}
               </Button>
+              <p className="source-voice-field__hint">
+                Chọn 1–5 bản ghi của cùng một người. Hỗ trợ WAV, MP3, FLAC, OGG
+                và M4A; tổng dung lượng tối đa 100 MB.
+              </p>
               {references.length > 0 && (
                 <ul
                   className="source-voice-reference-list"
@@ -303,13 +602,7 @@ export function VoicePage() {
                       <span title={reference.name}>{reference.name}</span>
                       <button
                         type="button"
-                        onClick={() =>
-                          setReferences((current) =>
-                            current.filter(
-                              (item) => item.localPath !== reference.localPath,
-                            ),
-                          )
-                        }
+                        onClick={() => removeReference(reference)}
                         aria-label={`Bỏ giọng mẫu ${reference.name}`}
                         title="Bỏ giọng mẫu"
                       >
@@ -322,33 +615,79 @@ export function VoicePage() {
             </div>
           )}
           <div className="source-voice-field">
-            <span className="source-voice-field__label">Ngôn ngữ</span>
+            <span
+              id="voice-language-label"
+              className="source-voice-field__label"
+            >
+              Ngôn ngữ <span className="source-required-mark">*</span>
+            </span>
             <Select value={language} onValueChange={setLanguage}>
-              <SelectTrigger>
-                <SelectValue />
+              <SelectTrigger aria-labelledby="voice-language-label">
+                <SelectValue>
+                  {(() => {
+                    const selected = languagesList.find(
+                      (item) => item.id === language,
+                    );
+                    if (!selected) return undefined;
+                    return (
+                      <span className="source-voice-language-option">
+                        <CountryFlag
+                          code={selected.id}
+                          width={20}
+                          height={14}
+                        />
+                        <span>{selected.label}</span>
+                      </span>
+                    );
+                  })()}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {XTTS_LANGUAGES.map((item) => (
+                {languagesList.map((item) => (
                   <SelectItem key={item.id} value={item.id}>
-                    {item.label}
+                    <span className="source-voice-language-option">
+                      <CountryFlag code={item.id} width={20} height={14} />
+                      <span>{item.label}</span>
+                    </span>
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <label className="source-voice-field">
+          <div className="source-voice-field">
             <span className="source-voice-field__label">
-              Tốc độ: {speed.toFixed(1)}×
+              Tốc độ <span className="source-required-mark">*</span>
             </span>
-            <input
-              type="range"
-              min="0.5"
-              max="2"
-              step="0.1"
-              value={speed}
-              onChange={(event) => setSpeed(Number(event.target.value))}
-            />
-          </label>
+            <div className="source-voice-speed-slider">
+              <div className="source-voice-speed-slider__labels">
+                <span>Chậm</span>
+                <span>Nhanh</span>
+              </div>
+              <div className="source-voice-speed-slider__track-wrapper">
+                <div
+                  className="source-voice-speed-slider__tooltip"
+                  style={{
+                    left: `calc(8px + (100% - 16px) * ${(speed - 0.5) / 1.5})`,
+                  }}
+                >
+                  {speed.toFixed(1)}
+                </div>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.1"
+                  value={speed}
+                  onChange={(event) => setSpeed(Number(event.target.value))}
+                  className="source-voice-speed-input"
+                  style={{
+                    background: `linear-gradient(to right, #18181b 0%, #18181b ${((speed - 0.5) / 1.5) * 100}%, #e4e4e7 ${((speed - 0.5) / 1.5) * 100}%, #e4e4e7 100%)`,
+                  }}
+                  aria-label="Tốc độ đọc"
+                />
+              </div>
+            </div>
+          </div>
         </aside>
       </div>
 
@@ -398,50 +737,45 @@ export function VoicePage() {
                 className="source-image-task-card"
               >
                 {task.fileUrl ? (
-                  <VoiceAudioCard
-                    src={task.fileUrl}
-                    filename={task.filename}
-                    title={task.snapshot.taskName}
-                    subtitle={`${task.snapshot.mode === "preset" ? task.snapshot.speaker || "Giọng đọc" : "Giọng mẫu"} · ${task.snapshot.language.toUpperCase()} · ${task.snapshot.speed.toFixed(1)}×`}
-                  />
+                  <VoiceAudioCard src={task.fileUrl} filename={task.filename} />
                 ) : (
                   <div className="source-image-task-placeholder source-voice-task-placeholder">
                     {task.status === "processing" ? (
                       <div className="source-processing-percent-box">
                         <Clock4
-                          size={30}
+                          size={20}
                           className="source-clock-ticking"
                           aria-hidden="true"
                         />
-                        <span
-                          className="source-processing-estimate-label"
-                          style={{ marginTop: 4 }}
-                        >
-                          {task.progress
-                            ? `Đã tạo ${task.progress.completedSegments}/${task.progress.totalSegments} đoạn${task.progress.resumedSegments > 0 ? ` · tiếp tục từ ${task.progress.resumedSegments} đoạn` : ""}`
-                            : "Đang chuẩn bị giọng đọc local..."}
+                        <span className="source-processing-estimate-label">
+                          {taskProgressLabel(
+                            task.progress,
+                            task.startedAt,
+                            now,
+                          )}
                         </span>
                       </div>
                     ) : task.status === "error" ? (
                       <div className="source-error-icon-box">
                         <CircleX
-                          size={30}
+                          size={20}
                           className="source-error-icon"
                           aria-hidden="true"
                         />
+                        <span className="source-processing-estimate-label">
+                          Tạo giọng đọc thất bại
+                        </span>
                       </div>
                     ) : (
                       <div className="source-queued-icon-box">
                         <Clock4
-                          size={30}
+                          size={20}
                           className="source-clock-ticking"
                           aria-hidden="true"
                         />
-                        <span
-                          className="source-processing-estimate-label"
-                          style={{ marginTop: 4 }}
-                        >
-                          Đang chờ...
+                        <span className="source-processing-estimate-label">
+                          Đang chờ · vị trí{" "}
+                          {queuedPositionById.get(task.id) ?? 1}
                         </span>
                       </div>
                     )}
@@ -462,29 +796,33 @@ export function VoicePage() {
                               ? "Hoàn tất"
                               : "Thất bại"}
                       </span>
-                      <span className="source-task-aspect-badge" title="Chế độ">
-                        {task.snapshot.mode === "preset"
-                          ? "Dựng sẵn"
-                          : "Nhân bản"}
-                      </span>
                       <span className="source-task-ref-badge" title="Giọng đọc">
-                        <Volume2 size={11} aria-hidden="true" />
-                        {task.snapshot.speaker ||
-                          (task.snapshot.mode === "clone"
-                            ? "Nhân bản"
-                            : "Giọng đọc")}
+                        <User size={11} aria-hidden="true" />
+                        {task.snapshot.mode === "clone"
+                          ? "Nhân bản"
+                          : task.snapshot.speaker || "Giọng đọc"}
                       </span>
                       <span className="source-task-slot-badge">
-                        {task.snapshot.language.toUpperCase()} •{" "}
-                        {task.snapshot.speed.toFixed(1)}×
+                        {languagesList.find(
+                          (l) => l.id === task.snapshot.language,
+                        )?.label || task.snapshot.language}{" "}
+                        • {task.snapshot.speed.toFixed(1)}
                       </span>
                     </div>
                   </header>
 
                   <div className="source-voice-task-body">
-                    <p className="source-voice-task-name">
-                      <strong>{task.snapshot.taskName}</strong>
-                    </p>
+                    {task.snapshot.taskName && (
+                      <p
+                        className="source-task-prompt-text source-voice-task-name"
+                        title={task.snapshot.taskName}
+                      >
+                        <strong className="source-task-prompt-label">
+                          Tác vụ:{" "}
+                        </strong>
+                        {task.snapshot.taskName}
+                      </p>
+                    )}
                     <p
                       className="source-task-prompt-text"
                       title={task.snapshot.text}
@@ -507,9 +845,7 @@ export function VoicePage() {
                       <button
                         type="button"
                         className="source-task-action-btn"
-                        onClick={() =>
-                          void voiceApi.showInFolder(task.localPath!)
-                        }
+                        onClick={() => void showTaskInFolder(task.localPath!)}
                         title="Mở thư mục chứa file âm thanh"
                       >
                         <FolderOpen
@@ -545,7 +881,7 @@ export function VoicePage() {
                       <button
                         type="button"
                         className="source-task-action-btn"
-                        onClick={() => queue.retry(task.id)}
+                        onClick={() => retryTask(task.id)}
                         title="Thử lại"
                       >
                         <RefreshCw
@@ -564,7 +900,7 @@ export function VoicePage() {
                           ? "Dừng tác vụ"
                           : "Xóa tác vụ"
                       }
-                      onClick={() => void queue.remove(task)}
+                      onClick={() => void removeTask(task)}
                       title={
                         task.status === "processing"
                           ? "Dừng tác vụ đang tạo"
@@ -574,7 +910,11 @@ export function VoicePage() {
                       }
                     >
                       {task.status === "processing" ? (
-                        <X size={14} aria-hidden="true" />
+                        <X
+                          size={14}
+                          className="source-action-icon--cancel"
+                          aria-hidden="true"
+                        />
                       ) : (
                         <Trash2
                           size={14}
