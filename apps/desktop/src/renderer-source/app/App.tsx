@@ -7,6 +7,7 @@ import { Toaster } from "@/components/ui/Toast";
 import { ProviderSelectionPage } from "@/pages/ProviderHub/ProviderSelectionPage";
 import { ImageQueueProvider } from "@/pages/Image/useImageQueue";
 import { VideoQueueProvider } from "@/pages/Video/useVideoQueue";
+import { VoiceQueueProvider } from "@/pages/Voice/useVoiceQueue";
 
 const SettingsPage = lazy(() =>
   import("@/pages/Settings/SettingsPage").then((module) => ({
@@ -90,7 +91,9 @@ export function App() {
       <LocaleProvider>
         <ImageQueueProvider>
           <VideoQueueProvider>
-            <SourceApplication />
+            <VoiceQueueProvider>
+              <SourceApplication />
+            </VoiceQueueProvider>
           </VideoQueueProvider>
         </ImageQueueProvider>
         <Toaster />

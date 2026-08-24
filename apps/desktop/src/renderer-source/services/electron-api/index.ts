@@ -3,7 +3,15 @@ export { providerApi } from "@/services/electron-api/provider";
 export { aiProviderApi } from "@/services/electron-api/ai-providers";
 export { settingsApi } from "@/services/electron-api/settings";
 export { imageApi, type ImageModel } from "@/services/electron-api/image";
-export { voiceApi, type FlowVoice } from "@/services/electron-api/voice";
+export {
+  voiceApi,
+  XTTS_LANGUAGES,
+  type XttsVoiceMode,
+  type XttsVoiceReference,
+  type XttsVoiceRequest,
+  type XttsVoiceResult,
+  type XttsVoiceStatus,
+} from "@/services/electron-api/voice";
 export {
   videoApi,
   type VideoMode,

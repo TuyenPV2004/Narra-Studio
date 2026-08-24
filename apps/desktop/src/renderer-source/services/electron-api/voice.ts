@@ -1,100 +1,74 @@
 import { getElectronApi } from "@/services/electron-api/client";
 
-export interface FlowVoice {
-  baseVoice?: string;
-  description?: string;
-  mediaId: string;
+export type XttsVoiceMode = "preset" | "clone";
+export interface XttsVoiceReference {
+  fileUrl: string;
+  id: string;
+  localPath: string;
   name: string;
-  sampleUrl?: string;
-  slotId: number;
 }
-const record = (value: unknown): Record<string, unknown> =>
-  typeof value === "object" && value !== null
-    ? (value as Record<string, unknown>)
-    : {};
+export interface XttsVoiceRequest {
+  language: string;
+  mode: XttsVoiceMode;
+  referencePath?: string;
+  requestId: string;
+  speaker?: string;
+  speed: number;
+  taskName: string;
+  text: string;
+}
+export interface XttsVoiceResult {
+  fileUrl: string;
+  filename: string;
+  id: string;
+  localPath: string;
+}
+export interface XttsVoiceStatus {
+  cudaAvailable?: boolean;
+  cudaName?: string;
+  device?: "cpu" | "cuda";
+  installed: boolean;
+  languages?: string[];
+  modelName?: string;
+  pythonPath: string;
+  reason?: string;
+  runtimeRoot: string;
+  speakers?: string[];
+  torchVersion?: string;
+}
+
+export const XTTS_LANGUAGES = [
+  { id: "en", label: "Tiếng Anh" },
+  { id: "ja", label: "Tiếng Nhật" },
+  { id: "ko", label: "Tiếng Hàn" },
+  { id: "es", label: "Tiếng Tây Ban Nha" },
+  { id: "fr", label: "Tiếng Pháp" },
+  { id: "de", label: "Tiếng Đức" },
+  { id: "it", label: "Tiếng Ý" },
+  { id: "pt", label: "Tiếng Bồ Đào Nha" },
+  { id: "pl", label: "Tiếng Ba Lan" },
+  { id: "tr", label: "Tiếng Thổ Nhĩ Kỳ" },
+  { id: "ru", label: "Tiếng Nga" },
+  { id: "nl", label: "Tiếng Hà Lan" },
+  { id: "cs", label: "Tiếng Séc" },
+  { id: "ar", label: "Tiếng Ả Rập" },
+  { id: "zh-cn", label: "Tiếng Trung giản thể" },
+  { id: "hu", label: "Tiếng Hungary" },
+  { id: "hi", label: "Tiếng Hindi" },
+] as const;
 
 export const voiceApi = {
-  async listVoices(): Promise<FlowVoice[]> {
-    const slots = await getElectronApi().getAllSlots();
-    const connected = Array.isArray(slots)
-      ? slots
-          .map(record)
-          .find(
-            (slot) =>
-              slot.status === "connected" && slot.hasBearerToken === true,
-          )
-      : undefined;
-    const slotId = typeof connected?.id === "number" ? connected.id : 0;
-    const project = record(
-      await getElectronApi().getFlowProjectInitialData({ slotId }),
-    );
-    return (Array.isArray(project.voices) ? project.voices : [])
-      .map(record)
-      .flatMap((voice) => {
-        if (typeof voice.mediaId !== "string" || typeof voice.name !== "string")
-          return [];
-        return [
-          {
-            mediaId: voice.mediaId,
-            name: voice.name,
-            slotId,
-            ...(typeof voice.baseVoice === "string"
-              ? { baseVoice: voice.baseVoice }
-              : {}),
-            ...(typeof voice.description === "string"
-              ? { description: voice.description }
-              : {}),
-            ...(typeof voice.sampleUrl === "string"
-              ? { sampleUrl: voice.sampleUrl }
-              : {}),
-          },
-        ];
-      });
-  },
-  async generate(dialog: string, voice: FlowVoice) {
-    const response = record(
-      await getElectronApi().generateFlowVoicePreview({
-        dialog,
-        voicePerformance: voice.description || "",
-        voiceName: voice.name,
-        baseVoice: voice.baseVoice || voice.name,
-        slotId: voice.slotId,
-      }),
-    );
-    const generated = record(response.voice);
-    if (typeof generated.sampleUrl !== "string")
-      throw new Error("Google Flow chưa trả về audio voice.");
-    return {
-      mediaId:
-        typeof generated.mediaId === "string"
-          ? generated.mediaId
-          : `flow-voice-${Date.now()}`,
-      sampleUrl: generated.sampleUrl,
-    };
-  },
-  async save(sampleUrl: string, filename: string): Promise<void> {
-    const response = await fetch(sampleUrl);
-    if (!response.ok)
-      throw new Error(`Không thể tải audio (${response.status}).`);
-    const blob = await response.blob();
-    const bytes = new Uint8Array(await blob.arrayBuffer());
-    let binary = "";
-    for (const byte of bytes) binary += String.fromCharCode(byte);
-    const mimeType = blob.type || "audio/mpeg";
-    const extension = mimeType.includes("wav")
-      ? "wav"
-      : mimeType.includes("ogg")
-        ? "ogg"
-        : "mp3";
-    const safeName =
-      filename
-        .trim()
-        .replace(/[\\/:*?"<>|]+/g, "-")
-        .slice(0, 80) || "narra-voice";
-    await getElectronApi().saveFileDialog({
-      data: btoa(binary),
-      filename: `${safeName}.${extension}`,
-      filters: [{ name: "Audio", extensions: [extension] }],
-    });
-  },
+  status: async () => (await getElectronApi().xttsStatus()) as XttsVoiceStatus,
+  prepare: async () =>
+    (await getElectronApi().xttsPrepare()) as XttsVoiceStatus,
+  importReference: async () =>
+    (await getElectronApi().xttsImportReference()) as XttsVoiceReference | null,
+  generate: async (request: XttsVoiceRequest) =>
+    (await getElectronApi().xttsGenerate(
+      request as unknown as Record<string, unknown>,
+    )) as XttsVoiceResult,
+  cancel: async (requestId: string) =>
+    getElectronApi().xttsCancel({ requestId }),
+  showInFolder: async (localPath: string) =>
+    getElectronApi().xttsShowInFolder({ filePath: localPath }),
 };

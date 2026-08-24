@@ -10,9 +10,20 @@ Narra Studio là ứng dụng Electron single-user. Renderer chính được bui
 - Nhiều tài khoản bằng Electron partition tách biệt; cookie không được chia sẻ giữa các slot.
 - CAPTCHA bridge và lớp anti-detect phục vụ phiên automation do người dùng khởi tạo.
 - Tạo ảnh/video, upload reference, polling, download media và lịch sử kết quả.
-- AI Agent Text/Vision, TTS và lip-sync dùng custom provider profile mã hóa, được chọn theo capability/protocol; Google Flow vẫn là provider media riêng.
+- Trang Giọng nói dùng XTTS-v2 chạy trong Python runtime local; WAV được lưu tại thư mục Voice chọn trong Cài đặt, mặc định là `Music/Narra Studio/Voice`. Luồng này không dùng Google Flow, account slot hoặc credit.
+- AI Agent Text/Vision, TTS và lip-sync dùng custom provider profile mã hóa, được chọn theo capability/protocol; các luồng này độc lập với trang Giọng nói. Google Flow vẫn là provider ảnh/video riêng.
 - Workspace/canvas lưu JSON và media trong Electron `userData`, không dùng team server.
 - FFmpeg, ONNX, tách audio, chỉnh sửa video và các công cụ media local.
+
+## Runtime XTTS-v2
+
+- Electron Main dùng Python tương thích (3.10 đến 3.14) để tạo môi trường riêng tại `userData/xtts-v2` khi người dùng chủ động yêu cầu.
+- Renderer chỉ gửi contract typed qua preload; không nhận đường dẫn tùy ý. Giọng mẫu được chọn bằng dialog, kiểm tra signature/dung lượng rồi sao chép vào thư viện local do Narra sở hữu.
+- Tác vụ chạy trong subprocess không dùng shell, có thể hủy thật bằng cách kết thúc process và giữ trạng thái queue ở cấp ứng dụng khi chuyển trang.
+- Model là `tts_models/multilingual/multi-dataset/xtts_v2` từ Coqui TTS. Danh sách speaker dựng sẵn và ngôn ngữ được đọc từ checkpoint sau khi tải.
+- Worker dùng nguyên cơ chế thiết bị của model: toàn bộ model chuyển sang CUDA khi `torch.cuda.is_available()` trả về `true`, nếu không toàn bộ model chạy trên CPU; Narra không chia model hoặc offload giữa GPU và CPU. Worker tự giải phóng sau thời gian rảnh để không giữ VRAM.
+- Văn bản dài dùng tùy chọn chính thức `split_sentences=True`; chế độ clone chỉ nhận file audio đã được nhập vào thư viện local của Narra.
+- Máy không có CUDA vẫn dùng profile CPU. UI phải hiển thị profile thực tế; không được âm thầm báo hybrid khi PyTorch chỉ là bản CPU.
 
 ## Thành phần đã xóa
 

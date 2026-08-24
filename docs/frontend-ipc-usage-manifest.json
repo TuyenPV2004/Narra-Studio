@@ -19,10 +19,10 @@
   "rendererRoot": "apps/desktop/src/renderer-source",
   "preloadFile": "apps/desktop/src/electron/preload.js",
   "summary": {
-    "usedMethods": 162,
-    "usedApiMethods": 162,
+    "usedMethods": 169,
+    "usedApiMethods": 169,
     "usedElectronApiMethods": 0,
-    "exposedPreloadMethods": 228,
+    "exposedPreloadMethods": 235,
     "missingFromPreload": 0,
     "missingFromPreloadDistinctMethodCount": 0,
     "missingFromPreloadCallSiteCount": 0,
@@ -290,7 +290,7 @@
       "global": "api",
       "method": "authorizeFilePath",
       "businessArea": "Desktop / Local utility",
-      "callCount": 10,
+      "callCount": 8,
       "files": [
         "apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
         "apps/desktop/src/renderer-source/services/electron-api/video.ts"
@@ -364,6 +364,19 @@
       "global": "api",
       "method": "changeOutputFolder",
       "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "changeVoiceOutputFolder",
+      "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
         "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
@@ -601,21 +614,6 @@
     },
     {
       "global": "api",
-      "method": "generateFlowVoicePreview",
-      "businessArea": "Google Flow / Session",
-      "callCount": 1,
-      "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
-      ],
-      "preload": {
-        "exposed": true,
-        "parameters": [
-          "p"
-        ]
-      }
-    },
-    {
-      "global": "api",
       "method": "generateImage",
       "businessArea": "Media / Generation",
       "callCount": 1,
@@ -723,11 +721,12 @@
       "global": "api",
       "method": "getAllSlots",
       "businessArea": "Google Flow / Session",
-      "callCount": 3,
+      "callCount": 4,
       "files": [
+        "apps/desktop/src/renderer-source/pages/Image/ImageEditorPage.tsx",
+        "apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
         "apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -815,7 +814,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -870,6 +869,19 @@
     {
       "global": "api",
       "method": "getVideoOutputPath",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "getVoiceOutputPath",
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
@@ -1556,10 +1568,9 @@
       "global": "api",
       "method": "saveFileDialog",
       "businessArea": "Desktop / Local utility",
-      "callCount": 2,
+      "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent-conversations.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+        "apps/desktop/src/renderer-source/services/electron-api/agent-conversations.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2428,6 +2439,90 @@
         "parameters": [
           "p"
         ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsCancel",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsGenerate",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsImportReference",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsPrepare",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsShowInFolder",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsStatus",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
       }
     }
   ],

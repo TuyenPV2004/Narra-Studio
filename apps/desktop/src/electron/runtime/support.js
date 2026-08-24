@@ -166,6 +166,10 @@ function getImageOutputDir() {
   const s = loadSettings();
   return s.imageOutputPath || path.join(app.getPath('pictures'), 'VEO3Flow', 'images');
 }
+function getVoiceOutputDir() {
+  const s = loadSettings();
+  return s.voiceOutputPath || path.join(app.getPath('music'), 'Narra Studio', 'Voice');
+}
 
 // Generate sequential filename: p-DD-MM-NNN.ext
 // In-memory counter để cấp filename atomic — tránh race condition khi concurrent downloads
@@ -221,6 +225,7 @@ function getNextFilename(dir, ext) {
     saveSettings,
     getVideoOutputDir,
     getImageOutputDir,
+    getVoiceOutputDir,
     getNextFilename,
   };
 };

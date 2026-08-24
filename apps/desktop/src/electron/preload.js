@@ -89,8 +89,12 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("generate-video-reference-images", p),
   generateVideoEditVideo: (p) =>
     ipcRenderer.invoke("generate-video-edit-video", p),
-  generateFlowVoicePreview: (p) =>
-    ipcRenderer.invoke("generate-flow-voice-preview", p),
+  xttsStatus: () => ipcRenderer.invoke("xtts-status"),
+  xttsPrepare: () => ipcRenderer.invoke("xtts-prepare"),
+  xttsImportReference: () => ipcRenderer.invoke("xtts-import-reference"),
+  xttsGenerate: (p) => ipcRenderer.invoke("xtts-generate", p),
+  xttsCancel: (p) => ipcRenderer.invoke("xtts-cancel", p),
+  xttsShowInFolder: (p) => ipcRenderer.invoke("xtts-show-in-folder", p),
   uploadOmniVideo: (p) => ipcRenderer.invoke("upload-omni-video", p),
   pollVideoStatus: (p) => ipcRenderer.invoke("poll-video-status", p),
   resolveVideoUrl: (p) => ipcRenderer.invoke("resolve-video-url", p),
@@ -212,6 +216,9 @@ contextBridge.exposeInMainWorld("api", {
   getImageOutputPath: () => ipcRenderer.invoke("get-image-output-path"),
   changeImageOutputFolder: () =>
     ipcRenderer.invoke("change-image-output-folder"),
+  getVoiceOutputPath: () => ipcRenderer.invoke("get-voice-output-path"),
+  changeVoiceOutputFolder: () =>
+    ipcRenderer.invoke("change-voice-output-folder"),
   listImageFiles: () => ipcRenderer.invoke("list-image-files"),
   listVideoFiles: () => ipcRenderer.invoke("list-video-files"),
   getDashboardStats: () => ipcRenderer.invoke("get-dashboard-stats"),

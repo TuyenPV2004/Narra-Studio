@@ -46,6 +46,7 @@ module.exports = function registerStorageIpc(dependencies) {
     saveSettings,
     getVideoOutputDir,
     getImageOutputDir,
+    getVoiceOutputDir,
     getNextFilename,
     buildCleanUserAgent,
     DEFAULTS,
@@ -294,6 +295,24 @@ ipcMain.handle('change-image-output-folder', async () => {
   const newPath = result.filePaths[0];
   saveSettings({ imageOutputPath: newPath });
   console.log(`[SETTINGS] Image output path changed to: ${newPath}`);
+  return newPath;
+});
+
+// ── Voice output path ─────────────────────────────────────────────────
+ipcMain.handle('get-voice-output-path', async () => {
+  return getVoiceOutputDir();
+});
+
+ipcMain.handle('change-voice-output-folder', async () => {
+  const result = await dialog.showOpenDialog(runtime.mainWindow, {
+    title: 'Chọn thư mục lưu Voice',
+    defaultPath: getVoiceOutputDir(),
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  const newPath = result.filePaths[0];
+  saveSettings({ voiceOutputPath: newPath });
+  console.log(`[SETTINGS] Voice output path changed to: ${newPath}`);
   return newPath;
 });
 

@@ -1145,10 +1145,18 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .narra-input:hover {
   border-color: var(--border-strong);
+}
+.narra-input:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-muted);
 }
 .narra-input:disabled {
   color: var(--muted-foreground);
@@ -1743,6 +1751,17 @@
   border-radius: var(--radius-md);
   background: var(--surface);
   color: var(--foreground);
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.source-control-card select:focus,
+.source-control-card input:not([type="checkbox"]):not([type="file"]):focus,
+.source-control-card textarea:focus,
+.source-prompt-row textarea:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 2px var(--primary-muted);
 }
 .source-control-card textarea {
   min-height: 100px;
@@ -2544,6 +2563,23 @@
   font-size: 1.05rem;
   font-weight: 700;
   color: var(--foreground);
+}
+.source-voice-runtime {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  color: var(--muted-foreground);
+  font-size: 0.82rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+.source-voice-runtime strong {
+  color: var(--foreground);
+  font-size: 0.88rem;
+}
+.source-voice-runtime .narra-button {
+  margin-top: var(--space-2);
 }
 .source-voice-desc {
   display: flex;

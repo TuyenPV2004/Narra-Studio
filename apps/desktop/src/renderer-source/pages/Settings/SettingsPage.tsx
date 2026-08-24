@@ -1,4 +1,5 @@
 import {
+  AudioLines,
   Folder,
   FolderOpen,
   Image,
@@ -25,6 +26,7 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
   const [tab, setTab] = useState<SettingsTab>("output");
   const [videoPath, setVideoPath] = useState("");
   const [imagePath, setImagePath] = useState("");
+  const [voicePath, setVoicePath] = useState("");
   const [authToken, setAuthToken] = useState("");
   const [busy, setBusy] = useState(false);
   const tabs: readonly TabOption<SettingsTab>[] = [
@@ -52,6 +54,7 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
         if (!cancelled) {
           setVideoPath(paths.video);
           setImagePath(paths.image);
+          setVoicePath(paths.voice);
         }
       })
       .catch((error) => {
@@ -69,16 +72,18 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
     if (activeProvider !== "veo3" && tab === "advanced") setTab("output");
   }, [activeProvider, tab]);
 
-  const changeFolder = async (kind: "image" | "video") => {
+  const changeFolder = async (kind: "image" | "video" | "voice") => {
     setBusy(true);
     try {
-      const path =
-        kind === "video"
-          ? await settingsApi.changeVideoOutputFolder()
-          : await settingsApi.changeImageOutputFolder();
+      let path = "";
+      if (kind === "video") path = await settingsApi.changeVideoOutputFolder();
+      else if (kind === "image")
+        path = await settingsApi.changeImageOutputFolder();
+      else path = await settingsApi.changeVoiceOutputFolder();
       if (path) {
         if (kind === "video") setVideoPath(path);
-        else setImagePath(path);
+        else if (kind === "image") setImagePath(path);
+        else setVoicePath(path);
         toast.success("Đã cập nhật thư mục lưu thành công!", {
           description: path,
         });
@@ -176,7 +181,7 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
         >
           <header>
             <h2 id="output-title">Thư mục lưu</h2>
-            <p>Chọn thư mục dễ tìm cho hình ảnh và video đã tạo.</p>
+            <p>Chọn thư mục dễ tìm cho hình ảnh, video và Voice đã tạo.</p>
           </header>
           <div className="source-folder-list">
             <FolderRow
@@ -194,6 +199,14 @@ export function SettingsPage({ activeProvider }: SettingsPageProps) {
               busy={busy}
               onChange={() => void changeFolder("image")}
               onOpen={() => void openFolder(imagePath)}
+            />
+            <FolderRow
+              icon={<AudioLines size={24} aria-hidden="true" />}
+              label="Voice"
+              path={voicePath}
+              busy={busy}
+              onChange={() => void changeFolder("voice")}
+              onOpen={() => void openFolder(voicePath)}
             />
           </div>
         </section>

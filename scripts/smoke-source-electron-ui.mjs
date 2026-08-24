@@ -995,11 +995,11 @@ const assertions = {
         runtime.interaction?.annotationControls &&
         runtime.interaction?.generateDisabled)) &&
     (requestedPage !== "voice" ||
-      (runtime.targetPage.textareaMaxLength === 120 &&
+      (runtime.targetPage.textareaMaxLength === 5000 &&
         runtime.targetPage.settingsVisible &&
         runtime.targetPage.historyVisible &&
         runtime.interaction?.textLength === 11 &&
-        runtime.interaction?.maxLength === 120)) &&
+        runtime.interaction?.maxLength === 5000)) &&
     (requestedPage !== "video-pro" ||
       (runtime.targetPage.modeCount === 5 &&
         runtime.targetPage.settingsCount === 4 &&

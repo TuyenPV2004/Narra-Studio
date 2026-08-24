@@ -51,6 +51,8 @@ export interface NarraElectronApi {
   changeOutputFolder: () => Promise<unknown>;
   getImageOutputPath: () => Promise<unknown>;
   changeImageOutputFolder: () => Promise<unknown>;
+  getVoiceOutputPath: () => Promise<unknown>;
+  changeVoiceOutputFolder: () => Promise<unknown>;
   setManualAuth: (payload: {
     bearerToken: string;
     projectId: null;
@@ -82,9 +84,12 @@ export interface NarraElectronApi {
     targetResolution?: string;
   }) => Promise<unknown>;
   getFlowProjectInitialData: (payload: { slotId: number }) => Promise<unknown>;
-  generateFlowVoicePreview: (
-    payload: Record<string, unknown>,
-  ) => Promise<unknown>;
+  xttsStatus: () => Promise<unknown>;
+  xttsPrepare: () => Promise<unknown>;
+  xttsImportReference: () => Promise<unknown>;
+  xttsGenerate: (payload: Record<string, unknown>) => Promise<unknown>;
+  xttsCancel: (payload: { requestId: string }) => Promise<unknown>;
+  xttsShowInFolder: (payload: { filePath: string }) => Promise<unknown>;
   saveFileDialog: (payload: Record<string, unknown>) => Promise<unknown>;
   authorizeFilePath: (file: File) => Promise<string>;
   getFilePath: (file: File) => string;

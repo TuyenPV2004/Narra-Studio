@@ -30,6 +30,7 @@ const registerStorageIpc = require('./ipc/storage');
 const registerMediaIpc = require('./ipc/media');
 const registerAiIpc = require('./ipc/ai');
 const registerSystemIpc = require('./ipc/system');
+const registerVoiceIpc = require('./ipc/xtts');
 const registerProviderIpc = require('./ipc/providers');
 const registerLocalWorkspaceIpc = require('./ipc/collaboration-local');
 
@@ -86,6 +87,7 @@ registerProviderIpc({
 });
 registerLocalWorkspaceIpc(sharedDependencies);
 registerSystemIpc({ ...sharedDependencies, ...crossDomainDependencies, openAiProvider });
+registerVoiceIpc(sharedDependencies);
 
 
 registerAppLifecycle({
