@@ -1,5 +1,6 @@
 import {
   Brain,
+  Check,
   ChevronLeft,
   ChevronRight,
   CirclePlus,
@@ -397,10 +398,18 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
     }
   };
 
-  const copyPrompt = (promptText: string, id: string) => {
-    void navigator.clipboard.writeText(promptText);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 1500);
+  const copyPrompt = async (promptText: string, id: string) => {
+    try {
+      try {
+        await navigator.clipboard.writeText(promptText);
+      } catch {
+        await getElectronApi().copyToClipboard(promptText);
+      }
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      // ignore
+    }
   };
 
   const run = useCallback(() => {
@@ -972,15 +981,23 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
                     <button
                       type="button"
                       className="source-task-action-btn"
-                      onClick={() => copyPrompt(task.prompt, task.id)}
+                      onClick={() => void copyPrompt(task.prompt, task.id)}
                       title="Sao chép prompt"
                     >
-                      <Copy
-                        size={14}
-                        className="source-action-icon--copy"
-                        aria-hidden="true"
-                      />
-                      {copiedId === task.id ? "Đã copy" : "Copy"}
+                      {copiedId === task.id ? (
+                        <Check
+                          size={14}
+                          className="source-action-icon--check"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <Copy
+                          size={14}
+                          className="source-action-icon--copy"
+                          aria-hidden="true"
+                        />
+                      )}
+                      Copy
                     </button>
                     {task.status === "error" && (
                       <button

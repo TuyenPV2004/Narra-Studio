@@ -2,6 +2,8 @@ const { spawn } = require('child_process');
 const crypto = require('crypto');
 
 const MAX_REFERENCE_BYTES = 50 * 1024 * 1024;
+const MAX_REFERENCE_FILES = 5;
+const MAX_REFERENCE_TOTAL_BYTES = 100 * 1024 * 1024;
 const MAX_TEXT_CHARS = 20_000;
 const MODEL_DOWNLOAD_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 const WORKER_READY_TIMEOUT_MS = 10 * 60 * 1000;
@@ -13,7 +15,7 @@ const SUPPORTED_LANGUAGES = new Set(['en', 'es', 'fr', 'de', 'it', 'pt', 'pl', '
 const activeJobs = new Map();
 
 function logVoiceEvent(message, level = 'log') {
-  const allowed = ['event', 'requestId', 'device', 'torchVersion', 'cudaAvailable', 'cudaName', 'loadMs', 'speakerCount', 'mode', 'language', 'speed', 'textChars', 'elapsedMs', 'outputBytes', 'sampleRate', 'audioFrames'];
+  const allowed = ['event', 'requestId', 'device', 'torchVersion', 'cudaAvailable', 'cudaName', 'loadMs', 'speakerCount', 'mode', 'language', 'speed', 'textChars', 'elapsedMs', 'outputBytes', 'sampleRate', 'audioFrames', 'segmentIndex', 'totalSegments', 'completedSegments', 'resumedSegments', 'segmentChars'];
   const details = {};
   for (const field of allowed) if (message[field] !== undefined) details[field] = message[field];
   console[level]('[XTTS-V2]', details);
@@ -50,7 +52,7 @@ function terminateProcessTree(proc, spawnProcess = spawn) {
   try { proc.kill('SIGKILL'); } catch { /* already stopped */ }
 }
 
-module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, shell, pathToFileURL, getVoiceOutputDir, spawnProcess = spawn }) {
+module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, shell, pathToFileURL, getVoiceOutputDir, getVoiceOutputRoots, runtime, spawnProcess = spawn }) {
   const runtimeRoot = () => process.env.NARRA_XTTS_RUNTIME_ROOT || path.join(app.getPath('userData'), 'xtts-v2');
   const pythonPath = () => process.env.NARRA_XTTS_PYTHON || (process.platform === 'win32' ? path.join(runtimeRoot(), '.venv', 'Scripts', 'python.exe') : path.join(runtimeRoot(), '.venv', 'bin', 'python'));
   const workerPath = path.join(__dirname, '..', 'runtime', 'xtts-worker.py');
@@ -162,7 +164,22 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
           workerDetails = { device: message.device, cudaAvailable: Boolean(message.cudaAvailable), cudaName: message.cudaName || '', torchVersion: message.torchVersion || '', speakers: message.speakers || [], languages: message.languages || [] };
           logVoiceEvent({ ...message, speakerCount: workerDetails.speakers.length });
           settle();
-        } else if (message.type === 'lifecycle' || message.type === 'progress') logVoiceEvent(message);
+        } else if (message.type === 'lifecycle' || message.type === 'progress') {
+          logVoiceEvent(message);
+          if (message.type === 'progress' && message.requestId) {
+            const window = runtime?.mainWindow;
+            if (window && !window.isDestroyed?.() && !window.webContents.isDestroyed?.()) {
+              window.webContents.send('xtts-progress', {
+                requestId: String(message.requestId),
+                event: String(message.event || ''),
+                segmentIndex: Number(message.segmentIndex || 0),
+                totalSegments: Number(message.totalSegments || 0),
+                completedSegments: Number(message.completedSegments || 0),
+                resumedSegments: Number(message.resumedSegments || 0),
+              });
+            }
+          }
+        }
         else if (message.type === 'diagnostic') console.error('[XTTS-V2]', { event: message.event, requestId: message.requestId, stage: message.stage, errorType: message.errorType, traceback: message.traceback });
         else if (message.type === 'result') {
           const pending = activeJobs.get(String(message.requestId || ''));
@@ -208,23 +225,40 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
     return status();
   });
 
-  ipcMain.handle('xtts-import-reference', async () => {
-    const picked = await dialog.showOpenDialog({ title: 'Chọn giọng mẫu cho XTTS-v2', properties: ['openFile'], filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'flac', 'ogg', 'm4a'] }] });
-    if (picked.canceled || !picked.filePaths[0]) return null;
-    const source = fs.realpathSync(picked.filePaths[0]);
-    const extension = path.extname(source).toLowerCase();
-    if (!new Set(['.wav', '.mp3', '.flac', '.ogg', '.m4a']).has(extension)) throw new Error('Định dạng giọng mẫu không được hỗ trợ.');
-    const stat = fs.statSync(source);
-    if (!stat.isFile() || stat.size < 12 || stat.size > MAX_REFERENCE_BYTES) throw new Error('File giọng mẫu phải từ 12 byte đến 50 MB.');
-    const fd = fs.openSync(source, 'r');
-    const header = Buffer.alloc(Math.min(64, stat.size));
-    try { fs.readSync(fd, header, 0, header.length, 0); } finally { fs.closeSync(fd); }
-    if (!isAudioHeader(header)) throw new Error('File giọng mẫu không có định dạng audio hợp lệ.');
+  ipcMain.handle('xtts-import-reference', async (_, { limit } = {}) => {
+    const allowedCount = Math.max(1, Math.min(MAX_REFERENCE_FILES, Number(limit) || MAX_REFERENCE_FILES));
+    const picked = await dialog.showOpenDialog({ title: 'Chọn giọng mẫu cho XTTS-v2', properties: ['openFile', 'multiSelections'], filters: [{ name: 'Audio', extensions: ['wav', 'mp3', 'flac', 'ogg', 'm4a'] }] });
+    if (picked.canceled || !picked.filePaths.length) return [];
+    if (picked.filePaths.length > allowedCount) throw new Error(`Chỉ có thể thêm tối đa ${allowedCount} file giọng mẫu nữa.`);
+    const validated = picked.filePaths.map(selectedPath => {
+      const source = fs.realpathSync(selectedPath);
+      const extension = path.extname(source).toLowerCase();
+      if (!new Set(['.wav', '.mp3', '.flac', '.ogg', '.m4a']).has(extension)) throw new Error('Định dạng giọng mẫu không được hỗ trợ.');
+      const stat = fs.statSync(source);
+      if (!stat.isFile() || stat.size < 12 || stat.size > MAX_REFERENCE_BYTES) throw new Error('Mỗi file giọng mẫu phải từ 12 byte đến 50 MB.');
+      const fd = fs.openSync(source, 'r');
+      const header = Buffer.alloc(Math.min(64, stat.size));
+      try { fs.readSync(fd, header, 0, header.length, 0); } finally { fs.closeSync(fd); }
+      if (!isAudioHeader(header)) throw new Error(`File “${path.basename(source)}” không có định dạng audio hợp lệ.`);
+      return { source, extension, size: stat.size };
+    });
+    if (validated.reduce((total, item) => total + item.size, 0) > MAX_REFERENCE_TOTAL_BYTES) {
+      throw new Error('Tổng dung lượng giọng mẫu không được vượt quá 100 MB.');
+    }
     fs.mkdirSync(referenceDir(), { recursive: true });
-    const id = `${Date.now()}-${crypto.randomUUID()}`;
-    const target = path.join(referenceDir(), `${id}${extension}`);
-    fs.copyFileSync(source, target);
-    return { id, name: path.basename(source), localPath: target, fileUrl: pathToFileURL(target).toString() };
+    const imported = [];
+    try {
+      for (const item of validated) {
+        const id = `${Date.now()}-${crypto.randomUUID()}`;
+        const target = path.join(referenceDir(), `${id}${item.extension}`);
+        await fs.promises.copyFile(item.source, target);
+        imported.push({ id, name: path.basename(item.source), localPath: target, fileUrl: pathToFileURL(target).toString() });
+      }
+      return imported;
+    } catch (error) {
+      for (const item of imported) try { await fs.promises.rm(item.localPath, { force: true }); } catch { /* best-effort rollback */ }
+      throw error;
+    }
   });
 
   ipcMain.handle('xtts-generate', async (_, payload = {}) => {
@@ -240,12 +274,28 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
     const currentStatus = await status();
     if (!currentStatus.installed) throw new Error('XTTS-v2 chưa tải đủ model. Hãy bấm “Cài XTTS-v2” trước.');
     if (mode === 'preset' && !currentStatus.speakers?.includes(speaker)) throw new Error('Giọng dựng sẵn không tồn tại trong XTTS-v2.');
-    let referencePath = '';
+    let referencePaths = [];
     if (mode === 'clone') {
       if (!fs.existsSync(referenceDir())) throw new Error('Hãy chọn giọng mẫu trước.');
-      referencePath = fs.realpathSync(String(payload.referencePath || ''));
       const root = fs.realpathSync(referenceDir());
-      if (!referencePath.startsWith(`${root}${path.sep}`) || !fs.statSync(referencePath).isFile()) throw new Error('Giọng mẫu không thuộc thư viện XTTS-v2 của Narra.');
+      const supplied = Array.isArray(payload.referencePaths)
+        ? payload.referencePaths
+        : payload.referencePath ? [payload.referencePath] : [];
+      if (!supplied.length || supplied.length > MAX_REFERENCE_FILES) throw new Error('Hãy chọn từ một đến năm file giọng mẫu.');
+      referencePaths = [...new Set(supplied.map(item => fs.realpathSync(String(item || ''))))];
+      if (referencePaths.length !== supplied.length || referencePaths.some(referencePath => {
+        const relative = path.relative(root, referencePath);
+        if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) return true;
+        const stat = fs.statSync(referencePath);
+        if (!stat.isFile() || stat.size < 12 || stat.size > MAX_REFERENCE_BYTES) return true;
+        const fd = fs.openSync(referencePath, 'r');
+        const header = Buffer.alloc(Math.min(64, stat.size));
+        try { fs.readSync(fd, header, 0, header.length, 0); } finally { fs.closeSync(fd); }
+        return !isAudioHeader(header);
+      })) throw new Error('Giọng mẫu không thuộc thư viện XTTS-v2 của Narra.');
+      if (referencePaths.reduce((total, referencePath) => total + fs.statSync(referencePath).size, 0) > MAX_REFERENCE_TOTAL_BYTES) {
+        throw new Error('Tổng dung lượng giọng mẫu không được vượt quá 100 MB.');
+      }
     }
     if (activeJobs.has(requestId)) throw new Error('Tác vụ XTTS-v2 đang chạy.');
     let resolveJob;
@@ -258,7 +308,7 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
       outputPath = path.join(outputDir(), `${safeName(payload.taskName)}-${Date.now()}.wav`);
       const proc = await Promise.race([ensureWorker(), result]);
       if (!activeJobs.has(requestId)) throw new Error('Tác vụ XTTS-v2 đã bị hủy.');
-      proc.stdin.write(`${JSON.stringify({ requestId, text, mode, language, speaker, referencePath, speed, outputPath })}\n`, error => {
+      proc.stdin.write(`${JSON.stringify({ requestId, text, mode, language, speaker, referencePaths, speed, outputPath })}\n`, error => {
         if (!error) return;
         activeJobs.get(requestId)?.reject(error);
         activeJobs.delete(requestId);
@@ -275,13 +325,17 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
   });
 
   ipcMain.handle('xtts-cancel', async (_, { requestId } = {}) => {
-    if (!activeJobs.has(String(requestId || ''))) return { cancelled: false };
-    stopWorker(new Error('Tác vụ XTTS-v2 đã bị hủy.'));
-    return { cancelled: true };
+    const id = String(requestId || '');
+    const active = activeJobs.has(id);
+    if (active) stopWorker(new Error('Tác vụ XTTS-v2 đã bị hủy.'));
+    if (/^[0-9a-f-]{36}$/i.test(id)) {
+      try { fs.rmSync(path.join(runtimeRoot(), 'jobs', id), { recursive: true, force: true }); } catch { /* best-effort checkpoint cleanup */ }
+    }
+    return { cancelled: active };
   });
   ipcMain.handle('xtts-show-in-folder', async (_, { filePath } = {}) => {
     const resolved = fs.realpathSync(String(filePath || ''));
-    const allowedRoots = [outputDir(), path.join(runtimeRoot(), 'output')]
+    const allowedRoots = getVoiceOutputRoots()
       .filter(root => fs.existsSync(root))
       .map(root => fs.realpathSync(root));
     const isAllowed = allowedRoots.some(root => {

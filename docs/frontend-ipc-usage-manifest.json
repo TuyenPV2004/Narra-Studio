@@ -19,10 +19,10 @@
   "rendererRoot": "apps/desktop/src/renderer-source",
   "preloadFile": "apps/desktop/src/electron/preload.js",
   "summary": {
-    "usedMethods": 169,
-    "usedApiMethods": 169,
+    "usedMethods": 171,
+    "usedApiMethods": 171,
     "usedElectronApiMethods": 0,
-    "exposedPreloadMethods": 235,
+    "exposedPreloadMethods": 237,
     "missingFromPreload": 0,
     "missingFromPreloadDistinctMethodCount": 0,
     "missingFromPreloadCallSiteCount": 0,
@@ -435,9 +435,10 @@
       "global": "api",
       "method": "copyToClipboard",
       "businessArea": "Desktop / Local utility",
-      "callCount": 2,
+      "callCount": 3,
       "files": [
         "apps/desktop/src/renderer-source/pages/GoogleFlow/GoogleFlowPage.tsx",
+        "apps/desktop/src/renderer-source/pages/Voice/VoicePage.tsx",
         "apps/desktop/src/renderer-source/services/electron-api/captcha.ts"
       ],
       "preload": {
@@ -987,6 +988,19 @@
     },
     {
       "global": "api",
+      "method": "listVoiceFiles",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
       "method": "loadDirectorScene",
       "businessArea": "Other frontend runtime",
       "callCount": 1,
@@ -1220,6 +1234,21 @@
         "exposed": true,
         "parameters": [
           "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onXttsProgress",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "callback"
         ]
       }
     },
@@ -2481,7 +2510,9 @@
       ],
       "preload": {
         "exposed": true,
-        "parameters": []
+        "parameters": [
+          "p"
+        ]
       }
     },
     {

@@ -18,6 +18,11 @@ export interface VoiceQueueTask {
   filename?: string;
   id: string;
   localPath?: string;
+  progress?: {
+    completedSegments: number;
+    resumedSegments: number;
+    totalSegments: number;
+  };
   request?: XttsVoiceRequest;
   snapshot: Omit<XttsVoiceRequest, "requestId">;
   status: "error" | "processing" | "queued" | "success";
@@ -31,8 +36,29 @@ const restore = (): VoiceQueueTask[] => {
         task &&
         typeof task.id === "string" &&
         task.snapshot &&
-        (task.status === "success" || task.status === "error"),
+        ["success", "error", "processing", "queued"].includes(task.status),
     )
+    .map((task) => {
+      const legacyReference = task.snapshot.referencePath;
+      const referencePaths = Array.isArray(task.snapshot.referencePaths)
+        ? task.snapshot.referencePaths
+        : legacyReference
+          ? [legacyReference]
+          : [];
+      const interrupted =
+        task.status === "processing" || task.status === "queued";
+      return {
+        ...task,
+        snapshot: { ...task.snapshot, referencePaths },
+        ...(interrupted
+          ? {
+              status: "error" as const,
+              error:
+                "Tác vụ bị gián đoạn. Bấm Thử lại để tiếp tục từ đoạn đã hoàn thành.",
+            }
+          : {}),
+      };
+    })
     .slice(0, 40);
 };
 
@@ -43,9 +69,29 @@ function useVoiceQueueState() {
   const tasksRef = useRef(tasks);
   tasksRef.current = tasks;
 
+  useEffect(
+    () =>
+      voiceApi.onProgress((progress) => {
+        setTasks((current) =>
+          current.map((task) =>
+            task.id === progress.requestId
+              ? {
+                  ...task,
+                  progress: {
+                    completedSegments: progress.completedSegments,
+                    resumedSegments: progress.resumedSegments,
+                    totalSegments: progress.totalSegments,
+                  },
+                }
+              : task,
+          ),
+        );
+      }),
+    [],
+  );
+
   useEffect(() => {
     const history = tasks
-      .filter((task) => task.status === "success" || task.status === "error")
       .slice(0, 40)
       .map(({ request: _request, ...task }) => task);
     writeStorageValue(storageKeys.voiceQueueHistory, JSON.stringify(history));
@@ -68,7 +114,11 @@ function useVoiceQueueState() {
           current.map((task) =>
             task.id === next.id
               ? (() => {
-                  const { request: _request, ...rest } = task;
+                  const {
+                    progress: _progress,
+                    request: _request,
+                    ...rest
+                  } = task;
                   return {
                     ...rest,
                     status: "success",
@@ -144,13 +194,25 @@ function useVoiceQueueState() {
   }, []);
 
   const remove = useCallback(async (task: VoiceQueueTask) => {
-    if (task.status === "processing") await voiceApi.cancel(task.id);
+    if (task.status !== "success") await voiceApi.cancel(task.id);
     setTasks((current) =>
       current.filter((candidate) => candidate.id !== task.id),
     );
   }, []);
 
-  return { enqueue, remove, retry, tasks };
+  const clearFinished = useCallback(() => {
+    const failedIds = tasksRef.current
+      .filter((task) => task.status === "error")
+      .map((task) => task.id);
+    void Promise.allSettled(failedIds.map((id) => voiceApi.cancel(id)));
+    setTasks((current) =>
+      current.filter(
+        (task) => task.status === "queued" || task.status === "processing",
+      ),
+    );
+  }, []);
+
+  return { clearFinished, enqueue, remove, retry, tasks };
 }
 
 type VoiceQueueContextValue = ReturnType<typeof useVoiceQueueState>;

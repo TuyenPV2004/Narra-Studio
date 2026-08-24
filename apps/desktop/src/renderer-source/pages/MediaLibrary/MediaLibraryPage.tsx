@@ -1,10 +1,12 @@
 import {
   AlertTriangle,
+  AudioLines,
   ChevronLeft,
   ChevronRight,
   Eye,
   FolderOpen,
   Image as ImageIcon,
+  Music,
   Play,
   RefreshCw,
   Search,
@@ -25,6 +27,7 @@ import {
 } from "@/components/ui/Dialog";
 import { toast } from "@/components/ui/Toast";
 import { mediaApi, type LocalMedia } from "@/services/electron-api/media";
+import { VoiceAudioCard } from "@/components/audio/VoiceAudioCard";
 
 function formatFileSize(bytes: number): string {
   if (!bytes || bytes <= 0) return "—";
@@ -52,7 +55,9 @@ export function MediaLibraryPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [importing, setImporting] = useState(false);
-  const [filter, setFilter] = useState<"all" | "image" | "video">("all");
+  const [filter, setFilter] = useState<"all" | "image" | "video" | "audio">(
+    "all",
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [previewMedia, setPreviewMedia] = useState<LocalMedia | null>(null);
   const [deletingMedia, setDeletingMedia] = useState<LocalMedia | null>(null);
@@ -182,7 +187,7 @@ export function MediaLibraryPage() {
           </span>
           <div>
             <h1 id="media-title">Thư viện</h1>
-            <p>Ảnh và video được lưu trên thiết bị này.</p>
+            <p>Ảnh, video và âm thanh được lưu trên thiết bị này.</p>
           </div>
         </div>
         <div
@@ -249,6 +254,15 @@ export function MediaLibraryPage() {
               <Video size={13} aria-hidden="true" />
               Video ({items.filter((i) => i.type === "video").length})
             </button>
+            <button
+              type="button"
+              className="source-media-filter-btn"
+              data-active={filter === "audio"}
+              onClick={() => setFilter("audio")}
+            >
+              <AudioLines size={13} aria-hidden="true" />
+              Âm thanh ({items.filter((i) => i.type === "audio").length})
+            </button>
           </div>
 
           <div className="source-media-search">
@@ -296,12 +310,18 @@ export function MediaLibraryPage() {
                       loading="lazy"
                       className="source-media-card__media"
                     />
-                  ) : (
+                  ) : item.type === "video" ? (
                     <video
                       src={item.path}
                       preload="metadata"
                       className="source-media-card__media"
                     />
+                  ) : (
+                    <div className="source-media-card__audio-thumb">
+                      <div className="source-media-card__audio-disc">
+                        <AudioLines size={24} aria-hidden="true" />
+                      </div>
+                    </div>
                   )}
 
                   <div className="source-media-card__badge">
@@ -310,7 +330,7 @@ export function MediaLibraryPage() {
                         <ImageIcon size={11} aria-hidden="true" />
                         <span>Ảnh</span>
                       </>
-                    ) : (
+                    ) : item.type === "video" ? (
                       <>
                         <Play
                           size={11}
@@ -319,12 +339,17 @@ export function MediaLibraryPage() {
                         />
                         <span>Video</span>
                       </>
+                    ) : (
+                      <>
+                        <AudioLines size={11} aria-hidden="true" />
+                        <span>Âm thanh</span>
+                      </>
                     )}
                   </div>
 
                   <div className="source-media-card__overlay">
                     <span className="source-media-card__action-icon">
-                      {item.type === "video" ? (
+                      {item.type === "video" || item.type === "audio" ? (
                         <Play
                           size={20}
                           fill="currentColor"
@@ -416,25 +441,37 @@ export function MediaLibraryPage() {
                 </button>
               )}
 
-              <div className="source-media-lightbox__stage">
-                {previewMedia.type === "image" ? (
-                  <img
+              {previewMedia.type === "audio" ? (
+                <div className="source-media-lightbox__audio-stage">
+                  <VoiceAudioCard
                     key={previewMedia.path}
                     src={previewMedia.path}
-                    alt={previewMedia.name}
-                    className="source-media-lightbox__img"
+                    filename={previewMedia.name}
+                    title={previewMedia.name}
+                    subtitle={`Tệp âm thanh · ${formatFileSize(previewMedia.size)}`}
                   />
-                ) : (
-                  <video
-                    key={previewMedia.path}
-                    src={previewMedia.path}
-                    controls
-                    autoPlay
-                    playsInline
-                    className="source-media-lightbox__video"
-                  />
-                )}
-              </div>
+                </div>
+              ) : (
+                <div className="source-media-lightbox__stage">
+                  {previewMedia.type === "image" ? (
+                    <img
+                      key={previewMedia.path}
+                      src={previewMedia.path}
+                      alt={previewMedia.name}
+                      className="source-media-lightbox__img"
+                    />
+                  ) : (
+                    <video
+                      key={previewMedia.path}
+                      src={previewMedia.path}
+                      controls
+                      autoPlay
+                      playsInline
+                      className="source-media-lightbox__video"
+                    />
+                  )}
+                </div>
+              )}
 
               {hasNext && (
                 <button
@@ -484,7 +521,11 @@ export function MediaLibraryPage() {
               <div>
                 <DialogTitle>
                   Xác nhận xóa{" "}
-                  {deletingMedia?.type === "image" ? "ảnh" : "video"}
+                  {deletingMedia?.type === "image"
+                    ? "ảnh"
+                    : deletingMedia?.type === "video"
+                      ? "video"
+                      : "tệp âm thanh"}
                 </DialogTitle>
                 <DialogDescription>
                   Tệp sẽ được chuyển vào Thùng rác của hệ thống.

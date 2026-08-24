@@ -6,7 +6,7 @@ export interface LocalMedia {
   localPath: string;
   size: number;
   time: number;
-  type: "image" | "video";
+  type: "image" | "video" | "audio";
 }
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -53,13 +53,16 @@ const normalize = (value: unknown, type: LocalMedia["type"]): LocalMedia[] =>
 
 export const mediaApi = {
   async list(): Promise<LocalMedia[]> {
-    const [images, videos] = await Promise.all([
+    const [images, videos, voices] = await Promise.all([
       getElectronApi().listImageFiles(),
       getElectronApi().listVideoFiles(),
+      getElectronApi().listVoiceFiles(),
     ]);
-    return [...normalize(images, "image"), ...normalize(videos, "video")].sort(
-      (left, right) => right.time - left.time,
-    );
+    return [
+      ...normalize(images, "image"),
+      ...normalize(videos, "video"),
+      ...normalize(voices, "audio"),
+    ].sort((left, right) => right.time - left.time);
   },
   delete(mediaOrPath: LocalMedia | string) {
     const pathToDelete =

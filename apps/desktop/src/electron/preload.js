@@ -91,10 +91,15 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("generate-video-edit-video", p),
   xttsStatus: () => ipcRenderer.invoke("xtts-status"),
   xttsPrepare: () => ipcRenderer.invoke("xtts-prepare"),
-  xttsImportReference: () => ipcRenderer.invoke("xtts-import-reference"),
+  xttsImportReference: (p) => ipcRenderer.invoke("xtts-import-reference", p),
   xttsGenerate: (p) => ipcRenderer.invoke("xtts-generate", p),
   xttsCancel: (p) => ipcRenderer.invoke("xtts-cancel", p),
   xttsShowInFolder: (p) => ipcRenderer.invoke("xtts-show-in-folder", p),
+  onXttsProgress: (callback) => {
+    const handler = (_event, payload) => callback(payload);
+    ipcRenderer.on("xtts-progress", handler);
+    return () => ipcRenderer.removeListener("xtts-progress", handler);
+  },
   uploadOmniVideo: (p) => ipcRenderer.invoke("upload-omni-video", p),
   pollVideoStatus: (p) => ipcRenderer.invoke("poll-video-status", p),
   resolveVideoUrl: (p) => ipcRenderer.invoke("resolve-video-url", p),
@@ -221,6 +226,7 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.invoke("change-voice-output-folder"),
   listImageFiles: () => ipcRenderer.invoke("list-image-files"),
   listVideoFiles: () => ipcRenderer.invoke("list-video-files"),
+  listVoiceFiles: () => ipcRenderer.invoke("list-voice-files"),
   getDashboardStats: () => ipcRenderer.invoke("get-dashboard-stats"),
   getCredits: (params) => ipcRenderer.invoke("get-credits", params),
 

@@ -76,7 +76,14 @@ function resolveLocalFilePath(filePath, options = {}) {
 
 function getAllowedMediaDirectories(context = {}) {
   const path = context.path || nativePath;
-  const { getImageOutputDir, getVideoOutputDir, loadSettings, app } = context;
+  const {
+    getImageOutputDir,
+    getVideoOutputDir,
+    getVoiceOutputDir,
+    getVoiceOutputRoots,
+    loadSettings,
+    app,
+  } = context;
   const allowed = [];
 
   try {
@@ -86,10 +93,29 @@ function getAllowedMediaDirectories(context = {}) {
     if (typeof getVideoOutputDir === 'function') allowed.push(path.resolve(getVideoOutputDir()));
   } catch {}
   try {
+    if (typeof getVoiceOutputDir === 'function') allowed.push(path.resolve(getVoiceOutputDir()));
+  } catch {}
+  try {
+    if (typeof getVoiceOutputRoots === 'function') {
+      const roots = getVoiceOutputRoots();
+      if (Array.isArray(roots)) {
+        for (const r of roots) {
+          if (r && typeof r === 'string') allowed.push(path.resolve(r));
+        }
+      }
+    }
+  } catch {}
+  try {
     if (typeof loadSettings === 'function') {
       const settings = loadSettings() || {};
       if (settings.imageOutputPath) allowed.push(path.resolve(settings.imageOutputPath));
       if (settings.videoOutputPath) allowed.push(path.resolve(settings.videoOutputPath));
+      if (settings.voiceOutputPath) allowed.push(path.resolve(settings.voiceOutputPath));
+      if (Array.isArray(settings.voiceOutputPaths)) {
+        for (const p of settings.voiceOutputPaths) {
+          if (p && typeof p === 'string') allowed.push(path.resolve(p));
+        }
+      }
     }
   } catch {}
   try {
@@ -97,6 +123,7 @@ function getAllowedMediaDirectories(context = {}) {
       const userData = app.getPath('userData');
       allowed.push(path.resolve(path.join(userData, 'images')));
       allowed.push(path.resolve(path.join(userData, 'videos')));
+      allowed.push(path.resolve(path.join(userData, 'xtts-v2', 'output')));
     }
   } catch {}
 

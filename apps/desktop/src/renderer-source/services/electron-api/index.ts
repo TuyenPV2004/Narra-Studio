@@ -5,6 +5,7 @@ export { settingsApi } from "@/services/electron-api/settings";
 export { imageApi, type ImageModel } from "@/services/electron-api/image";
 export {
   voiceApi,
+  XTTS_DEFAULT_SPEAKERS,
   XTTS_LANGUAGES,
   type XttsVoiceMode,
   type XttsVoiceReference,

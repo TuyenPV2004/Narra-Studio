@@ -1,6 +1,7 @@
 import {
   Brain,
   BroomSparkles,
+  Check,
   ChevronLeft,
   ChevronRight,
   CirclePlus,
@@ -281,10 +282,18 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
   const [previewTask, setPreviewTask] = useState<VideoQueueTask | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const copyPrompt = (promptText: string, id: string) => {
-    void navigator.clipboard.writeText(promptText);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 1500);
+  const copyPrompt = async (promptText: string, id: string) => {
+    try {
+      try {
+        await navigator.clipboard.writeText(promptText);
+      } catch {
+        await getElectronApi().copyToClipboard(promptText);
+      }
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 1500);
+    } catch {
+      // ignore
+    }
   };
 
   const successfulTasks = useMemo(
@@ -1725,15 +1734,23 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
                     <button
                       type="button"
                       className="source-task-action-btn"
-                      onClick={() => copyPrompt(task.prompt, task.id)}
+                      onClick={() => void copyPrompt(task.prompt, task.id)}
                       title="Sao chép prompt"
                     >
-                      <Copy
-                        size={14}
-                        className="source-action-icon--copy"
-                        aria-hidden="true"
-                      />
-                      {copiedId === task.id ? "Đã copy" : "Copy"}
+                      {copiedId === task.id ? (
+                        <Check
+                          size={14}
+                          className="source-action-icon--check"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <Copy
+                          size={14}
+                          className="source-action-icon--copy"
+                          aria-hidden="true"
+                        />
+                      )}
+                      Copy
                     </button>
 
                     {/* 4. 3 button nâng cấp & hậu kỳ: Tạo GIF, Nâng cấp 1080p, Nâng cấp 4K */}

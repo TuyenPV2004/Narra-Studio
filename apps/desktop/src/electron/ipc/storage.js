@@ -47,6 +47,7 @@ module.exports = function registerStorageIpc(dependencies) {
     getVideoOutputDir,
     getImageOutputDir,
     getVoiceOutputDir,
+    getVoiceOutputRoots,
     getNextFilename,
     buildCleanUserAgent,
     DEFAULTS,
@@ -304,6 +305,7 @@ ipcMain.handle('get-voice-output-path', async () => {
 });
 
 ipcMain.handle('change-voice-output-folder', async () => {
+  const previousPath = getVoiceOutputDir();
   const result = await dialog.showOpenDialog(runtime.mainWindow, {
     title: 'Chọn thư mục lưu Voice',
     defaultPath: getVoiceOutputDir(),
@@ -311,7 +313,8 @@ ipcMain.handle('change-voice-output-folder', async () => {
   });
   if (result.canceled || !result.filePaths.length) return null;
   const newPath = result.filePaths[0];
-  saveSettings({ voiceOutputPath: newPath });
+  const trustedPaths = [...new Set([...getVoiceOutputRoots(), previousPath, newPath])].slice(-20);
+  saveSettings({ voiceOutputPath: newPath, voiceOutputPaths: trustedPaths });
   console.log(`[SETTINGS] Voice output path changed to: ${newPath}`);
   return newPath;
 });
@@ -362,6 +365,39 @@ ipcMain.handle('list-video-files', async () => {
       .sort((a, b) => b.time - a.time);
     return files;
   } catch { return []; }
+});
+
+// ── List voice / audio files in output folder ─────────────────────────
+ipcMain.handle('list-voice-files', async () => {
+  const roots = typeof getVoiceOutputRoots === 'function'
+    ? getVoiceOutputRoots()
+    : [typeof getVoiceOutputDir === 'function' ? getVoiceOutputDir() : null].filter(Boolean);
+  const exts = ['.wav', '.mp3', '.m4a', '.flac', '.ogg', '.aac', '.opus'];
+  const seenPaths = new Set();
+  const allFiles = [];
+  for (const dir of roots) {
+    if (!dir || !fs.existsSync(dir)) continue;
+    try {
+      const entries = fs.readdirSync(dir);
+      for (const f of entries) {
+        if (!exts.includes(path.extname(f).toLowerCase())) continue;
+        const fp = path.join(dir, f);
+        if (seenPaths.has(fp)) continue;
+        seenPaths.add(fp);
+        const stat = fs.statSync(fp);
+        if (!stat.isFile()) continue;
+        allFiles.push({
+          name: f,
+          path: fp,
+          fileUrl: pathToFileURL(fp).toString(),
+          size: stat.size,
+          time: stat.mtimeMs,
+        });
+      }
+    } catch { /* ignore directory read error */ }
+  }
+  allFiles.sort((a, b) => b.time - a.time);
+  return allFiles;
 });
 
 // ── Dashboard stats ───────────────────────────────────────────────────

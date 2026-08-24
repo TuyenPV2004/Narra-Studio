@@ -86,10 +86,13 @@ export interface NarraElectronApi {
   getFlowProjectInitialData: (payload: { slotId: number }) => Promise<unknown>;
   xttsStatus: () => Promise<unknown>;
   xttsPrepare: () => Promise<unknown>;
-  xttsImportReference: () => Promise<unknown>;
+  xttsImportReference: (payload: { limit: number }) => Promise<unknown>;
   xttsGenerate: (payload: Record<string, unknown>) => Promise<unknown>;
   xttsCancel: (payload: { requestId: string }) => Promise<unknown>;
   xttsShowInFolder: (payload: { filePath: string }) => Promise<unknown>;
+  onXttsProgress: (
+    callback: (payload: Record<string, unknown>) => void,
+  ) => () => void;
   saveFileDialog: (payload: Record<string, unknown>) => Promise<unknown>;
   authorizeFilePath: (file: File) => Promise<string>;
   getFilePath: (file: File) => string;
@@ -167,6 +170,7 @@ export interface NarraElectronApi {
   }) => Promise<unknown>;
   listImageFiles: () => Promise<unknown>;
   listVideoFiles: () => Promise<unknown>;
+  listVoiceFiles: () => Promise<unknown>;
   deleteFile: (path: string) => Promise<unknown>;
   selectFiles: () => Promise<unknown>;
   selectVideoFiles: () => Promise<unknown>;
