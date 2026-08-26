@@ -103,33 +103,62 @@ export function useAgentConversationLibrary(welcomeMessage: AgentMessage) {
     };
   }, [welcomeMessage]);
 
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const schedulePersist = useCallback(
+    (libraryList: AgentConversation[], currentMessages: AgentMessage[], immediate = false) => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+      const doPersist = () => {
+        const library = libraryList.slice(0, MAX_CONVERSATIONS);
+        const sourceSnapshot = {
+          messages: currentMessages.slice(-200),
+          updatedAt: Date.now(),
+          version: SOURCE_VERSION,
+        };
+        persistenceQueue.current = persistenceQueue.current
+          .catch(() => undefined)
+          .then(async () => {
+            await Promise.all([
+              historyApi.save(LIBRARY_KEY, library),
+              historyApi.save(SOURCE_KEY, [sourceSnapshot]),
+            ]);
+          });
+        void persistenceQueue.current
+          .then(() => setPersistenceError(undefined))
+          .catch((error: unknown) =>
+            setPersistenceError(
+              error instanceof Error ? error.message : String(error),
+            ),
+          );
+      };
+
+      if (immediate) {
+        doPersist();
+      } else {
+        debounceTimerRef.current = setTimeout(doPersist, 600);
+      }
+    },
+    [],
+  );
+
   useEffect(() => {
     if (!hydrated) return;
-    const library = conversations.slice(0, MAX_CONVERSATIONS);
-    const sourceSnapshot = {
-      messages: messages.slice(-200),
-      updatedAt: Date.now(),
-      version: SOURCE_VERSION,
+    schedulePersist(conversations, messages, false);
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
     };
-    persistenceQueue.current = persistenceQueue.current
-      .catch(() => undefined)
-      .then(async () => {
-        await Promise.all([
-          historyApi.save(LIBRARY_KEY, library),
-          historyApi.save(SOURCE_KEY, [sourceSnapshot]),
-        ]);
-      });
-    void persistenceQueue.current
-      .then(() => setPersistenceError(undefined))
-      .catch((error: unknown) =>
-        setPersistenceError(
-          error instanceof Error ? error.message : String(error),
-        ),
-      );
-  }, [conversations, hydrated]);
+  }, [conversations, messages, hydrated, schedulePersist]);
 
   const setMessages = useCallback(
-    (value: AgentMessage[] | ((current: AgentMessage[]) => AgentMessage[])) => {
+    (
+      value: AgentMessage[] | ((current: AgentMessage[]) => AgentMessage[]),
+      immediatePersist = false,
+    ) => {
       setConversations((items) =>
         items.map((item) => {
           if (item.id !== activeId) return item;
@@ -142,19 +171,34 @@ export function useAgentConversationLibrary(welcomeMessage: AgentMessage) {
           };
         }),
       );
+      if (immediatePersist) {
+        setTimeout(() => {
+          setConversations((items) => {
+            const currentItem = items.find((it) => it.id === activeId);
+            schedulePersist(items, currentItem?.messages || [], true);
+            return items;
+          });
+        }, 0);
+      }
     },
-    [activeId],
+    [activeId, schedulePersist],
   );
+
   const clearConversation = useCallback(async () => {
-    setMessages([welcomeMessage]);
+    setMessages([welcomeMessage], true);
     setPersistenceError(undefined);
   }, [setMessages, welcomeMessage]);
+
   const newConversation = useCallback(() => {
     const next = createConversation(welcomeMessage);
-    setConversations((items) => [next, ...items]);
+    const updated = [next, ...conversations];
+    setConversations(updated);
     setActiveId(next.id);
-  }, [welcomeMessage]);
+    schedulePersist(updated, next.messages, true);
+  }, [conversations, welcomeMessage, schedulePersist]);
+
   const selectConversation = useCallback((id: string) => setActiveId(id), []);
+
   const renameConversation = useCallback(
     (title: string) =>
       setConversations((items) =>
@@ -162,7 +206,7 @@ export function useAgentConversationLibrary(welcomeMessage: AgentMessage) {
           item.id === activeId
             ? {
                 ...item,
-                title: title.trim() || item.title,
+                title,
                 updatedAt: Date.now(),
               }
             : item,
@@ -170,23 +214,106 @@ export function useAgentConversationLibrary(welcomeMessage: AgentMessage) {
       ),
     [activeId],
   );
-  const deleteConversation = useCallback(() => {
-    setConversations((items) => {
-      const remaining = items.filter((item) => item.id !== activeId);
-      const next = remaining.length
-        ? remaining
-        : [createConversation(welcomeMessage)];
-      setActiveId(next[0]!.id);
-      return next;
-    });
-  }, [activeId, welcomeMessage]);
-  const importConversation = useCallback(async (file: File) => {
-    const imported = parseConversationPackage(await file.text());
+
+  const normalizeActiveTitle = useCallback(() => {
     setConversations((items) =>
-      [imported, ...items].slice(0, MAX_CONVERSATIONS),
+      items.map((item) =>
+        item.id === activeId
+          ? {
+              ...item,
+              title: item.title.trim() || "Cuộc trò chuyện",
+              updatedAt: Date.now(),
+            }
+          : item,
+      ),
     );
-    setActiveId(imported.id);
-  }, []);
+  }, [activeId]);
+
+  const deleteConversation = useCallback(() => {
+    const remaining = conversations.filter((item) => item.id !== activeId);
+    const next = remaining.length
+      ? remaining
+      : [createConversation(welcomeMessage)];
+    setConversations(next);
+    setActiveId(next[0]!.id);
+    schedulePersist(next, next[0]!.messages, true);
+  }, [conversations, activeId, welcomeMessage, schedulePersist]);
+
+  const importConversation = useCallback(
+    async (file: File) => {
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error("File JSON vượt quá dung lượng 5MB.");
+      }
+      const imported = parseConversationPackage(await file.text());
+      const updated = [imported, ...conversations].slice(0, MAX_CONVERSATIONS);
+      setConversations(updated);
+      setActiveId(imported.id);
+      schedulePersist(updated, imported.messages, true);
+    },
+    [conversations, schedulePersist],
+  );
+
+  const latestStateRef = useRef({ conversations, messages, hydrated });
+  useEffect(() => {
+    latestStateRef.current = { conversations, messages, hydrated };
+  }, [conversations, messages, hydrated]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+        if (latestStateRef.current.hydrated) {
+          schedulePersist(
+            latestStateRef.current.conversations,
+            latestStateRef.current.messages,
+            true,
+          );
+        }
+      }
+    };
+  }, [schedulePersist]);
+
+  const updateActiveConversationWorkflow = useCallback(
+    (patch: Partial<AgentConversation>) => {
+      setConversations((items) => {
+        const next = items.map((item) =>
+          item.id === activeId
+            ? {
+                ...item,
+                ...patch,
+                updatedAt: Date.now(),
+              }
+            : item,
+        );
+        const currentItem = next.find((it) => it.id === activeId);
+        schedulePersist(next, currentItem?.messages || [], false);
+        return next;
+      });
+    },
+    [activeId, schedulePersist],
+  );
+
+  const updateActiveConversationPlan = useCallback(
+    (plan: unknown, runItems?: unknown[]) => {
+      setConversations((items) => {
+        const next = items.map((item) =>
+          item.id === activeId
+            ? {
+                ...item,
+                plan,
+                ...(Array.isArray(runItems) ? { runItems } : {}),
+                updatedAt: Date.now(),
+              }
+            : item,
+        );
+        const currentItem = next.find((it) => it.id === activeId);
+        schedulePersist(next, currentItem?.messages || [], true);
+        return next;
+      });
+    },
+    [activeId, schedulePersist],
+  );
 
   return {
     activeConversation,
@@ -198,9 +325,12 @@ export function useAgentConversationLibrary(welcomeMessage: AgentMessage) {
     importConversation,
     messages,
     newConversation,
+    normalizeActiveTitle,
     persistenceError,
     renameConversation,
     selectConversation,
     setMessages,
+    updateActiveConversationPlan,
+    updateActiveConversationWorkflow,
   };
 }

@@ -590,16 +590,28 @@ async function requestAgentTextChat(args) {
   return requestAgentTextChatWithSettings(await getAgentTextRuntimeSettings(), args);
 }
 
+const activeChatHttpRequests = new Map();
+
 function extractAgentTextStreamDelta(data) {
   if (!data || typeof data !== 'object') return '';
-  return data.choices?.[0]?.delta?.content
-    || data.choices?.[0]?.message?.content
-    || data.message?.content
-    || data.response
-    || '';
+  const choice = data.choices?.[0];
+  if (choice) {
+    if (typeof choice.delta?.content === 'string') return choice.delta.content;
+    if (Array.isArray(choice.delta?.content)) {
+      return choice.delta.content.map(p => typeof p === 'string' ? p : p?.text || '').join('');
+    }
+    if (typeof choice.text === 'string') return choice.text;
+    if (typeof choice.message?.content === 'string') return choice.message.content;
+  }
+  if (typeof data.candidates?.[0]?.content?.parts?.[0]?.text === 'string') {
+    return data.candidates[0].content.parts[0].text;
+  }
+  if (typeof data.message?.content === 'string') return data.message.content;
+  if (typeof data.response === 'string') return data.response;
+  return '';
 }
 
-function postJsonStreaming(urlString, { headers = {}, body, timeoutMs = 120000, providerLabel = 'AI provider', onLine }) {
+function postJsonStreaming(urlString, { headers = {}, body, timeoutMs = 120000, providerLabel = 'AI provider', onLine, onCancelRegister }) {
   return new Promise((resolve, reject) => {
     let settled = false;
     let buffer = '';
@@ -623,7 +635,12 @@ function postJsonStreaming(urlString, { headers = {}, body, timeoutMs = 120000, 
         let errorText = '';
         res.setEncoding('utf8');
         res.on('data', chunk => { errorText += chunk; });
-        res.on('end', () => reject(new Error(`${providerLabel} error ${res.statusCode}: ${errorText.slice(0, 400)}`)));
+        res.on('end', () => {
+          if (!settled) {
+            settled = true;
+            reject(new Error(`${providerLabel} error ${res.statusCode}: ${errorText.slice(0, 400)}`));
+          }
+        });
         return;
       }
       res.setEncoding('utf8');
@@ -641,6 +658,16 @@ function postJsonStreaming(urlString, { headers = {}, body, timeoutMs = 120000, 
         }
       });
     });
+
+    const abortFn = () => {
+      if (!settled) {
+        settled = true;
+        try { req.destroy(new Error('Request cancelled by user')); } catch {}
+        reject(new Error('Request cancelled by user'));
+      }
+    };
+    if (onCancelRegister) onCancelRegister(abortFn);
+
     req.on('timeout', () => {
       req.destroy(new Error(`${providerLabel} stream timeout after ${Math.round(timeoutMs / 1000)}s`));
     });
@@ -655,7 +682,7 @@ function postJsonStreaming(urlString, { headers = {}, body, timeoutMs = 120000, 
   });
 }
 
-async function requestAgentTextChatStream({ event, requestId, messages, model, numPredict = 1000, content }) {
+async function requestAgentTextChatStream({ event, requestId, messages, model, numPredict = 2000, content }) {
   const settings = await getAgentTextRuntimeSettings();
   const requestMessages = messages || [{ role: 'user', content }];
   const send = (payload) => {
@@ -664,14 +691,23 @@ async function requestAgentTextChatStream({ event, requestId, messages, model, n
     }
   };
   let reply = '';
+  let cancelCallback = null;
+
+  activeChatHttpRequests.set(requestId, {
+    abort: () => {
+      send({ type: 'cancelled', requestId });
+      if (cancelCallback) cancelCallback();
+    },
+  });
+
   const streamWithSettings = async (runtimeSettings) => {
     if (!runtimeSettings.apiKey) throw getMissingAgentTextRuntimeError(runtimeSettings);
-      const body = {
-        model: model || runtimeSettings.visionModel,
-        stream: true,
-        messages: requestMessages,
-        max_tokens: numPredict,
-      };
+    const body = {
+      model: model || runtimeSettings.visionModel,
+      stream: true,
+      messages: requestMessages,
+      max_tokens: numPredict,
+    };
     await postJsonStreaming(runtimeSettings.apiUrl, {
       headers: {
         'Authorization': `Bearer ${runtimeSettings.apiKey}`,
@@ -679,26 +715,41 @@ async function requestAgentTextChatStream({ event, requestId, messages, model, n
       body,
       timeoutMs: 120000,
       providerLabel: 'AI provider',
+      onCancelRegister(fn) {
+        cancelCallback = fn;
+      },
       onLine(rawLine) {
         let line = rawLine.trim();
         if (!line) return;
         if (line.startsWith('data:')) line = line.slice(5).trim();
         if (!line || line === '[DONE]') return;
         let data;
-        try { data = JSON.parse(line); } catch { return; }
+        try {
+          data = JSON.parse(line);
+        } catch {
+          return;
+        }
+        if (data?.error) {
+          throw new Error(`Provider error: ${data.error.message || JSON.stringify(data.error)}`);
+        }
         const delta = String(extractAgentTextStreamDelta(data) || '');
         if (delta) {
           reply += delta;
-          send({ type: 'delta', delta });
+          send({ type: 'delta', delta, model: runtimeSettings.visionModel, source: runtimeSettings.source });
         }
       },
     });
   };
-  await streamWithSettings(settings);
-  if (!reply.trim()) throw new Error('AI provider returned an empty text stream.');
-  const finalReply = reply.trim();
-  send({ type: 'done', reply: finalReply, model: settings.visionModel, source: settings.source });
-  return { reply: finalReply, model: settings.visionModel, source: settings.source };
+
+  try {
+    await streamWithSettings(settings);
+    if (!reply.trim()) throw new Error('AI provider returned an empty text stream.');
+    const finalReply = reply.trim();
+    send({ type: 'done', reply: finalReply, model: settings.visionModel, source: settings.source });
+    return { reply: finalReply, model: settings.visionModel, source: settings.source };
+  } finally {
+    activeChatHttpRequests.delete(requestId);
+  }
 }
 
 function extractJsonPayload(reply) {
@@ -743,59 +794,76 @@ async function parseModelJson(reply, schemaHint, numPredict = 2200) {
   }
 }
 
-ipcMain.handle('ai-agent-chat', async (_, { message, history = [], hasPlan = false } = {}) => {
+ipcMain.handle('ai-agent-chat-cancel', async (_, { requestId } = {}) => {
+  if (!requestId) return { cancelled: false };
+  const entry = activeChatHttpRequests.get(requestId);
+  if (entry) {
+    try {
+      entry.abort();
+    } catch {}
+    activeChatHttpRequests.delete(requestId);
+    return { cancelled: true, requestId };
+  }
+  return { cancelled: false, requestId };
+});
+
+ipcMain.handle('ai-agent-chat', async (_, { message, history = [], hasPlan = false, workflowContext = null } = {}) => {
   if (!message || !String(message).trim()) throw new Error('Missing chat message');
 
-  const recent = Array.isArray(history) ? history.slice(-8) : [];
+  const recent = Array.isArray(history) ? history.slice(-12) : [];
+  const systemPrompt = [
+    `You are the Creative AI Agent inside ${brand.displayName}.`,
+    'Chat naturally like ChatGPT in Vietnamese unless the user uses another language.',
+    'You specialize in turning creative concepts into actionable workflows for AI image and video generation.',
+    'If the user is greeting or asking general questions, answer concisely and warmly.',
+    'When the user wants creative assistance, provide concrete scene ideas, artistic direction, lighting, mood, and composition.',
+    'Keep your advice structured and practical. Do not output raw internal code.',
+    hasPlan ? 'There is an active production plan in the current session.' : 'There is no workflow plan yet.',
+    workflowContext?.brief ? `Project Brief: ${String(workflowContext.brief).slice(0, 300)}` : '',
+    workflowContext?.planTitle ? `Active Plan: ${String(workflowContext.planTitle).slice(0, 100)}` : '',
+    typeof workflowContext?.runItemsCount === 'number' && workflowContext.runItemsCount > 0 ? `Queued Scenes: ${workflowContext.runItemsCount}` : '',
+  ].filter(Boolean).join('\n');
+
   const messages = [
-    {
-      role: 'system',
-      content: [
-        `You are the AI Agent inside ${brand.displayName}.`,
-        'Chat naturally like ChatGPT in Vietnamese unless the user uses another language.',
-        'You specialize in turning simple ideas into workflows for AI image and video generation.',
-        'If the user is just greeting or asking casually, answer briefly and warmly.',
-        'If the user wants image/video/workflow creation, guide them with practical next steps and invite them to describe the target. Do not output JSON here.',
-        'Do not mention hidden implementation details. Keep replies concise but helpful.',
-        hasPlan ? 'There is already a workflow plan in the current session.' : 'There is no workflow plan yet.',
-      ].join('\n'),
-    },
+    { role: 'system', content: systemPrompt },
     ...recent
       .filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content)
-      .map(m => ({ role: m.role, content: String(m.content).slice(0, 1200) })),
-    { role: 'user', content: String(message).trim() },
+      .map(m => ({ role: m.role, content: String(m.content).slice(0, 2500) })),
+    { role: 'user', content: String(message).trim().slice(0, 20000) },
   ];
 
-  const out = await requestAgentTextChat({ messages, numPredict: 500 });
+  const out = await requestAgentTextChat({ messages, numPredict: 2000 });
   return { reply: out.reply, model: out.model, source: out.source };
 });
 
-ipcMain.handle('ai-agent-chat-stream', async (event, { requestId, message, history = [], hasPlan = false } = {}) => {
+ipcMain.handle('ai-agent-chat-stream', async (event, { requestId, message, history = [], hasPlan = false, workflowContext = null } = {}) => {
   if (!requestId) throw new Error('Missing stream requestId');
   if (!message || !String(message).trim()) throw new Error('Missing chat message');
 
-  const recent = Array.isArray(history) ? history.slice(-8) : [];
+  const recent = Array.isArray(history) ? history.slice(-12) : [];
+  const systemPrompt = [
+    `You are the Creative AI Agent inside ${brand.displayName}.`,
+    'Chat naturally like ChatGPT in Vietnamese unless the user uses another language.',
+    'You specialize in turning creative concepts into actionable workflows for AI image and video generation.',
+    'If the user is greeting or asking general questions, answer concisely and warmly.',
+    'When the user wants creative assistance, provide concrete scene ideas, artistic direction, lighting, mood, and composition.',
+    'Keep your advice structured and practical. Do not output raw internal code.',
+    hasPlan ? 'There is an active production plan in the current session.' : 'There is no workflow plan yet.',
+    workflowContext?.brief ? `Project Brief: ${String(workflowContext.brief).slice(0, 300)}` : '',
+    workflowContext?.planTitle ? `Active Plan: ${String(workflowContext.planTitle).slice(0, 100)}` : '',
+    typeof workflowContext?.runItemsCount === 'number' && workflowContext.runItemsCount > 0 ? `Queued Scenes: ${workflowContext.runItemsCount}` : '',
+  ].filter(Boolean).join('\n');
+
   const messages = [
-    {
-      role: 'system',
-      content: [
-        `You are the AI Agent inside ${brand.displayName}.`,
-        'Chat naturally like ChatGPT in Vietnamese unless the user uses another language.',
-        'You specialize in turning simple ideas into workflows for AI image and video generation.',
-        'If the user is just greeting or asking casually, answer briefly and warmly.',
-        'If the user wants image/video/workflow creation, guide them with practical next steps and invite them to describe the target. Do not output JSON here.',
-        'Do not mention hidden implementation details. Keep replies concise but helpful.',
-        hasPlan ? 'There is already a workflow plan in the current session.' : 'There is no workflow plan yet.',
-      ].join('\n'),
-    },
+    { role: 'system', content: systemPrompt },
     ...recent
       .filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content)
-      .map(m => ({ role: m.role, content: String(m.content).slice(0, 1200) })),
-    { role: 'user', content: String(message).trim() },
+      .map(m => ({ role: m.role, content: String(m.content).slice(0, 2500) })),
+    { role: 'user', content: String(message).trim().slice(0, 20000) },
   ];
 
   try {
-    return await requestAgentTextChatStream({ event, requestId, messages, numPredict: 500 });
+    return await requestAgentTextChatStream({ event, requestId, messages, numPredict: 2000 });
   } catch (err) {
     if (!event?.sender?.isDestroyed?.()) {
       event.sender.send('ai-agent-chat-stream', {
@@ -811,8 +879,6 @@ ipcMain.handle('ai-agent-chat-stream', async (event, { requestId, message, histo
 ipcMain.handle('ai-agent-intent', async (_, { message, history = [], hasReference = false, hasPriorImage = false } = {}) => {
   if (!message || !String(message).trim()) throw new Error('Missing intent message');
 
-  // Keep enough compact turns for long production briefs where brand/subject is
-  // introduced early and the latest message only contains the final scope.
   const recent = (Array.isArray(history) ? history.slice(-12) : [])
     .filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content)
     .map(m => `${m.role === 'user' ? 'User' : 'Assistant'}: ${String(m.content).slice(0, 700)}`)

@@ -4,7 +4,7 @@ const net = require('node:net');
 
 const PROFILE_LIMIT = 20;
 const MODEL_LIMIT = 500;
-const REQUEST_TIMEOUT_MS = 8000;
+const REQUEST_TIMEOUT_MS = 15000;
 const CAPABILITIES = ['text', 'vision', 'text-to-speech', 'lip-sync'];
 const PROTOCOL_CAPABILITIES = {
   'openai-compatible': ['text', 'vision', 'text-to-speech', 'lip-sync'],
@@ -160,12 +160,16 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
     try {
       response = await net.fetch(`${baseUrl}/models`, {
         method: 'GET',
-        headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
+          'User-Agent': 'NarraStudio/1.0 (Windows)',
+        },
         signal: controller.signal,
       });
     } catch (fetchError) {
       if (fetchError.name === 'AbortError') {
-        throw new Error('Kết nối tới Base URL quá hạn (Timeout sau 8s).');
+        throw new Error('Kết nối tới Base URL quá hạn (Timeout sau 15s).');
       }
       const message = fetchError?.message || String(fetchError);
       if (message.includes('ERR_NAME_NOT_RESOLVED')) {
@@ -199,6 +203,59 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
     const models = normalizeModels(parsed);
     if (!models.length) throw new Error('Provider kết nối được nhưng không tìm thấy model nào.');
     return { connected: true, baseUrl, models };
+  };
+
+  const verifyChatCompletion = async (payload, model) => {
+    const { baseUrl, apiKey } = resolveConnection(payload);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    let response;
+    try {
+      response = await net.fetch(`${baseUrl}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'User-Agent': 'NarraStudio/1.0 (Windows)',
+        },
+        body: JSON.stringify({
+          model,
+          stream: false,
+          messages: [{ role: 'user', content: 'Reply with OK.' }],
+          max_tokens: 10,
+        }),
+        signal: controller.signal,
+      });
+    } catch (fetchError) {
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Kiểm tra API key quá hạn (Timeout sau 15s).');
+      }
+      const message = fetchError?.message || String(fetchError);
+      throw new Error(`Không thể kiểm tra API key: ${message}`);
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    const text = await response.text();
+    if (!response.ok) {
+      let detail = text;
+      try {
+        const errJson = JSON.parse(text);
+        detail = errJson?.error?.message || errJson?.message || text;
+      } catch {}
+      throw new Error(`Provider phản hồi HTTP ${response.status}: ${redactSecret(detail, apiKey).slice(0, 200)}`);
+    }
+
+    let parsed;
+    try {
+      parsed = JSON.parse(text || '{}');
+    } catch {
+      throw new Error('Provider trả về dữ liệu kiểm tra không đúng định dạng JSON.');
+    }
+    if (!Array.isArray(parsed?.choices)) {
+      throw new Error('Provider không trả về phản hồi chat/completions hợp lệ.');
+    }
   };
 
   return {
@@ -293,7 +350,22 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
     models: fetchModels,
     async test(payload) {
       const result = await fetchModels(payload);
-      return { connected: true, baseUrl: result.baseUrl, modelCount: result.models.length };
+      const stored = payload?.id ? findProfile(normalizeProfileId(payload.id)) : undefined;
+      const protocol = PROTOCOL_CAPABILITIES[payload?.protocol]
+        ? payload.protocol
+        : (stored?.protocol || 'openai-compatible');
+      if (protocol !== 'openai-compatible') {
+        throw new Error('Kiểm tra kết nối hiện chỉ hỗ trợ provider OpenAI-compatible.');
+      }
+      const requestedModel = String(payload?.model || stored?.model || '').trim();
+      const model = requestedModel || result.models[0].id;
+      await verifyChatCompletion(payload, model);
+      return {
+        connected: true,
+        baseUrl: result.baseUrl,
+        modelCount: result.models.length,
+        verifiedModel: model,
+      };
     },
     getActiveRuntime(capability = 'text') {
       const settings = loadSettings();

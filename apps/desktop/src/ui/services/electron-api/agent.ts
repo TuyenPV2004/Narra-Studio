@@ -2,8 +2,21 @@ import { getElectronApi } from "@/services/electron-api/client";
 import { aiProviderApi } from "@/services/electron-api/ai-providers";
 
 export interface AgentMessage extends Record<string, unknown> {
+  id?: string | undefined;
+  role: "assistant" | "user" | "system";
   content: string;
-  role: "assistant" | "user";
+  status?: "streaming" | "completed" | "cancelled" | "failed" | undefined;
+  error?: string | undefined;
+  model?: string | undefined;
+  provider?: string | undefined;
+  planProposal?: unknown | undefined;
+}
+
+export interface WorkflowContextPayload {
+  brief?: string | undefined;
+  planTitle?: string | undefined;
+  runItemsCount?: number | undefined;
+  kind?: string | undefined;
 }
 
 export type ScriptStage =
@@ -29,29 +42,66 @@ const streamChat = async (
   history: AgentMessage[],
   requestId: string,
   onDelta: (content: string) => void,
-): Promise<string> => {
+  onCancelReady?: (cancel: () => void) => void,
+  hasPlan = false,
+  workflowContext?: WorkflowContextPayload,
+  onMeta?: (meta: { model?: string | undefined; source?: string | undefined }) => void,
+): Promise<{ reply: string; model?: string | undefined; source?: string | undefined }> => {
   let content = "";
   const stream = getElectronApi().aiAgentChatStream(
-    { requestId, message, history, hasPlan: false },
+    {
+      requestId,
+      message,
+      history: history.filter(
+        (m) => m.status !== "failed" && m.status !== "cancelled",
+      ),
+      hasPlan,
+      workflowContext: workflowContext || null,
+    },
     (payload) => {
       const event = record(payload);
       if (event.type === "delta" && typeof event.delta === "string") {
         content += event.delta;
         onDelta(content);
+        if (onMeta && (event.model || event.source)) {
+          onMeta({
+            model: typeof event.model === "string" ? event.model : undefined,
+            source: typeof event.source === "string" ? event.source : undefined,
+          });
+        }
       }
       if (event.type === "done" && typeof event.reply === "string") {
         content = event.reply;
         onDelta(content);
+        if (onMeta && (event.model || event.source)) {
+          onMeta({
+            model: typeof event.model === "string" ? event.model : undefined,
+            source: typeof event.source === "string" ? event.source : undefined,
+          });
+        }
       }
     },
   );
-  activeRequests.set(requestId, stream.cancel);
+
+  const abortLocalAndRemote = () => {
+    stream.cancel();
+    getElectronApi().aiAgentChatCancel({ requestId }).catch(() => {});
+  };
+
+  activeRequests.set(requestId, abortLocalAndRemote);
+  if (onCancelReady) {
+    onCancelReady(abortLocalAndRemote);
+  }
   try {
     const result = record(await stream.promise);
     const reply =
       typeof result.reply === "string" ? result.reply.trim() : content.trim();
     if (!reply) throw new Error("AI Agent không trả về nội dung.");
-    return reply;
+    return {
+      reply,
+      model: typeof result.model === "string" ? result.model : undefined,
+      source: typeof result.source === "string" ? result.source : undefined,
+    };
   } finally {
     activeRequests.delete(requestId);
   }
@@ -61,9 +111,19 @@ const genericPrompt = (instruction: string, context: unknown) =>
   `${instruction}\n\nReturn concise JSON when structured output is requested. Context:\n${JSON.stringify(context)}`;
 
 export const agentApi = {
-  async chat(message: string, history: AgentMessage[]): Promise<string> {
+  async chat(
+    message: string,
+    history: AgentMessage[],
+    hasPlan = false,
+    workflowContext?: WorkflowContextPayload,
+  ): Promise<string> {
     const response = record(
-      await getElectronApi().aiAgentChat({ message, history, hasPlan: false }),
+      await getElectronApi().aiAgentChat({
+        message,
+        history,
+        hasPlan,
+        workflowContext: workflowContext || null,
+      }),
     );
     if (typeof response.reply !== "string" || !response.reply.trim())
       throw new Error("AI Agent không trả về nội dung.");
@@ -74,13 +134,39 @@ export const agentApi = {
     message: string,
     history: AgentMessage[],
     onDelta: (content: string) => void,
-  ): Promise<string> {
+    onCancelReady?: (cancel: () => void) => void,
+    hasPlan = false,
+    workflowContext?: WorkflowContextPayload,
+    onMeta?: (meta: { model?: string | undefined; source?: string | undefined }) => void,
+  ): Promise<{ reply: string; model?: string | undefined; source?: string | undefined }> {
     return streamChat(
       message,
       history,
       `agent-${Date.now()}-${crypto.randomUUID()}`,
       onDelta,
+      onCancelReady,
+      hasPlan,
+      workflowContext,
+      onMeta,
     );
+  },
+
+  cancelChat(requestId?: string) {
+    if (requestId && activeRequests.has(requestId)) {
+      activeRequests.get(requestId)?.();
+      activeRequests.delete(requestId);
+      getElectronApi().aiAgentChatCancel({ requestId }).catch(() => {});
+    } else {
+      for (const [id, cancel] of activeRequests.entries()) {
+        try {
+          cancel();
+        } catch {
+          // ignore
+        }
+        activeRequests.delete(id);
+        getElectronApi().aiAgentChatCancel({ requestId: id }).catch(() => {});
+      }
+    }
   },
 
   intent: (message: string, history: AgentMessage[] = []) =>
@@ -124,7 +210,7 @@ export const agentApi = {
     progressId: string,
     onProgress: (payload: unknown) => void,
   ) {
-    const reply = await streamChat(
+    const { reply } = await streamChat(
       genericPrompt(
         `Perform the ${stage} stage for a video script. Preserve existing fields and return a JSON object with the updated project.`,
         {

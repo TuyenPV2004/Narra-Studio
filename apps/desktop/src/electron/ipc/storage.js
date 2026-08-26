@@ -1124,12 +1124,37 @@ ipcMain.handle('save-media-library', async (_, items) => {
 });
 
 // ── Result History Persistence (generic, per-key) ─────────────────────
+function sanitizeHistoryKey(key) {
+  if (typeof key !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(key)) {
+    throw new Error(`Invalid history key: ${String(key).slice(0, 50)}`);
+  }
+  const baseDir = path.resolve(app.getPath('userData'));
+  const resolved = path.resolve(baseDir, `history-${key}.json`);
+  if (!resolved.startsWith(baseDir)) {
+    throw new Error('Path traversal attempt in history storage');
+  }
+  return resolved;
+}
+
+function atomicWriteHistoryJson(filePath, data) {
+  const tmpPath = `${filePath}.${Date.now()}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  fs.writeFileSync(tmpPath, JSON.stringify(data, null, 2), 'utf-8');
+  fs.renameSync(tmpPath, filePath);
+}
+
 ipcMain.handle('load-history', async (_, key) => {
   try {
-    const filePath = path.join(app.getPath('userData'), `history-${key}.json`);
+    const filePath = sanitizeHistoryKey(key);
     if (fs.existsSync(filePath)) {
       const data = fs.readFileSync(filePath, 'utf-8');
-      return JSON.parse(data);
+      try {
+        return JSON.parse(data);
+      } catch (parseErr) {
+        console.error(`[HISTORY:${key}] Corrupted JSON file, creating backup:`, parseErr);
+        const corruptBackup = `${filePath}.corrupt-${Date.now()}.bak`;
+        try { fs.copyFileSync(filePath, corruptBackup); } catch {}
+        return [];
+      }
     }
   } catch (e) {
     console.error(`[HISTORY:${key}] Error loading:`, e);
@@ -1139,8 +1164,8 @@ ipcMain.handle('load-history', async (_, key) => {
 
 ipcMain.handle('save-history', async (_, key, items) => {
   try {
-    const filePath = path.join(app.getPath('userData'), `history-${key}.json`);
-    fs.writeFileSync(filePath, JSON.stringify(items, null, 2));
+    const filePath = sanitizeHistoryKey(key);
+    atomicWriteHistoryJson(filePath, items);
     return true;
   } catch (e) {
     console.error(`[HISTORY:${key}] Error saving:`, e);

@@ -8,7 +8,7 @@ import {
   Square,
   WandSparkles,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import {
@@ -77,19 +77,58 @@ const materializePlan = (value: unknown): WorkflowRunItem[] => {
   });
 };
 
-export function WorkflowPanel({ providerId }: { providerId: ProviderId }) {
-  const [brief, setBrief] = useState("");
+import type { AgentConversation } from "@/services/electron-api/agent-conversations";
+
+export function WorkflowPanel({
+  providerId,
+  activeConversation,
+  onUpdatePlan,
+}: {
+  providerId: ProviderId;
+  activeConversation?: AgentConversation;
+  onUpdatePlan?: (plan: unknown, runItems?: unknown[]) => void;
+}) {
+  const [brief, setBrief] = useState(
+    activeConversation?.title !== "New Dialogue" && activeConversation?.title
+      ? activeConversation.title
+      : "",
+  );
   const [instruction, setInstruction] = useState("");
-  const [kind, setKind] = useState<"campaign" | "image" | "video">("campaign");
-  const [aspect, setAspect] = useState<"landscape" | "portrait">("landscape");
+  const [kind, setKind] = useState<"campaign" | "image" | "video">(
+    activeConversation?.kind || "campaign",
+  );
+  const [aspect, setAspect] = useState<"landscape" | "portrait">(
+    activeConversation?.aspect || "landscape",
+  );
   const [outputKind, setOutputKind] = useState<"image" | "video">("image");
   const [outputUrl, setOutputUrl] = useState("");
   const [running, setRunning] = useState<WorkflowAction>();
   const [result, setResult] = useState<unknown>();
-  const [plan, setPlan] = useState<unknown>();
-  const [runItems, setRunItems] = useState<WorkflowRunItem[]>([]);
+  const [plan, setPlan] = useState<unknown>(activeConversation?.plan || null);
+  const [runItems, setRunItems] = useState<WorkflowRunItem[]>(
+    Array.isArray(activeConversation?.runItems) &&
+      activeConversation.runItems.length
+      ? (activeConversation.runItems as WorkflowRunItem[])
+      : activeConversation?.plan
+        ? materializePlan(activeConversation.plan)
+        : [],
+  );
   const [approved, setApproved] = useState(false);
   const [error, setError] = useState<string>();
+
+  useEffect(() => {
+    if (activeConversation) {
+      if (activeConversation.plan) {
+        setPlan(activeConversation.plan);
+      }
+      if (
+        Array.isArray(activeConversation.runItems) &&
+        activeConversation.runItems.length
+      ) {
+        setRunItems(activeConversation.runItems as WorkflowRunItem[]);
+      }
+    }
+  }, [activeConversation]);
 
   const run = async (action: WorkflowAction) => {
     if (running) return;
@@ -109,9 +148,11 @@ export function WorkflowPanel({ providerId }: { providerId: ProviderId }) {
       setResult(value);
       if (action === "workflow" || action === "polish") {
         const nextPlan = (value as { plan?: unknown })?.plan ?? value;
+        const nextItems = materializePlan(nextPlan);
         setPlan(nextPlan);
-        setRunItems(materializePlan(nextPlan));
+        setRunItems(nextItems);
         setApproved(false);
+        onUpdatePlan?.(nextPlan, nextItems);
       }
     } catch (value) {
       setError(value instanceof Error ? value.message : String(value));

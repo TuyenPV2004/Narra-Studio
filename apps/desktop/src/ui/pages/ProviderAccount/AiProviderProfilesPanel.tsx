@@ -9,6 +9,7 @@ import {
   GlobeLock,
   Inbox,
   KeyRound,
+  LoaderCircle,
   RotateCcw,
   SquarePen,
   Trash2,
@@ -99,6 +100,7 @@ export function AiProviderProfilesPanel({
   const [draftSnapshot, setDraftSnapshot] = useState(emptyDraft);
   const [models, setModels] = useState<AiProviderModel[]>([]);
   const [busy, setBusy] = useState(false);
+  const [checkingProfileId, setCheckingProfileId] = useState("");
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [deletingProfile, setDeletingProfile] =
     useState<AiProviderProfile | null>(null);
@@ -181,6 +183,8 @@ export function AiProviderProfilesPanel({
     ...(draft.id ? { id: draft.id } : {}),
     ...(draft.baseUrl.trim() ? { baseUrl: draft.baseUrl.trim() } : {}),
     ...(draft.apiKey.trim() ? { apiKey: draft.apiKey.trim() } : {}),
+    ...(draft.model.trim() ? { model: draft.model.trim() } : {}),
+    protocol: draft.protocol,
   });
 
   const discover = async () => {
@@ -224,14 +228,31 @@ export function AiProviderProfilesPanel({
     }
     setBusy(true);
     try {
-      const count = await aiProviderApi.test(connection());
+      const result = await aiProviderApi.test(connection());
       toast.success("Kết nối thành công!", {
-        description: `${count} model khả dụng.`,
+        description: `API key hoạt động với model ${result.verifiedModel} (${result.modelCount} model khả dụng).`,
       });
     } catch (error) {
       const msg = cleanErrorMessage(error);
       toast.error("Kiểm tra kết nối thất bại", { description: msg });
     } finally {
+      setBusy(false);
+    }
+  };
+
+  const checkProfile = async (profile: AiProviderProfile) => {
+    setBusy(true);
+    setCheckingProfileId(profile.id);
+    try {
+      const result = await aiProviderApi.test({ id: profile.id });
+      toast.success(`${profile.name} còn hoạt động`, {
+        description: `API key đã được xác thực với model ${result.verifiedModel}.`,
+      });
+    } catch (error) {
+      const msg = cleanErrorMessage(error);
+      toast.error(`${profile.name} không khả dụng`, { description: msg });
+    } finally {
+      setCheckingProfileId("");
       setBusy(false);
     }
   };
@@ -310,17 +331,12 @@ export function AiProviderProfilesPanel({
             </div>
           )}
           {profiles.map((profile) => {
-            const activeCapabilities = providerCapabilities.filter(
-              (capability) => activeByCapability[capability] === profile.id,
-            );
-            const isActive = activeCapabilities.length > 0;
             const isExpanded = expandedIds[profile.id] ?? true;
             const isEditing = draft.id === profile.id;
             return (
               <article
                 key={profile.id}
                 className="source-provider-card"
-                data-active={isActive}
                 data-expanded={isExpanded}
                 data-editing={isEditing}
               >
@@ -345,11 +361,6 @@ export function AiProviderProfilesPanel({
                         {protocolLabels[profile.protocol]}
                       </span>
                       <div className="source-provider-card__capabilities">
-                        {isActive && (
-                          <span className="source-provider-card__cap-pill source-provider-card__cap-pill--active">
-                            Hoạt động
-                          </span>
-                        )}
                         {profile.capabilities.map((capability) => (
                           <span
                             key={capability}
@@ -387,6 +398,33 @@ export function AiProviderProfilesPanel({
                         <SquarePen size={13} /> Chỉnh sửa
                       </Button>
                     )}
+                    <Button
+                      variant="ghost"
+                      className="source-provider-card__btn-check"
+                      disabled={
+                        busy || profile.protocol !== "openai-compatible"
+                      }
+                      title={
+                        profile.protocol === "openai-compatible"
+                          ? `Kiểm tra ${profile.name}`
+                          : "Check hiện chỉ hỗ trợ provider OpenAI-compatible"
+                      }
+                      aria-label={`Kiểm tra ${profile.name}`}
+                      onClick={() => void checkProfile(profile)}
+                    >
+                      {checkingProfileId === profile.id ? (
+                        <LoaderCircle
+                          size={13}
+                          className="is-spinning"
+                          aria-hidden="true"
+                        />
+                      ) : (
+                        <GlobeLock size={13} aria-hidden="true" />
+                      )}
+                      {checkingProfileId === profile.id
+                        ? "Đang check…"
+                        : "Check"}
+                    </Button>
                     <Button
                       variant="ghost"
                       className="source-provider-card__btn-delete"

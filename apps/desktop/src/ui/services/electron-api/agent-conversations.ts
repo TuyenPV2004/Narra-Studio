@@ -61,21 +61,46 @@ export const normalizeConversation = (
   };
 };
 
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_IMPORT_MESSAGES = 200;
+const MAX_MESSAGE_LENGTH = 50000;
+
 export const parseConversationPackage = (text: string): AgentConversation => {
-  const root = object(JSON.parse(text));
+  if (text.length > MAX_IMPORT_BYTES) {
+    throw new Error("Dữ liệu JSON vượt quá dung lượng cho phép (tối đa 5MB).");
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("Định dạng file JSON không hợp lệ.");
+  }
+  const root = object(parsed);
   const conversation = object(root.conversation || root);
   const workflow = object(root.workflow);
-  const messages = Array.isArray(conversation.messages)
-    ? conversation.messages.filter(isMessage)
+  const rawMessages = Array.isArray(conversation.messages)
+    ? conversation.messages
     : [];
-  if (!messages.length) throw new Error("File không có messages hợp lệ.");
+  const messages: AgentMessage[] = [];
+  for (const item of rawMessages) {
+    if (messages.length >= MAX_IMPORT_MESSAGES) break;
+    if (isMessage(item)) {
+      messages.push({
+        role: item.role,
+        content: String(item.content).slice(0, MAX_MESSAGE_LENGTH),
+      });
+    }
+  }
+  if (!messages.length) {
+    throw new Error("File JSON không chứa tin nhắn (messages) hợp lệ.");
+  }
   const now = Date.now();
   return {
     ...conversation,
     id: crypto.randomUUID(),
     title:
       typeof root.title === "string" && root.title.trim()
-        ? root.title
+        ? root.title.trim().slice(0, 100)
         : "Conversation import",
     messages,
     savedAt: now,
@@ -83,10 +108,14 @@ export const parseConversationPackage = (text: string): AgentConversation => {
     kind: kind(conversation.kind),
     aspect: aspect(conversation.aspect),
     plan: workflow.plan ?? null,
-    runItems: Array.isArray(workflow.runItems) ? workflow.runItems : [],
-    assets: Array.isArray(workflow.assets) ? workflow.assets : [],
+    runItems: Array.isArray(workflow.runItems)
+      ? workflow.runItems.slice(0, 100)
+      : [],
+    assets: Array.isArray(workflow.assets)
+      ? workflow.assets.slice(0, 100)
+      : [],
     canvasGroups: Array.isArray(workflow.canvasGroups)
-      ? workflow.canvasGroups
+      ? workflow.canvasGroups.slice(0, 50)
       : [],
   };
 };

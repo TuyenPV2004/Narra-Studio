@@ -403,9 +403,15 @@ contextBridge.exposeInMainWorld("api", {
       );
     return {
       promise,
-      cancel: () => ipcRenderer.removeListener("ai-agent-chat-stream", handler),
+      cancel: () => {
+        ipcRenderer.removeListener("ai-agent-chat-stream", handler);
+        if (requestId) {
+          ipcRenderer.invoke("ai-agent-chat-cancel", { requestId }).catch(() => {});
+        }
+      },
     };
   },
+  aiAgentChatCancel: (p) => ipcRenderer.invoke("ai-agent-chat-cancel", p),
   aiAgentIntent: (p) => ipcRenderer.invoke("ai-agent-intent", p),
   aiAgentWorkflow: (p) => ipcRenderer.invoke("ai-agent-workflow", p),
   aiAgentPolishWorkflow: (p) =>

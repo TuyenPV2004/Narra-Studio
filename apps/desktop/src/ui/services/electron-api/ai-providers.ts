@@ -44,6 +44,8 @@ export interface AiProviderConnection {
   apiKey?: string;
   baseUrl?: string;
   id?: string;
+  model?: string;
+  protocol?: AiProviderProtocol;
 }
 
 const record = (value: unknown): Record<string, unknown> =>
@@ -179,7 +181,10 @@ export const aiProviderApi = {
     }
     return models;
   },
-  async test(connection: AiProviderConnection): Promise<number> {
+  async test(connection: AiProviderConnection): Promise<{
+    modelCount: number;
+    verifiedModel: string;
+  }> {
     const response = record(
       await getElectronApi().aiProviderProfileTest(connection),
     );
@@ -190,6 +195,18 @@ export const aiProviderApi = {
           : "Không thể kết nối AI provider.",
       );
     }
-    return typeof response.modelCount === "number" ? response.modelCount : 0;
+    if (
+      typeof response.modelCount !== "number" ||
+      !Number.isInteger(response.modelCount) ||
+      response.modelCount < 0 ||
+      typeof response.verifiedModel !== "string" ||
+      !response.verifiedModel.trim()
+    ) {
+      throw new Error("Provider trả về kết quả kiểm tra không hợp lệ.");
+    }
+    return {
+      modelCount: response.modelCount,
+      verifiedModel: response.verifiedModel,
+    };
   },
 };

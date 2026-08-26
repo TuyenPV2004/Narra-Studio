@@ -5,6 +5,7 @@ const createProvider = require("../apps/desktop/src/electron/providers/openai-co
 
 let settings = {};
 const requests = [];
+let rejectInference = false;
 const provider = createProvider({
   loadSettings: () => settings,
   saveSettings: (patch) => {
@@ -18,7 +19,27 @@ const provider = createProvider({
   crypto: { randomUUID: () => "12345678-1234-1234-1234-123456789abc" },
   net: {
     fetch: async (url, options) => {
-      requests.push({ url, authorization: options.headers.Authorization });
+      requests.push({
+        url,
+        authorization: options.headers.Authorization,
+        body: options.body,
+      });
+      if (url.endsWith("/chat/completions")) {
+        if (rejectInference) {
+          return {
+            ok: false,
+            status: 403,
+            text: async () =>
+              JSON.stringify({ error: { message: "API key has expired" } }),
+          };
+        }
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            JSON.stringify({ choices: [{ message: { content: "OK" } }] }),
+        };
+      }
       return {
         ok: true,
         status: 200,
@@ -174,15 +195,32 @@ assert.equal(
   "https://sync.example",
 );
 
-provider
-  .models({ id: "local-ai" })
-  .then((result) => {
+void (async () => {
+  try {
+    const result = await provider.models({ id: "local-ai" });
     assert.deepEqual(
       result.models.map((model) => model.id),
       ["model-a", "model-b"],
     );
     assert.equal(requests[0].url, "http://127.0.0.1:11434/v1/models");
     assert.equal(requests[0].authorization, "Bearer top-secret-key");
+
+    const checked = await provider.test({ id: "local-ai" });
+    assert.equal(checked.connected, true);
+    assert.equal(checked.verifiedModel, "model-b");
+    const completionRequest = requests.find((request) =>
+      request.url.endsWith("/chat/completions"),
+    );
+    assert.equal(completionRequest.authorization, "Bearer top-secret-key");
+    assert.equal(JSON.parse(completionRequest.body).model, "model-b");
+
+    rejectInference = true;
+    await assert.rejects(
+      provider.test({ id: "local-ai" }),
+      /HTTP 403: API key has expired/,
+      "A public model catalog must not hide an expired inference key",
+    );
+
     provider.remove("local-ai");
     provider.remove("custom-tts");
     provider.remove("custom-lip");
@@ -190,8 +228,8 @@ provider
     assert.equal(provider.list().activeByCapability["text-to-speech"], "");
     assert.equal(provider.list().activeByCapability["lip-sync"], "");
     console.log("AI provider profile tests passed.");
-  })
-  .catch((error) => {
+  } catch (error) {
     console.error(error);
     process.exitCode = 1;
-  });
+  }
+})();

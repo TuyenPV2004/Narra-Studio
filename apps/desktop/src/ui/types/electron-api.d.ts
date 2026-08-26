@@ -31,6 +31,8 @@ export interface NarraElectronApi {
     id?: string;
     baseUrl?: string;
     apiKey?: string;
+    model?: string;
+    protocol?: string;
   }) => Promise<unknown>;
   aiProviderProfileModels: (payload: {
     id?: string;
@@ -251,6 +253,9 @@ export interface NarraElectronApi {
     payload: Record<string, unknown>,
     callback: (payload: unknown) => void,
   ) => { promise: Promise<unknown>; cancel: () => void };
+  aiAgentChatCancel: (payload: {
+    requestId: string;
+  }) => Promise<{ cancelled: boolean; requestId?: string }>;
   aiAgentIntent: (payload: Record<string, unknown>) => Promise<unknown>;
   aiAgentWorkflow: (payload: Record<string, unknown>) => Promise<unknown>;
   aiAgentPolishWorkflow: (payload: Record<string, unknown>) => Promise<unknown>;

@@ -124,6 +124,11 @@ assert.doesNotMatch(aiProviders, /source-ai-providers__capability-options/);
 assert.doesNotMatch(aiProviders, /source-provider-card__btn-select/);
 assert.doesNotMatch(aiProviders, /Tự động dùng cho/);
 assert.doesNotMatch(aiProviders, /Đang dùng:/);
+assert.match(
+  aiProviders,
+  /Chỉnh sửa[\s\S]*source-provider-card__btn-check[\s\S]*Xóa/,
+  "Provider Check action must remain between Edit and Delete",
+);
 assert.match(flowApi, /success === false/);
 assert.match(flow, /loadRequestRef/);
 assert.match(flow, /navigator\.clipboard\.writeText/);
