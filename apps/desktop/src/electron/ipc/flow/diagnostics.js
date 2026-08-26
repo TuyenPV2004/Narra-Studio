@@ -3,8 +3,7 @@
 const {findExtensionDirectory} = require('./extension-directory');
 
 /**
- * Flow webview diagnostics: CAPTCHA bridge status, extension folder, webview
- * reload/probe, and the debug-* DOM inspectors.
+ * CAPTCHA bridge and browser-runtime diagnostics.
  *
  * Registered by `electron/ipc/flow.js`.
  */
@@ -60,7 +59,6 @@ async function getCaptchaRuntimeStatus() {
   const extensionFilesAvailable = !!getExtensionDirectory();
   let chromeCdpReady = false;
   let chromeCdpUrl = null;
-  let webviewFallbackReady = false;
 
   if (getChromeRuntime().chromeCdp && getChromeRuntime().chromeReady) {
     try {
@@ -79,23 +77,11 @@ async function getCaptchaRuntimeStatus() {
     }
   }
 
-  try {
-    const wv = findFlowWebview();
-    if (wv) {
-      const url = typeof wv.getURL === 'function' ? wv.getURL() : '';
-      webviewFallbackReady = !!(url && url.includes('labs.google'));
-    }
-  } catch (e) {
-    webviewFallbackReady = false;
-  }
-
   const source = extensionConnected
     ? 'extension'
     : chromeCdpReady
       ? 'chrome-cdp'
-      : webviewFallbackReady
-        ? 'webview'
-        : 'none';
+      : 'none';
   const labsProjectOpen = !!(extensionCompatible && extensionStatus.labsProjectOpen);
   const tokenVerified = !!(extensionCompatible && extensionStatus.lastTokenAt);
   const setupReady = !!(extensionCompatible && labsProjectOpen && tokenVerified);
@@ -118,7 +104,6 @@ async function getCaptchaRuntimeStatus() {
     // a token verified on that project must all remain true.
     setupReady,
     chromeCdpReady,
-    webviewFallbackReady,
     ready: source !== 'none',
     source,
     port: captchaBridge.PORT,

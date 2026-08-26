@@ -22,8 +22,6 @@ module.exports = function createCaptchaRuntime(dependencies) {
     pathToFileURL,
     fileURLToPath,
     captchaBridge,
-    avisProvider,
-    cloudflareImagesProvider,
     runtime,
     getFfmpegBin,
     maybePromoteFilterComplexToScript,
@@ -62,8 +60,6 @@ module.exports = function createCaptchaRuntime(dependencies) {
     isDryRunActive,
     makeApiRequest,
     RECAPTCHA_SITE_KEY,
-    findFlowWebview,
-    setActiveWebviewSlot,
   } = dependencies;
 
 // ── Persistent Real Chrome for Captcha ───────────────────────────────
@@ -608,50 +604,6 @@ async function makeApiRequestViaChrome(url, body) {
 }
 
 
-// Reload the slot's flowWebview to reset reCAPTCHA session state.
-// Mirrors the user's manual F5 workflow: must F5 on a project URL specifically.
-async function reloadFlowWebviewForSlot(slotId) {
-  const wv = findFlowWebview(slotId);
-  if (!wv) return false;
-  try {
-    const curUrl = wv.getURL ? wv.getURL() : null;
-    const settings = loadSettings();
-    const targetUrl = (curUrl && curUrl.includes('/project/')) ? curUrl : settings.lastProjectUrl;
-    if (targetUrl && targetUrl.includes('/project/')) {
-      // Navigate to project URL (matches user's manual F5-on-project-URL workflow).
-      // Use loadURL instead of reload — ensures we land on the project page even
-      // if current URL drifted to /flow home or an error page.
-      console.log(`[RELOAD-SLOT-${slotId}] Navigating to project URL: ${targetUrl}`);
-      if (typeof wv.loadURL === 'function') await wv.loadURL(targetUrl);
-      else await wv.executeJavaScript(`location.href = ${JSON.stringify(targetUrl)}`);
-    } else {
-      // No saved project URL — plain reload
-      if (typeof wv.reload === 'function') wv.reload();
-      else await wv.executeJavaScript('location.reload()');
-    }
-    // Wait for prompt textbox to be ready (max 25s)
-    const start = Date.now();
-    while (Date.now() - start < 25000) {
-      await new Promise(r => setTimeout(r, 1000));
-      try {
-        const ready = await wv.executeJavaScript(`!!(document.querySelector('[contenteditable="true"]') || document.querySelector('textarea'))`);
-        if (ready) {
-          const url = wv.getURL ? wv.getURL() : '?';
-          console.log(`[RELOAD-SLOT-${slotId}] Webview ready (url=${url})`);
-          // Extra dwell time — reCAPTCHA needs ~1-2s after load to settle
-          await new Promise(r => setTimeout(r, 1500));
-          return true;
-        }
-      } catch (e) {}
-    }
-    console.warn(`[RELOAD-SLOT-${slotId}] Webview reload timed out`);
-    return false;
-  } catch (e) {
-    console.warn(`[RELOAD-SLOT-${slotId}] Reload error:`, e.message);
-    return false;
-  }
-}
-
 // Reload the Chrome-CDP labs.google tab to reset its reCAPTCHA session state.
 async function reloadChromeCdpLabs() {
   if (!chromeCdp || !chromeReady) return false;
@@ -682,7 +634,7 @@ async function reloadChromeCdpLabs() {
   }
 }
 
-async function _doApiRequestViaWebviewOnce(url, body, slotId, captchaAction) {
+async function requestWithCaptchaOnce(url, body, slotId, captchaAction) {
   // Extract existing frontend token (if any) for fallback. Discard placeholders
   // sent by the renderer when it expects the extension to provide the real token.
   let frontendToken = null;
@@ -721,8 +673,7 @@ async function _doApiRequestViaWebviewOnce(url, body, slotId, captchaAction) {
       }
     }
     if (!captchaToken) {
-      const hint = 'Extension Chrome không tạo được token. Mở popup extension trong Chrome để kiểm tra: tab labs.google còn mở không? Status có "connected" không?';
-      throw new Error(extErr ? (extErr.message + ' — ' + hint) : hint);
+      console.warn('[CAPTCHA] Extension token request failed, falling back to other strategies:', extErr?.message || 'Token request failed');
     }
   }
 
@@ -743,32 +694,6 @@ async function _doApiRequestViaWebviewOnce(url, body, slotId, captchaAction) {
     console.log(`[CAPTCHA] Using frontend token (len: ${frontendToken.length})`);
   }
 
-  // Strategy 3: Main webview fallback
-  if (!captchaToken) {
-    const wv = findFlowWebview(slotId);
-    if (wv) {
-      try {
-        console.log('[CAPTCHA] Fallback: main webview (slot', slotId, '), action:', captchaAction);
-        await wv.executeJavaScript('window.__rcKey = ' + JSON.stringify(RECAPTCHA_SITE_KEY) + '; window.__rcAction = ' + JSON.stringify(captchaAction) + ';');
-        captchaToken = await wv.executeJavaScript(`
-          (async function() {
-            try {
-              if (!window.grecaptcha || !window.grecaptcha.enterprise) return null;
-              return await new Promise(function(resolve, reject) {
-                grecaptcha.enterprise.ready(async function() {
-                  try { var t = await grecaptcha.enterprise.execute(window.__rcKey, { action: window.__rcAction || 'IMAGE_GENERATION' }); resolve(t); }
-                  catch(e) { reject(e.message || String(e)); }
-                });
-                setTimeout(function() { reject('timeout'); }, 15000);
-              });
-            } catch(err) { return null; }
-          })()
-        `);
-        if (captchaToken) console.log('[CAPTCHA] Main webview OK, len:', captchaToken.length);
-      } catch (e) { console.error('[CAPTCHA] Webview failed:', e.message); }
-    }
-  }
-
   if (!captchaToken) throw new Error('Cannot get captcha token from any source');
 
   const bodyWithToken = JSON.parse(JSON.stringify(body));
@@ -784,7 +709,7 @@ async function _doApiRequestViaWebviewOnce(url, body, slotId, captchaAction) {
   return makeApiRequest(url, bodyWithToken, slotId);
 }
 
-async function makeApiRequestViaWebview(url, body, slotId = 0, captchaAction = 'IMAGE_GENERATION') {
+async function makeApiRequestWithCaptcha(url, body, slotId = 0, captchaAction = 'IMAGE_GENERATION') {
   console.log('[API] Request:', url.substring(0, 80));
   // DRY-RUN: skip real captcha acquisition (no extension/webview needed).
   // Inject a dummy token exactly where the real one would go, then let
@@ -801,19 +726,16 @@ async function makeApiRequestViaWebview(url, body, slotId = 0, captchaAction = '
     return makeApiRequest(url, bodyWithToken, slotId);
   }
   try {
-    return await _doApiRequestViaWebviewOnce(url, body, slotId, captchaAction);
+    return await requestWithCaptchaOnce(url, body, slotId, captchaAction);
   } catch (e) {
     const msg = (e && e.message) || String(e);
-    // Mirror user's manual F5 workflow: reload webview + Chrome-CDP labs page,
-    // then retry once. Targeted at reCAPTCHA UNUSUAL_ACTIVITY which resets after
+    // Reload the Chrome-CDP labs page, then retry once. Targeted at reCAPTCHA
+    // UNUSUAL_ACTIVITY which resets after
     // page reload (reCAPTCHA session state is per page lifecycle).
     if (msg.includes('UNUSUAL_ACTIVITY') || msg.includes('reCAPTCHA evaluation failed')) {
-      console.log('[API] UNUSUAL_ACTIVITY detected — reloading webview + Chrome-CDP, then retrying once...');
-      await Promise.all([
-        reloadFlowWebviewForSlot(slotId),
-        reloadChromeCdpLabs(),
-      ]);
-      return await _doApiRequestViaWebviewOnce(url, body, slotId, captchaAction);
+      console.log('[API] UNUSUAL_ACTIVITY detected — reloading Chrome-CDP, then retrying once...');
+      await reloadChromeCdpLabs();
+      return await requestWithCaptchaOnce(url, body, slotId, captchaAction);
     }
     throw e;
   }
@@ -829,9 +751,8 @@ async function makeApiRequestViaWebview(url, body, slotId = 0, captchaAction = '
     startPersistentChrome,
     getCaptchaFromChrome,
     makeApiRequestViaChrome,
-    reloadFlowWebviewForSlot,
     reloadChromeCdpLabs,
-    makeApiRequestViaWebview,
+    makeApiRequestWithCaptcha,
     getChromeRuntime,
   };
 };

@@ -2,7 +2,7 @@
 
 const {brand, primaryRgb} = require('./brand');
 
-module.exports = function registerLocalAppLifecycle({app, BrowserWindow, path, runtime, isDev, createWindow}) {
+module.exports = function registerLocalAppLifecycle({app, BrowserWindow, path, runtime, isDev, createWindow, restoreAllSlotSessions}) {
   let splashWindow;
   const closeSplash = () => {
     if (splashWindow && !splashWindow.isDestroyed()) splashWindow.close();
@@ -37,6 +37,11 @@ module.exports = function registerLocalAppLifecycle({app, BrowserWindow, path, r
     }
     if (!isDev) createSplash();
     createWindow();
+    if (typeof restoreAllSlotSessions === 'function') {
+      restoreAllSlotSessions().catch(err => {
+        console.warn('[STARTUP] Session hydration error:', err?.message || err);
+      });
+    }
     let shown = false;
     const showApp = () => {
       if (shown) return;

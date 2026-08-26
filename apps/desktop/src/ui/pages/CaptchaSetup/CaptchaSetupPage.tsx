@@ -1,0 +1,291 @@
+import {
+  Check,
+  ChevronDown,
+  Clipboard,
+  ExternalLink,
+  FolderOpen,
+  RefreshCw,
+  ShieldCheck,
+  TriangleAlert,
+  WifiCog,
+} from "lucide-react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/Button";
+import { toast } from "@/components/ui/Toast";
+import { captchaApi } from "@/services/electron-api";
+import { useCaptchaSetup } from "@/pages/CaptchaSetup/useCaptchaSetup";
+
+interface Step {
+  actions: ReactNode;
+  description: string;
+  done: boolean;
+  id: string;
+  instructions: string[];
+  title: string;
+}
+
+export function CaptchaSetupPage() {
+  const { checking, error, refresh, status, verify, verifying } =
+    useCaptchaSetup();
+  const extensionReady =
+    status.extensionConnected && status.extensionCompatible;
+  const [expanded, setExpanded] = useState(0);
+
+  const openFolder = async () => {
+    try {
+      const result = await captchaApi.openExtensionFolder();
+      if (result.ok) {
+        toast.success("Đã mở thư mục Extension.");
+      } else {
+        toast.error("Không thể mở thư mục Extension.", {
+          description: result.error,
+        });
+      }
+    } catch (e) {
+      toast.error("Lỗi khi mở thư mục", { description: String(e) });
+    }
+  };
+
+  const openFlow = async () => {
+    try {
+      await captchaApi.openGoogleFlow();
+    } catch (e) {
+      toast.error("Không thể mở Google Flow", { description: String(e) });
+    }
+  };
+
+  const copyAddress = async () => {
+    try {
+      await captchaApi.copyChromeExtensionsAddress();
+      toast.success("Đã sao chép chrome://extensions vào bộ nhớ tạm.");
+    } catch {
+      toast.error("Không thể sao chép địa chỉ extension.");
+    }
+  };
+
+  const runVerify = async () => {
+    try {
+      const ok = await verify();
+      if (ok) {
+        toast.success("Kết nối VEO3 đã được xác minh thành công!");
+      } else {
+        toast.error("Chưa thể xác minh kết nối VEO3.", {
+          description:
+            "Vui lòng kiểm tra lại tab Google Flow và Extension trong Chrome.",
+        });
+      }
+    } catch (e) {
+      toast.error("Xác minh thất bại", { description: String(e) });
+    }
+  };
+  const steps = useMemo<Step[]>(
+    () => [
+      {
+        id: "files",
+        done: status.extensionFilesAvailable,
+        title: "Bước 1/4. Chuẩn bị Extension",
+        description: status.extensionFilesAvailable
+          ? `Đã nhận diện Extension ${status.extensionVersion || ""}`.trim()
+          : "Mở thư mục Extension Narra đã được đóng gói cùng ứng dụng.",
+        instructions: [
+          "Mở thư mục Extension Narra.",
+          "Trong Chrome, chọn Load unpacked và chọn thư mục này.",
+        ],
+        actions: (
+          <Button onClick={() => void openFolder()}>
+            <FolderOpen size={16} />
+            Mở thư mục Extension
+          </Button>
+        ),
+      },
+      {
+        id: "extension",
+        done: extensionReady,
+        title: "Bước 2/4. Cài đặt Extension",
+        description: extensionReady
+          ? `Extension ${status.extensionVersion || status.requiredExtensionVersion} tương thích.`
+          : "Cài đặt Extension dạng unpacked trong Chrome.",
+        instructions: [
+          "Mở trang quản lý Extension.",
+          "Bật Chế độ dành cho nhà phát triển.",
+          "Chọn Tải tiện ích đã giải nén và chọn thư mục Extension.",
+        ],
+        actions: (
+          <>
+            <Button onClick={() => void copyAddress()}>
+              <Clipboard size={16} />
+              chrome://extensions
+            </Button>
+            <Button
+              variant="secondary"
+              aria-label="Mở thư mục Extension để cài đặt"
+              onClick={() => void openFolder()}
+            >
+              Mở Extension
+            </Button>
+          </>
+        ),
+      },
+      {
+        id: "flow",
+        done: extensionReady && status.labsProjectOpen,
+        title: "Bước 3/4. Mở Google Flow",
+        description: status.labsProjectOpen
+          ? "Đã nhận diện dự án Google Flow."
+          : status.labsTabOpen
+            ? "Hãy mở một dự án trong Google Flow."
+            : "Đăng nhập và giữ dự án Google Flow đang mở.",
+        instructions: [
+          "Đăng nhập Google Flow.",
+          "Mở một dự án.",
+          "Giữ tab dự án đang mở khi sử dụng Narra Studio.",
+        ],
+        actions: (
+          <Button onClick={() => void openFlow()}>
+            <ExternalLink size={16} />
+            Mở Google Flow
+          </Button>
+        ),
+      },
+      {
+        id: "verify",
+        done: extensionReady && status.labsProjectOpen && status.tokenVerified,
+        title: "Bước 4/4. Kiểm tra kết nối",
+        description: status.tokenVerified
+          ? "Kết nối đã được xác minh."
+          : status.tokenError ||
+            "Kiểm tra Extension và dự án Flow trước khi tạo nội dung.",
+        instructions: ["Nhấn Kiểm tra để xác minh kết nối trình duyệt."],
+        actions: (
+          <Button
+            disabled={!extensionReady || !status.labsProjectOpen || verifying}
+            onClick={() => void runVerify()}
+          >
+            {verifying ? (
+              <RefreshCw className="is-spinning" size={16} />
+            ) : (
+              <ShieldCheck size={16} />
+            )}
+            Kiểm tra
+          </Button>
+        ),
+      },
+    ],
+    [extensionReady, status, verifying],
+  );
+  const currentStep = status.setupReady
+    ? 3
+    : Math.max(
+        0,
+        steps.findIndex((step) => !step.done),
+      );
+  const completed = steps.filter((step) => step.done).length;
+  useEffect(() => {
+    setExpanded(currentStep);
+  }, [currentStep]);
+
+  return (
+    <section className="source-captcha-page" aria-labelledby="captcha-title">
+      <header className="source-captcha-hero">
+        <div className="source-captcha-hero__left">
+          <span className="source-captcha-hero__icon">
+            <WifiCog size={28} aria-hidden="true" />
+          </span>
+          <div>
+            <h1 id="captcha-title">Kết nối VEO3 với Narra Studio</h1>
+            <p>
+              Làm theo từng bước bên dưới. Narra Studio sẽ tự nhận diện và
+              chuyển bước khi Chrome đã sẵn sàng.
+            </p>
+          </div>
+        </div>
+        <span className="source-captcha-state" data-ready={status.setupReady}>
+          {checking ? (
+            <RefreshCw className="is-spinning" size={15} />
+          ) : status.setupReady ? (
+            <Check size={15} />
+          ) : (
+            <TriangleAlert size={15} />
+          )}
+          {checking
+            ? "Đang kiểm tra"
+            : status.setupReady
+              ? "Đã kết nối"
+              : "Cần thiết lập"}
+        </span>
+      </header>
+      <div className="source-captcha-progress">
+        <span>
+          {status.setupReady
+            ? "Đã hoàn tất"
+            : `Bước hiện tại ${currentStep + 1}/4`}
+        </span>
+        <strong>{Math.round((completed / 4) * 100)}%</strong>
+        <i>
+          <span style={{ width: `${(completed / 4) * 100}%` }} />
+        </i>
+      </div>
+      {error && (
+        <p
+          className="source-captcha-feedback"
+          role="alert"
+          aria-live="assertive"
+        >
+          {error}
+        </p>
+      )}
+      <div className="source-captcha-steps">
+        {steps.map((step, index) => (
+          <article
+            key={step.id}
+            className="source-captcha-step"
+            data-done={step.done}
+            data-current={index === currentStep}
+          >
+            <button
+              type="button"
+              className="source-captcha-step__summary"
+              aria-expanded={expanded === index}
+              aria-controls={`source-captcha-${step.id}`}
+              onClick={() => setExpanded(expanded === index ? -1 : index)}
+            >
+              <span className="source-captcha-step__check">
+                {step.done ? <Check size={16} strokeWidth={3} /> : index + 1}
+              </span>
+              <span>
+                <strong>{step.title}</strong>
+                <small>{step.description}</small>
+              </span>
+              <ChevronDown size={18} aria-hidden="true" />
+            </button>
+            {expanded === index && (
+              <div
+                id={`source-captcha-${step.id}`}
+                className="source-captcha-step__panel"
+              >
+                <ol>
+                  {step.instructions.map((instruction, itemIndex) => (
+                    <li key={instruction}>
+                      <span>{itemIndex + 1}</span>
+                      <p>{instruction}</p>
+                    </li>
+                  ))}
+                </ol>
+                <div className="source-captcha-step__actions">
+                  {step.actions}
+                  <Button variant="ghost" onClick={() => void refresh()}>
+                    <RefreshCw
+                      className={checking ? "is-spinning" : ""}
+                      size={15}
+                    />
+                    Kiểm tra
+                  </Button>
+                </div>
+              </div>
+            )}
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}

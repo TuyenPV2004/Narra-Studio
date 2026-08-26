@@ -5,9 +5,9 @@
   "type": "commonjs",
   "main": "dist-electron/main.js",
   "scripts": {
-    "build": "node ../../scripts/build-recovered-desktop.mjs",
+    "build": "node ../../scripts/build-source-desktop.mjs",
     "dev": "pnpm build && electron .",
-    "typecheck": "node ../../scripts/check-recovered-desktop.mjs",
+    "typecheck": "node ../../scripts/check-desktop-runtime.mjs",
     "package:win": "node ../../scripts/package-windows.mjs"
   },
   "dependencies": {

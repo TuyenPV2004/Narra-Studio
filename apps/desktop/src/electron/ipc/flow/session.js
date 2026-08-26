@@ -23,13 +23,14 @@ module.exports = function registerFlowSessionIpc(dependencies) {
     saveSettings,
     DEFAULTS,
     accountSlots,
-    capturedAuth,
     getSlot,
     pickRandomSlot,
     refreshCapturedCookies,
     fetchSlotSession,
+    restoreSlotSession,
+    restoreAllSlotSessions,
+    getIsRestoringSessions,
     findFlowWebview,
-    setActiveWebviewSlot,
   } = dependencies;
 
   // __dirname was electron/ipc before this group moved into flow/;
@@ -38,95 +39,171 @@ module.exports = function registerFlowSessionIpc(dependencies) {
 
 ipcMain.handle('copy-to-clipboard', (_, text) => { clipboard.writeText(text); return true; });
 
-ipcMain.handle('get-auth-info', () => {
-  // Check ANY slot has bearer token — not just slot 0
+ipcMain.handle('get-auth-info', (_, { slotId } = {}) => {
+  if (typeof slotId === 'number') {
+    const slot = getSlot(slotId);
+    return {
+      hasBearerToken: !!slot.bearerToken,
+      bearerPreview: slot.bearerToken ? slot.bearerToken.substring(0, 25) + '...' : null,
+      projectId: slot.projectId || null,
+      lastCaptured: slot.lastCaptured || null,
+    };
+  }
   const anyConnected = accountSlots.some(s => !!s.bearerToken);
-  // Use first connected slot for preview info, fallback to slot 0
-  const activeSlot = accountSlots.find(s => !!s.bearerToken) || capturedAuth;
+  const activeSlot = accountSlots.find(s => !!s.bearerToken) || accountSlots[0];
   return {
     hasBearerToken: anyConnected,
-    bearerPreview: activeSlot.bearerToken ? activeSlot.bearerToken.substring(0, 25) + '...' : null,
-    projectId: activeSlot.projectId,
-    lastCaptured: activeSlot.lastCaptured,
+    bearerPreview: activeSlot?.bearerToken ? activeSlot.bearerToken.substring(0, 25) + '...' : null,
+    projectId: activeSlot?.projectId || null,
+    lastCaptured: activeSlot?.lastCaptured || null,
   };
+});
+
+// ── IPC: Get all slots status with silent hydration & hasSession ──────
+ipcMain.handle('get-all-slots', async () => {
+  for (const slot of accountSlots) {
+    if (slot.status === 'empty' && typeof restoreSlotSession === 'function') {
+      try {
+        const ses = session.fromPartition(slot.partition);
+        const [googleCookies, labsCookies] = await Promise.all([
+          ses.cookies.get({ domain: '.google.com' }).catch(() => []),
+          ses.cookies.get({ domain: 'labs.google' }).catch(() => []),
+        ]);
+        if (googleCookies.length > 0 || labsCookies.length > 0) {
+          await restoreSlotSession(slot.id).catch(() => {});
+        }
+      } catch {}
+    } else if (slot.status === 'connected' && !slot.email) {
+      fetchSlotSession(slot.id).catch(() => {});
+    }
+  }
+
+  return accountSlots.map(slot => ({
+    id: slot.id,
+    status: slot.status,
+    hasBearerToken: !!slot.bearerToken,
+    hasSession: slot.status === 'authenticated' || slot.status === 'connected',
+    projectId: slot.projectId || null,
+    lastCaptured: slot.lastCaptured || null,
+    partition: slot.partition,
+    email: slot.email || null,
+    displayName: slot.displayName || null,
+    avatar: slot.avatar || null,
+  }));
 });
 
 ipcMain.handle('create-flow-project', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
-  const wv = findFlowWebview(slot.id);
-  if (!wv || wv.isDestroyed()) throw new Error('Không tìm thấy phiên Google Flow đang hoạt động.');
+  const ses = session.fromPartition(slot.partition);
+  const cleanUA = slot.userAgent || DEFAULTS.userAgent;
+  ses.setUserAgent(cleanUA);
+  const tempWin = new BrowserWindow({
+    width: 1100,
+    height: 750,
+    show: false,
+    title: `Google Flow — Slot ${slot.id + 1}`,
+    backgroundColor: '#202124',
+    webPreferences: {
+      partition: slot.partition,
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+  tempWin.webContents.setUserAgent(cleanUA);
+  const wv = tempWin.webContents;
 
-  const previousProjectId = String(
-    wv.getURL().match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1]
-      || slot.projectId
-      || capturedAuth.projectId
-      || '',
-  );
-  await wv.loadURL('https://labs.google/fx/tools/flow');
+  try {
+    const previousProjectId = String(
+      (typeof wv.getURL === 'function' ? wv.getURL() : '').match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1]
+        || slot.projectId
+        || '',
+    );
+    await wv.loadURL('https://labs.google/fx/tools/flow');
 
-  let clicked = false;
-  for (let attempt = 0; attempt < 30 && !clicked; attempt += 1) {
-    clicked = await wv.executeJavaScript(`
-      (() => {
-        const controls = Array.from(document.querySelectorAll('button, [role="button"]'));
-        const control = controls.find(item => {
-          const text = (item.textContent || '').trim().toLowerCase();
-          return text.includes('new project') || text.includes('tạo project') || text.includes('dự án mới');
-        });
-        if (!control) return false;
-        control.click();
-        return true;
-      })()
-    `, true).catch(() => false);
-    if (!clicked) await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  if (!clicked) throw new Error('Không tìm thấy nút tạo project mới trong Google Flow.');
-
-  let projectId = '';
-  for (let attempt = 0; attempt < 60; attempt += 1) {
-    const currentUrl = wv.getURL();
-    const candidate = currentUrl.match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1] || '';
-    if (candidate && candidate !== previousProjectId) {
-      projectId = candidate;
-      break;
+    let clicked = false;
+    for (let attempt = 0; attempt < 30 && !clicked; attempt += 1) {
+      clicked = await wv.executeJavaScript(`
+        (() => {
+          const controls = Array.from(document.querySelectorAll('button, [role="button"], a'));
+          const control = controls.find(item => {
+            const text = (item.textContent || '').trim().toLowerCase();
+            return text.includes('new project') || text.includes('tạo project') || text.includes('dự án mới') || text.includes('create project') || text.includes('new');
+          });
+          if (!control) return false;
+          control.click();
+          return true;
+        })()
+      `, true).catch(() => false);
+      if (!clicked) {
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
     }
-    await new Promise(resolve => setTimeout(resolve, 500));
-  }
-  if (!projectId) throw new Error('Google Flow chưa trả về project ID mới.');
 
-  slot.projectId = projectId;
-  capturedAuth.projectId = projectId;
-  saveSettings({ lastProjectUrl: `https://labs.google/fx/tools/flow/project/${projectId}` });
-  if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
-    runtime.mainWindow.webContents.send('flow-project-changed', { projectId, slotId: slot.id });
-    runtime.mainWindow.webContents.send('auto-entered-project');
+    let projectId = '';
+    for (let attempt = 0; attempt < 40; attempt += 1) {
+      const currentUrl = typeof wv.getURL === 'function' ? wv.getURL() : '';
+      const matched = currentUrl.match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1];
+      if (matched && matched !== previousProjectId) {
+        projectId = matched;
+        break;
+      }
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    if (!projectId) {
+      const domProjectId = await wv.executeJavaScript(`
+        (() => {
+          const m = window.location.href.match(/\\/project\\/([a-zA-Z0-9_-]+)/);
+          if (m) return m[1];
+          const projectLink = document.querySelector('a[href*="/project/"]');
+          if (projectLink) {
+            const match = projectLink.getAttribute('href').match(/\\/project\\/([a-zA-Z0-9_-]+)/);
+            if (match) return match[1];
+          }
+          return null;
+        })()
+      `).catch(() => null);
+      if (domProjectId) {
+        projectId = domProjectId;
+      }
+    }
+
+    if (!projectId) {
+      if (tempWin && !tempWin.isDestroyed()) {
+        tempWin.show();
+        tempWin.focus();
+      }
+      throw new Error('Google Flow chưa trả về project ID mới. Hãy tạo một dự án trong Google Flow.');
+    }
+
+    slot.projectId = projectId;
+    saveSettings({ lastProjectUrl: `https://labs.google/fx/tools/flow/project/${projectId}` });
+    if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+      runtime.mainWindow.webContents.send('flow-project-changed', { projectId, slotId: slot.id });
+      runtime.mainWindow.webContents.send('auto-entered-project');
+    }
+    return { success: true, projectId };
+  } finally {
+    if (tempWin && !tempWin.isDestroyed()) {
+      tempWin.close();
+    }
   }
-  return { success: true, projectId };
 });
 
 // Read the current Flow project's preset/custom Voice references through the
-// authenticated WebView session. Cookies and bearer tokens never cross into
+// authenticated slot session. Cookies and bearer tokens never cross into
 // the renderer; only the normalized public catalog is returned.
 ipcMain.handle('get-flow-project-initial-data', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
-  let wv = findFlowWebview(slot.id);
-  const currentWebviewUrl = wv && !wv.isDestroyed() ? wv.getURL() : '';
-  const currentProjectId = currentWebviewUrl.match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1] || '';
-  const savedProjectId = String((loadSettings().lastProjectUrl || '').match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1] || '');
-  const projectCandidates = [
-    currentProjectId,
-    capturedAuth.projectId,
-    slot.projectId,
-    savedProjectId,
-    DEFAULTS.projectId,
-  ].map(value => String(value || '').trim()).filter((value, index, values) => value && values.indexOf(value) === index);
-  if (!projectCandidates.length) throw new Error('Chưa xác định được Google Flow project.');
+  const projectCandidates = [slot.projectId]
+    .map(value => String(value || '').trim())
+    .filter(Boolean);
+  if (!projectCandidates.length) throw new Error(`Slot ${slot.id} chưa có Google Flow project nào. Vui lòng mở phiên Flow cho slot này trước.`);
   let data = null;
   let projectId = projectCandidates[0];
 
-  // Canvas unmounts the visible Google Flow WebView. session.fetch keeps using
-  // the same authenticated persist:slot partition, so pricing/voices remain
-  // available from every Flow node instead of depending on the login page.
+  // session.fetch uses the authenticated persist:slot partition, so
+  // pricing/voices do not depend on an open browser window.
   const slotSession = session.fromPartition(slot.partition);
   for (const candidate of projectCandidates) {
     try {
@@ -149,74 +226,16 @@ ipcMain.handle('get-flow-project-initial-data', async (_, { slotId = 0 } = {}) =
           break;
         }
       }
-    } catch {
-      // Try the next known project identity, then the mounted WebView fallback.
-    }
+    } catch {}
   }
 
   if (!data) {
-    if (!wv || wv.isDestroyed()) wv = findFlowWebview(slot.id);
-    if (!wv || wv.isDestroyed()) {
-      throw new Error('Không tải được Google Flow Init từ phiên tài khoản hiện tại.');
-    }
-    const webviewUrl = wv.getURL();
-    const mountedProjectId = webviewUrl.match(/\/project\/([a-zA-Z0-9_-]+)/)?.[1] || '';
-    const webviewCandidates = [mountedProjectId, ...projectCandidates]
-      .filter((value, index, values) => value && values.indexOf(value) === index);
-    const fetchInitialDataInWebview = candidates => wv.executeJavaScript(`
-      (async (candidates) => {
-        const statuses = [];
-        for (const candidate of candidates) {
-          const input = encodeURIComponent(JSON.stringify({ json: { projectId: candidate } }));
-          const response = await fetch('https://labs.google/fx/api/trpc/flow.projectInitialData?input=' + input, {
-            credentials: 'include',
-            headers: { 'accept': '*/*', 'content-type': 'application/json' }
-          });
-          statuses.push(candidate + ':' + response.status);
-          if (!response.ok) continue;
-          const payload = await response.json();
-          const value = payload && payload.result && payload.result.data && payload.result.data.json;
-          if (value) return { value, projectId: candidate, statuses };
-        }
-        return { value: null, projectId: '', statuses };
-      })(${JSON.stringify(candidates)})
-    `, true);
-    let webviewResult = await fetchInitialDataInWebview(webviewCandidates);
-
-    // Never accept a project merely because Flow redirected to its URL. A stale
-    // tile can still exist while projectInitialData returns 400.
-    if (!webviewResult?.value) {
-      const rejected = new Set(webviewCandidates);
-      const rejectedProjectIds = [...rejected];
-      await wv.loadURL('https://labs.google/fx/tools/flow');
-      let visibleProjectIds = [];
-      for (let attempt = 0; attempt < 30 && visibleProjectIds.length === 0; attempt += 1) {
-        visibleProjectIds = await wv.executeJavaScript(`
-          (() => Array.from(document.querySelectorAll('a[href*="/project/"]'))
-            .map(link => (link.href.match(/\\/project\\/([a-zA-Z0-9_-]+)/) || [])[1] || '')
-            .filter(Boolean))
-        `, true).catch(() => []);
-        visibleProjectIds = [...new Set(visibleProjectIds)].filter(candidate => !rejectedProjectIds.includes(candidate));
-        if (visibleProjectIds.length === 0) await new Promise(resolve => setTimeout(resolve, 500));
-      }
-      if (visibleProjectIds.length > 0) {
-        webviewResult = await fetchInitialDataInWebview(visibleProjectIds);
-        if (webviewResult?.value) {
-          await wv.loadURL(`https://labs.google/fx/tools/flow/project/${webviewResult.projectId}`);
-        }
-      }
-    }
-    if (!webviewResult?.value) {
-      throw new Error('Project Flow hiện tại không còn hợp lệ. Hãy bấm “Tạo project” ở thẻ tài khoản.');
-    }
-    projectId = webviewResult.projectId || mountedProjectId;
-    data = webviewResult.value;
+    throw new Error('Không tải được Google Flow Init từ phiên tài khoản hiện tại. Hãy đồng bộ lại slot hoặc tạo project mới.');
   }
 
   if (!data) throw new Error('projectInitialData response không hợp lệ');
   projectId = String(data.projectId || projectId);
   slot.projectId = projectId;
-  capturedAuth.projectId = projectId;
   saveSettings({ lastProjectUrl: `https://labs.google/fx/tools/flow/project/${projectId}` });
   const external = (((data.projectContents || {}).externalReferenceMedia) || []);
   const voices = external
@@ -294,71 +313,40 @@ ipcMain.handle('get-flow-project-initial-data', async (_, { slotId = 0 } = {}) =
   };
 });
 
-ipcMain.handle('set-manual-auth', (_, { bearerToken, projectId }) => {
+ipcMain.handle('set-manual-auth', (_, { bearerToken, projectId, slotId = 0 }) => {
+  const slot = getSlot(slotId);
   if (bearerToken) {
-    capturedAuth.bearerToken = bearerToken.startsWith('Bearer ') ? bearerToken : 'Bearer ' + bearerToken;
+    slot.bearerToken = bearerToken.startsWith('Bearer ') ? bearerToken : 'Bearer ' + bearerToken;
   }
-  if (projectId) capturedAuth.projectId = projectId;
-  capturedAuth.lastCaptured = new Date().toISOString();
-  console.log('[AUTH] Manual auth set. Bearer:', !!capturedAuth.bearerToken, 'ProjectId:', capturedAuth.projectId);
+  if (projectId) slot.projectId = projectId;
+  slot.lastCaptured = new Date().toISOString();
+  console.log(`[SLOT-${slot.id}][AUTH] Manual auth set. Bearer:`, !!slot.bearerToken, 'ProjectId:', slot.projectId);
   return true;
 });
 
-// ── IPC: Force sync cookies + token từ webview session ────────────────
-ipcMain.handle('sync-session', async () => {
+// ── IPC: Force sync cookies from the isolated slot session ────────────
+ipcMain.handle('sync-session', async (_, { slotId = 0 } = {}) => {
+  const slot = getSlot(slotId);
   try {
     // 1. Refresh cookies từ Electron session
-    await refreshCapturedCookies();
+    await refreshCapturedCookies(slot.id);
 
-    // 2. Lấy Bearer token mới từ webview bằng cách trigger 1 lightweight API call
-    const wv = findFlowWebview();
-    if (wv) {
-      // Inject JS để trigger API call → interceptor sẽ capture Bearer token mới
-      await wv.executeJavaScript(`
-        (async () => {
-          try {
-            const r = await fetch('https://labs.google/fx/api/trpc/user.getCredits', {
-              credentials: 'include',
-              headers: { 'content-type': 'application/json' }
-            });
-            console.log('[SYNC] Token refresh triggered, status:', r.status);
-          } catch(e) { console.warn('[SYNC] Token trigger failed:', e.message); }
-        })();
-      `).catch(() => { });
-    }
-
-    // 3. Đợi ngắn để interceptor kịp capture token mới
-    await new Promise(r => setTimeout(r, 1500));
-
-    const cookieCount = String(accountSlots[0].cookies || '').split(';').filter(Boolean).length;
-    console.log(`[SYNC] Session synced: cookies=${cookieCount}, token=${!!capturedAuth.bearerToken}`);
+    const cookieCount = String(slot.cookies || '').split(';').filter(Boolean).length;
+    console.log(`[SLOT-${slot.id}][SYNC] Session synced: cookies=${cookieCount}, token=${!!slot.bearerToken}`);
     return {
       success: true,
-      hasBearerToken: !!capturedAuth.bearerToken,
+      hasBearerToken: !!slot.bearerToken,
       cookieCount,
-      projectId: capturedAuth.projectId,
-      lastCaptured: capturedAuth.lastCaptured,
+      projectId: slot.projectId || null,
+      lastCaptured: slot.lastCaptured || null,
     };
   } catch (err) {
-    console.error('[SYNC] Session sync failed:', err.message);
+    console.error(`[SLOT-${slot.id}][SYNC] Session sync failed:`, err.message);
     return { success: false, error: err.message };
   }
 });
 
-// ── IPC: Get all slots status ─────────────────────────────────────────
-ipcMain.handle('get-all-slots', () => {
-  return accountSlots.map(slot => ({
-    id: slot.id,
-    status: slot.status,
-    hasBearerToken: !!slot.bearerToken,
-    projectId: slot.projectId,
-    lastCaptured: slot.lastCaptured,
-    partition: slot.partition,
-    email: slot.email || null,
-    displayName: slot.displayName || null,
-    avatar: slot.avatar || null,
-  }));
-});
+
 
 // ── IPC: Logout a specific slot ───────────────────────────────────────
 // Xóa toàn bộ cookies + storage của partition → lần sau reload sẽ không auto-login
@@ -397,12 +385,6 @@ ipcMain.handle('logout-slot', async (_, { slotId = 0 } = {}) => {
     slot.lastCaptured = null;
     slot.status = 'empty';
 
-    // Nếu đang hiển thị webview của slot này → reload về trang chính
-    try {
-      const wv = findFlowWebview(slotId);
-      if (wv) wv.loadURL('https://labs.google/fx/tools/flow');
-    } catch (e) {}
-
     // Notify renderer để cập nhật UI ngay
     if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
       runtime.mainWindow.webContents.send('slot-logged-out', { slotId });
@@ -416,28 +398,36 @@ ipcMain.handle('logout-slot', async (_, { slotId = 0 } = {}) => {
   }
 });
 
-// ── IPC: Switch WebView partition to a specific slot ──────────────────
-ipcMain.handle('switch-webview-slot', async (_, { slotId = 0 } = {}) => {
+// ── IPC: Open the selected slot's isolated Google Flow session ─────────
+ipcMain.handle('open-flow-session', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
-  setActiveWebviewSlot(slotId); // track for findFlowWebview
-  if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
-    runtime.mainWindow.webContents.send('webview-switch-slot', {
-      slotId,
+  const flowWindow = new BrowserWindow({
+    width: 1200,
+    height: 820,
+    title: `Google Flow — Slot ${slotId + 1}`,
+    backgroundColor: '#202124',
+    webPreferences: {
       partition: slot.partition,
-    });
-  }
-  console.log(`[SLOT] Switched active webview slot to ${slotId}`);
-  return { slotId, partition: slot.partition };
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  flowWindow.setMenuBarVisibility(false);
+  flowWindow.webContents.setUserAgent(slot.userAgent || DEFAULTS.userAgent);
+  const targetUrl = slot.projectId
+    ? `https://labs.google/fx/tools/flow/project/${encodeURIComponent(slot.projectId)}`
+    : 'https://labs.google/fx/tools/flow';
+  await flowWindow.loadURL(targetUrl);
+  return { success: true, slotId, partition: slot.partition };
 });
 
-// ── IPC: Open real Chromium incognito window for login ──────────────
-// Dùng partition tạm (non-persist) → ẩn danh thật, login xong copy cookies sang slot chính (persist)
+// ── IPC: Open isolated Google login window for slot ─────────────────
+// Sử dụng trực tiếp persistent partition của slot (persist:slot-${slotId})
+// Chromium tự lưu toàn bộ Cookies, NextAuth token, LocalStorage và IndexedDB xuống đĩa.
 ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
-
-  // Partition tạm — non-persist = ẩn danh thật (tự xóa khi đóng window)
-  const incogPartition = `incognito-${slotId}-${Date.now()}`;
-  const ses = session.fromPartition(incogPartition);
+  const ses = session.fromPartition(slot.partition);
 
   // Clean UA — remove Electron/app name
   const chromeVersion = process.versions.chrome || '130.0.0.0';
@@ -466,9 +456,10 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
   const loginWin = new BrowserWindow({
     width: 1100,
     height: 800,
-    title: `Đăng nhập Google (Ẩn danh) — Slot ${slotId + 1}`,
+    title: `Đăng nhập Google — Slot ${slotId + 1}`,
     backgroundColor: '#202124',
     webPreferences: {
+      partition: slot.partition,
       session: ses,
       contextIsolation: true,
       nodeIntegration: false,
@@ -478,41 +469,6 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
   });
 
   loginWin.setMenuBarVisibility(false);
-
-  // Hàm copy cookies từ session ẩn danh → slot chính (persist)
-  async function copyCookiesToSlot() {
-    try {
-      const slotSes = session.fromPartition(slot.partition);
-      // Xóa cookies cũ của slot trước
-      const oldCookies = await slotSes.cookies.get({}).catch(() => []);
-      await Promise.all((oldCookies || []).map(c => {
-        const url = `${c.secure ? 'https' : 'http'}://${c.domain.replace(/^\./, '')}${c.path || '/'}`;
-        return slotSes.cookies.remove(url, c.name).catch(() => {});
-      }));
-      // Copy cookies mới từ incognito session
-      const newCookies = await ses.cookies.get({}).catch(() => []);
-      let copied = 0;
-      for (const c of (newCookies || [])) {
-        try {
-          await slotSes.cookies.set({
-            url: `${c.secure ? 'https' : 'http'}://${c.domain.replace(/^\./, '')}${c.path || '/'}`,
-            name: c.name,
-            value: c.value,
-            domain: c.domain,
-            path: c.path,
-            secure: c.secure,
-            httpOnly: c.httpOnly,
-            sameSite: c.sameSite || 'unspecified',
-            expirationDate: c.expirationDate,
-          });
-          copied++;
-        } catch {}
-      }
-      console.log(`[SLOT-${slotId}][INCOGNITO] Copied ${copied}/${newCookies.length} cookies to ${slot.partition}`);
-    } catch (err) {
-      console.error(`[SLOT-${slotId}][INCOGNITO] Cookie copy failed:`, err.message);
-    }
-  }
 
   // Intercept auth token từ cửa sổ login
   ses.webRequest.onBeforeSendHeaders(
@@ -529,26 +485,23 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
         slot.lastCaptured = new Date().toISOString();
         slot.status = 'connected';
         slot.userAgent = cleanUA;
-        console.log(`[SLOT-${slotId}][INCOGNITO] ✅ Bearer token captured!`);
+        console.log(`[SLOT-${slotId}][LOGIN] ✅ Bearer token captured!`);
 
-        // Copy cookies từ incognito → slot chính (persist)
-        copyCookiesToSlot().then(() => {
-          refreshCapturedCookies(slotId);
-        });
+        refreshCapturedCookies(slotId);
 
         // Fetch session info (email, avatar)
         setTimeout(() => {
           fetchSlotSession(slotId).then(s => {
-            if (s) {
-              if (s.email) slot.email = s.email;
-              if (s.name) slot.displayName = s.name;
-              if (s.avatar) slot.avatar = s.avatar;
+            if (s && s.user) {
+              if (s.user.email) slot.email = s.user.email;
+              if (s.user.name) slot.displayName = s.user.name;
+              if (s.user.avatar) slot.avatar = s.user.avatar;
               if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
-                runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...s });
+                runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...s.user });
               }
             }
           }).catch(() => {});
-        }, 2000);
+        }, 1000);
 
         // Notify UI
         if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
@@ -598,12 +551,11 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
 
   loginWin.on('closed', () => {
     clearInterval(checkInterval);
-    // Cleanup: xóa session tạm
-    ses.clearStorageData().catch(() => {});
-    console.log(`[SLOT-${slotId}][INCOGNITO] Login window closed, temp session cleaned`);
+    refreshCapturedCookies(slotId);
+    console.log(`[SLOT-${slotId}][LOGIN] Login window closed, session persisted in ${slot.partition}`);
   });
 
-  console.log(`[SLOT-${slotId}][INCOGNITO] Opened incognito login (partition: ${incogPartition})`);
+  console.log(`[SLOT-${slotId}][LOGIN] Opened login window for ${slot.partition}`);
   return { success: true, slotId };
 });
 
@@ -621,26 +573,27 @@ ipcMain.handle('pick-random-slot', () => {
 ipcMain.handle('sync-slot-session', async (_, { slotId = 0 } = {}) => {
   try {
     const slot = getSlot(slotId);
-    await refreshCapturedCookies(slotId);
-
-    // Trigger fetch qua webview sinh đúng partition (slot 0 dùng flowWebview chính)
-    const wv = findFlowWebview();
-    if (wv && slotId === 0) {
-      await wv.executeJavaScript(`
-        fetch('https://labs.google/fx/api/trpc/user.getCredits', { credentials: 'include' }).catch(()=>{});
-      `).catch(() => { });
-      await new Promise(r => setTimeout(r, 1500));
+    if (typeof restoreSlotSession === 'function') {
+      await restoreSlotSession(slotId);
+    } else {
+      await refreshCapturedCookies(slotId);
+      await fetchSlotSession(slotId).catch(() => {});
     }
 
-    const cookieCount = slot.cookies.split(';').filter(Boolean).length;
-    console.log(`[SLOT-${slotId}][SYNC] Session synced: cookies=${cookieCount}, token=${!!slot.bearerToken}`);
+    const cookieCount = (slot.cookies || '').split(';').filter(Boolean).length;
+    console.log(`[SLOT-${slotId}][SYNC] Session synced: status=${slot.status}, cookies=${cookieCount}, token=${!!slot.bearerToken}, email=${slot.email}`);
     return {
       success: true,
       slotId,
+      status: slot.status,
       hasBearerToken: !!slot.bearerToken,
+      hasSession: slot.status === 'authenticated' || slot.status === 'connected',
       cookieCount,
-      projectId: slot.projectId,
-      lastCaptured: slot.lastCaptured,
+      projectId: slot.projectId || null,
+      email: slot.email || null,
+      displayName: slot.displayName || null,
+      avatar: slot.avatar || null,
+      lastCaptured: slot.lastCaptured || null,
     };
   } catch (err) {
     console.error(`[SLOT-${slotId}][SYNC] Failed:`, err.message);
@@ -725,9 +678,10 @@ ipcMain.handle('open-login-window', async (_, { slotId = 0 } = {}) => {
 });
 
 // ── IPC: Trigger auto-enter project on demand (e.g. after account switch) ──
-ipcMain.handle('auto-enter-project', async () => {
+ipcMain.handle('auto-enter-project', async (_, { slotId = 0 } = {}) => {
+  const slot = getSlot(slotId);
   try {
-    const wv = findFlowWebview();
+    const wv = findFlowWebview(slot.id);
     if (!wv) return { success: false, reason: 'webview not found' };
 
     const pageState = await wv.executeJavaScript(`
@@ -750,13 +704,15 @@ ipcMain.handle('auto-enter-project', async () => {
         saveSettings({ lastProjectUrl: pageState.url });
         // Extract và set projectId nếu chưa có
         const m = pageState.url.match(/\/project\/([a-zA-Z0-9_-]+)/);
-        if (m && m[1] && !capturedAuth.projectId) {
-          capturedAuth.projectId = m[1];
-          console.log('[AUTO-ENTER-IPC] ✅ Extracted projectId from URL:', capturedAuth.projectId);
-          if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) runtime.mainWindow.webContents.send('auto-entered-project');
+        if (m && m[1] && !slot.projectId) {
+          slot.projectId = m[1];
+          console.log(`[SLOT-${slot.id}][AUTO-ENTER-IPC] ✅ Extracted projectId from URL:`, slot.projectId);
+          if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+            runtime.mainWindow.webContents.send('auto-entered-project', { slotId: slot.id, projectId: slot.projectId });
+          }
         }
       }
-      return { success: true, action: 'already-in-project', projectId: capturedAuth.projectId };
+      return { success: true, action: 'already-in-project', projectId: slot.projectId };
     }
 
     if (pageState.hasNewProjectBtn) {
@@ -773,12 +729,14 @@ ipcMain.handle('auto-enter-project', async () => {
           saveSettings({ lastProjectUrl: projectUrl });
           const m = projectUrl.match(/\/project\/([a-zA-Z0-9_-]+)/);
           if (m && m[1]) {
-            capturedAuth.projectId = m[1];
-            console.log('[AUTO-ENTER-IPC] ✅ Extracted projectId:', capturedAuth.projectId);
+            slot.projectId = m[1];
+            console.log(`[SLOT-${slot.id}][AUTO-ENTER-IPC] ✅ Extracted projectId:`, slot.projectId);
           }
         }
-        if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) runtime.mainWindow.webContents.send('auto-entered-project');
-        return { success: true, action: 'entered-existing', projectId: capturedAuth.projectId };
+        if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+          runtime.mainWindow.webContents.send('auto-entered-project', { slotId: slot.id, projectId: slot.projectId });
+        }
+        return { success: true, action: 'entered-existing', projectId: slot.projectId };
       } else {
         // Click "New project"
         await wv.executeJavaScript(`
@@ -799,14 +757,18 @@ ipcMain.handle('auto-enter-project', async () => {
               saveSettings({ lastProjectUrl: url });
               const m = url.match(/\/project\/([a-zA-Z0-9_-]+)/);
               if (m && m[1]) {
-                capturedAuth.projectId = m[1];
-                console.log('[AUTO-ENTER-IPC] ✅ Extracted projectId from new project:', capturedAuth.projectId);
-                if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) runtime.mainWindow.webContents.send('auto-entered-project');
+                slot.projectId = m[1];
+                console.log(`[SLOT-${slot.id}][AUTO-ENTER-IPC] ✅ Extracted projectId from new project:`, slot.projectId);
+                if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+                  runtime.mainWindow.webContents.send('auto-entered-project', { slotId: slot.id, projectId: slot.projectId });
+                }
               }
             }
           } catch (e) { }
         }, 5000);
-        if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) runtime.mainWindow.webContents.send('auto-entered-project');
+        if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+          runtime.mainWindow.webContents.send('auto-entered-project', { slotId: slot.id });
+        }
         return { success: true, action: 'created-new' };
       }
     }
@@ -817,10 +779,11 @@ ipcMain.handle('auto-enter-project', async () => {
 });
 
 
-ipcMain.handle('extract-auth-from-webview', async () => {
+ipcMain.handle('extract-auth-from-webview', async (_, { slotId = 0 } = {}) => {
+  const slot = getSlot(slotId);
   return {
-    hasBearerToken: !!capturedAuth.bearerToken,
-    projectId: capturedAuth.projectId,
+    hasBearerToken: !!slot.bearerToken,
+    projectId: slot.projectId || null,
   };
 });
 

@@ -1,8 +1,7 @@
 'use strict';
 
-const scriptWorkflowProvider = require('../providers/avis/script-workflow');
-const videoStoryProvider = require('../providers/avis/video-story');
 const { brand } = require('../runtime/brand');
+const { normalizeBaseUrl } = require('../providers/openai-compatible');
 
 module.exports = function registerAiIpc(dependencies) {
   const {
@@ -24,9 +23,6 @@ module.exports = function registerAiIpc(dependencies) {
     pathToFileURL,
     fileURLToPath,
     captchaBridge,
-    avisProvider,
-    cloudflareImagesProvider,
-    cloudflareR2Provider,
     runtime,
     getFfmpegBin,
     maybePromoteFilterComplexToScript,
@@ -65,7 +61,6 @@ module.exports = function registerAiIpc(dependencies) {
     isDryRunActive,
     makeApiRequest,
     RECAPTCHA_SITE_KEY,
-    findFlowWebview,
     findChromePath,
     httpGetJson,
     createCdpClient,
@@ -75,38 +70,33 @@ module.exports = function registerAiIpc(dependencies) {
     makeApiRequestViaChrome,
     reloadFlowWebviewForSlot,
     reloadChromeCdpLabs,
-    makeApiRequestViaWebview,
-    setActiveWebviewSlot,
     getChromeRuntime,
+    openAiProvider,
   } = dependencies;
-const activeScriptStageControllers = new Map();
-const activeAvisImageControllers = new Map();
 
 // ── AI Lip sync video render (local MuseTalk default + Sync.so fallback) ──
 function getLipSyncApiKey() {
-  const s = loadSettings();
-  return (
-    s.lipSyncApiKey ||
-    process.env.SYNC_API_KEY ||
-    process.env.LIP_SYNC_API_KEY ||
-    process.env.VEO3_LIPSYNC_API_KEY ||
-    ''
-  ).trim();
+  const profile = openAiProvider?.getActiveRuntime?.('lip-sync');
+  return String(profile?.apiKey || '').trim();
+}
+
+function getLipSyncRuntime() {
+  return openAiProvider?.getActiveRuntime?.('lip-sync') || null;
 }
 
 function getLipSyncSettings() {
-  const s = loadSettings();
   const key = getLipSyncApiKey();
+  const profile = getLipSyncRuntime();
   // Provider is now always Sync.so cloud — local Wav2Lip/MuseTalk has been
   // removed. We ignore any persisted `lipSyncProvider` from earlier app
   // versions so users on a fresh build don't see "Local engine not installed"
   // when local mode no longer exists.
   return {
-    provider: 'sync.so',
-    apiBase: (s.lipSyncApiBase || 'https://api.sync.so').replace(/\/+$/, ''),
-    model: s.lipSyncModel || 'sync-3',
+    provider: profile?.protocol || 'sync-v2',
+    apiBase: profile?.apiBase || '',
+    model: profile?.visionModel || '',
     apiKeySet: !!key,
-    apiKeyPreview: key ? `${key.slice(0, 4)}...${key.slice(-4)}` : '',
+    apiKeyPreview: key ? `••••••${key.slice(-4)}` : '',
     local: getLocalLipSyncStatusSync(),
   };
 }
@@ -507,250 +497,37 @@ ipcMain.handle('prepare-local-tts-engine', async (event, params = {}) => {
 });
 
 ipcMain.handle('save-lip-sync-settings', async (_, params = {}) => {
-  const patch = {};
-  if (typeof params.apiKey === 'string' && params.apiKey.trim()) patch.lipSyncApiKey = params.apiKey.trim();
-  if (typeof params.apiBase === 'string' && params.apiBase.trim()) patch.lipSyncApiBase = params.apiBase.trim().replace(/\/+$/, '');
-  if (typeof params.model === 'string' && params.model.trim()) patch.lipSyncModel = params.model.trim();
-  if (typeof params.provider === 'string' && params.provider.trim()) patch.lipSyncProvider = params.provider.trim();
-  if (Object.keys(patch).length > 0) saveSettings(patch);
-  return getLipSyncSettings();
+  void params;
+  throw new Error('Configure lip-sync through Provider Account custom profiles.');
 });
 
-// ── Ollama Cloud (vision LLM for AI auto-suggest features) ──────────────
-function getOllamaApiKey() {
-  const s = loadSettings();
-  return (s.ollamaApiKey || process.env.OLLAMA_API_KEY || '').trim();
-}
-
-function normalizeOllamaApiUrl(value) {
-  const raw = String(value || 'https://ollama.com/api/chat').trim().replace(/\/+$/, '');
-  if (raw.endsWith('/api/chat') || raw.endsWith('/v1/chat/completions')) return raw;
-  return `${raw}/v1/chat/completions`;
-}
-
-// ── Avis (unified AI gateway, OpenAI-compatible) ────────────────────────
-// Key is loaded from a gitignored local secret file / env / user settings so it
-// is persisted locally but NEVER committed. Do not hardcode the key here.
-const AVIS_DEFAULT_BASE = 'https://api.avis.xyz/api/openai/v1';
-const AVIS_DEFAULT_MODEL = 'gpt-5-4-nano';
-const AVIS_LEGACY_TEXT_MODELS = new Set(['anthropic/claude-haiku-4.5', 'glm-5-2']);
-let avisSecretCache = { value: null, loadedAt: 0 };
-let cloudflareSecretCache = { value: null, loadedAt: 0 };
-// Live model catalog (GET /ai/models) is read-only + costs 0 credits, but the
-// list is large (~387 models) so cache it for 10 minutes. `force` bypasses.
-let avisModelsCache = { value: null, expiresAt: 0 };
-let avisAudioModelsCache = { value: null, expiresAt: 0 };
-let avisAudioVoicesCache = { value: null, expiresAt: 0 };
-
-// Account balance (GET /api/compat/v1/balance) is read-only + costs 0 credits.
-// The header widget polls it, so cache for 30s to avoid hammering; `force`
-// bypasses (e.g. right after a generation completes).
-let avisBalanceCache = { value: null, expiresAt: 0 };
-
-function normalizeAvisApiUrl(value) {
-  let raw = String(value || AVIS_DEFAULT_BASE).trim().replace(/\/+$/, '');
-  if (raw.endsWith('/chat/completions')) return raw;
-  if (/\/v1$/.test(raw)) return `${raw}/chat/completions`;
-  if (/\/api\/openai$/.test(raw)) return `${raw}/v1/chat/completions`;
-  return `${raw}/api/openai/v1/chat/completions`;
-}
-
-function loadAvisSecretFile() {
-  // Cache for 30s to avoid disk churn; refreshed when settings change.
-  if (avisSecretCache.value && (Date.now() - avisSecretCache.loadedAt) < 30000) return avisSecretCache.value;
-  const candidates = [
-    process.env.AVIS_KEY_FILE,
-    path.join(process.cwd(), '.secrets', 'avis.json'),
-    (() => { try { return path.join(app.getAppPath(), '.secrets', 'avis.json'); } catch { return null; } })(),
-    (() => { try { return path.join(app.getPath('userData'), 'avis.json'); } catch { return null; } })(),
-  ].filter(Boolean);
-  let value = null;
-  for (const file of candidates) {
-    try {
-      if (file && fs.existsSync(file)) {
-        const parsed = JSON.parse(fs.readFileSync(file, 'utf8') || '{}');
-        if (parsed && typeof parsed === 'object') { value = parsed; break; }
-      }
-    } catch (err) {
-      console.warn('[AVIS] Failed to read secret file', file, err?.message || err);
-    }
-  }
-  avisSecretCache = { value, loadedAt: Date.now() };
-  return value;
-}
-
-function getAvisRuntime(settings) {
-  const s = settings || loadSettings();
-  const secret = loadAvisSecretFile() || {};
-  const credentialDisabled = s.avisApiKeyDisabled === true;
-  const apiKey = credentialDisabled
-    ? ''
-    : String(s.avisApiKey || process.env.AVIS_API_KEY || secret.apiKey || '').trim();
-  const apiUrl = normalizeAvisApiUrl(s.avisApiBase || secret.apiBase || AVIS_DEFAULT_BASE);
-  const configuredModel = String(s.avisModel || secret.model || AVIS_DEFAULT_MODEL).trim();
-  // The original Avis integration used a model id that is no longer present in
-  // the live catalog. Migrate that exact legacy default without overriding a
-  // model explicitly chosen by the user.
-  const model = AVIS_LEGACY_TEXT_MODELS.has(configuredModel) ? AVIS_DEFAULT_MODEL : configuredModel;
-  const enabled = !credentialDisabled && secret.enabled !== false;
-  return { apiKey, apiUrl, model, configured: !!apiKey && enabled };
-}
-
-// Runtime for Avis IMAGE/VIDEO generation (electron/providers/avis).
-// Independent of the `aiProvider` text-provider selection: media generation is
-// an explicit agent action, so it works whenever an Avis key is configured,
-// regardless of whether the chosen text agent is the branded local agent or Avis. The Avis
-// provider module receives apiBase/apiKey/fetchImpl and never reads the secret.
-function getAvisMediaRuntime(settings) {
-  const s = settings || loadSettings();
-  const avis = getAvisRuntime(s);
-  const secret = loadAvisSecretFile() || {};
-  return {
-    apiBase: avis.apiUrl, // provider.apiRoot() strips the trailing /chat/completions
-    apiKey: avis.apiKey,
-    configured: avis.configured,
-    imageModel: String(s.avisImageModel || secret.imageModel || avisProvider.DEFAULT_IMAGE_MODEL).trim(),
-    videoModel: String(s.avisVideoModel || secret.videoModel || avisProvider.DEFAULT_VIDEO_MODEL).trim(),
-    fetchImpl: net.fetch.bind(net),
-  };
-}
-
-function loadCloudflareSecretFile() {
-  if (cloudflareSecretCache.value && (Date.now() - cloudflareSecretCache.loadedAt) < 30000) {
-    return cloudflareSecretCache.value;
-  }
-  const candidates = [
-    process.env.CLOUDFLARE_KEY_FILE,
-    path.join(process.cwd(), '.secrets', 'cloudflare.json'),
-    (() => { try { return path.join(app.getAppPath(), '.secrets', 'cloudflare.json'); } catch { return null; } })(),
-    // Packaged desktop builds ship the user-approved Cloudflare Images upload
-    // credential as an Electron extraResource. process.resourcesPath resolves
-    // to Contents/Resources on macOS and resources/ on Windows/Linux.
-    (() => { try { return path.join(process.resourcesPath, 'cloudflare.json'); } catch { return null; } })(),
-    (() => { try { return path.join(app.getPath('userData'), 'cloudflare.json'); } catch { return null; } })(),
-  ].filter(Boolean);
-  let value = null;
-  for (const file of candidates) {
-    try {
-      if (file && fs.existsSync(file)) {
-        const parsed = JSON.parse(fs.readFileSync(file, 'utf8') || '{}');
-        if (parsed && typeof parsed === 'object') { value = parsed; break; }
-      }
-    } catch (err) {
-      console.warn('[CLOUDFLARE-R2] Failed to read secret file', file, err?.message || err);
-    }
-  }
-  cloudflareSecretCache = { value, loadedAt: Date.now() };
-  return value;
-}
-
-function getCloudflareImagesRuntime() {
-  const secret = loadCloudflareSecretFile() || {};
-  const accountId = String(process.env.CLOUDFLARE_ACCOUNT_ID || secret.accountId || '').trim();
-  const apiToken = String(process.env.CLOUDFLARE_API_TOKEN || secret.apiToken || secret.token || '').trim();
-  return {
-    accountId, apiToken,
-    configured: !!(accountId && apiToken),
-    fetchImpl: net.fetch.bind(net),
-  };
-}
-
-function loadCloudflareR2SecretFile() {
-  const candidates = [
-    process.env.CLOUDFLARE_R2_KEY_FILE,
-    path.join(process.cwd(), '.secrets', 'cloudflare-r2.json'),
-    (() => { try { return path.join(app.getAppPath(), '.secrets', 'cloudflare-r2.json'); } catch { return null; } })(),
-    (() => { try { return path.join(process.resourcesPath, 'cloudflare-r2.json'); } catch { return null; } })(),
-    (() => { try { return path.join(app.getPath('userData'), 'cloudflare-r2.json'); } catch { return null; } })(),
-  ].filter(Boolean);
-  for (const file of candidates) {
-    try {
-      if (file && fs.existsSync(file)) return JSON.parse(fs.readFileSync(file, 'utf8') || '{}');
-    } catch (err) {
-      console.warn('[CLOUDFLARE-R2] Failed to read secret file', file, err?.message || err);
-    }
-  }
-  return {};
-}
-
-function getCloudflareR2Runtime() {
-  const secret = loadCloudflareR2SecretFile();
-  return {
-    accessKeyId: String(process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || secret.accessKeyId || '').trim(),
-    secretAccessKey: String(process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || secret.secretAccessKey || '').trim(),
-    bucketName: String(process.env.CLOUDFLARE_R2_BUCKET || secret.bucketName || '').trim(),
-    endpoint: String(process.env.CLOUDFLARE_R2_ENDPOINT || secret.endpoint || '').trim(),
-    publicBaseUrl: String(process.env.CLOUDFLARE_R2_PUBLIC_BASE_URL || secret.publicBaseUrl || '').trim(),
-    fetchImpl: net.fetch.bind(net),
-  };
-}
-
-function guessReferenceMimeType(fileName, fallback) {
-  if (fallback) return fallback;
-  const ext = path.extname(String(fileName || '')).toLowerCase();
-  return ({
-    '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp',
-    '.gif': 'image/gif', '.mp4': 'video/mp4', '.mov': 'video/quicktime', '.webm': 'video/webm',
-    '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo',
-  })[ext] || 'application/octet-stream';
-}
-
-function resolveAvisReferenceBytes({ filePath, imageBytes, dataUrl } = {}) {
-  if (filePath) {
-    const rawPath = String(filePath);
-    const resolvedPath = rawPath.startsWith('file://') ? fileURLToPath(rawPath) : rawPath;
-    if (!fs.existsSync(resolvedPath)) throw new Error(`Không tìm thấy file local: ${resolvedPath}`);
-    return fs.readFileSync(resolvedPath);
-  }
-  const source = dataUrl || imageBytes;
-  if (!source) throw new Error('Thiếu filePath/imageBytes/dataUrl để upload Cloudflare.');
-  const raw = String(source);
-  const comma = raw.startsWith('data:') ? raw.indexOf(',') : -1;
-  return Buffer.from(comma >= 0 ? raw.slice(comma + 1) : raw, 'base64');
-}
-
-async function getLegacyAgentTextRuntimeSettings() {
-  const s = loadSettings();
-  const key = getOllamaApiKey();
-  const apiUrl = normalizeOllamaApiUrl(s.ollamaApiBase || process.env.OLLAMA_API_BASE || 'https://ollama.com');
-  const visionModel = s.ollamaVisionModel || process.env.OLLAMA_MODEL || 'glm-5-2';
-  return {
-    apiUrl,
-    apiBase: apiUrl.replace(/\/(?:api\/chat|v1\/chat\/completions)$/, ''),
-    visionModel,
-    apiKeySet: !!key,
-    apiKeyPreview: key ? `${key.slice(0, 4)}...${key.slice(-4)}` : '',
-    apiKey: key,
-    source: key ? 'local' : 'none',
-    format: apiUrl.endsWith('/v1/chat/completions') ? 'openai' : 'ollama',
-  };
-}
-
 async function getAgentTextRuntimeSettings() {
-  const s = loadSettings();
-  const avis = getAvisRuntime(s);
-  // Avis remains the selected/default primary text runtime. If an individual
-  // text request fails, requestAgentTextChat* may retry it through the legacy
-  // Local Ollama fallback without mutating the persisted provider selection.
-  if (s.aiProvider === 'avis' || (!s.aiProvider && avis.configured)) {
-    return {
-      apiUrl: avis.apiUrl,
-      apiBase: avis.apiUrl.replace(/\/chat\/completions$/, ''),
-      visionModel: avis.model,
-      apiKeySet: avis.configured,
-      apiKeyPreview: avis.apiKey ? `${avis.apiKey.slice(0, 4)}...${avis.apiKey.slice(-4)}` : '',
-      apiKey: avis.apiKey,
-      source: 'avis',
-      format: 'openai',
-    };
+  const configured = openAiProvider?.getActiveRuntime?.('text');
+  return configured || {
+    apiKey: '',
+    apiKeySet: false,
+    apiUrl: '',
+    source: 'none',
+    format: 'openai',
+    visionModel: '',
+  };
+}
+
+async function getVisionProviderRuntime() {
+  const settings = openAiProvider?.getActiveRuntime?.('vision');
+  if (!settings?.apiKey) {
+    throw new Error('AI provider is not configured. Add Base URL, API key and model in Provider Account.');
   }
-  return getLegacyAgentTextRuntimeSettings();
+  if (settings.format !== 'openai') {
+    throw new Error('The active provider does not support OpenAI-compatible vision requests.');
+  }
+  return settings;
 }
 
 function getMissingAgentTextRuntimeError(settings) {
-  return new Error(settings.source === 'avis'
-    ? 'AI Provider API key missing. Add the key in AI Agent settings.'
-    : 'AI chat config missing. Set OLLAMA_API_KEY in the local environment or configure Avis.');
+  return new Error(settings.source === 'none'
+    ? 'AI chat chÆ°a Ä‘Æ°á»£c cáº¥u hÃ¬nh. HÃ£y thÃªm Base URL, API key vÃ  model trong TÃ i khoáº£n provider.'
+    : 'AI provider API key khÃ´ng kháº£ dá»¥ng.');
 }
 
 async function requestAgentTextChatWithSettings(settings, { messages, model, numPredict = 1000, content }) {
@@ -758,22 +535,12 @@ async function requestAgentTextChatWithSettings(settings, { messages, model, num
     throw getMissingAgentTextRuntimeError(settings);
   }
   const requestMessages = messages || [{ role: 'user', content }];
-  const body = settings.format === 'openai'
-    ? {
-      // Standard OpenAI chat schema (Avis / OpenAI-compatible gateways)
-      model: model || settings.visionModel,
-      stream: false,
-      messages: requestMessages,
-      max_tokens: numPredict,
-    }
-    : {
-      // Ollama native schema
-      model: model || settings.visionModel,
-      stream: false,
-      think: false,
-      options: { num_predict: numPredict },
-      messages: requestMessages,
-    };
+  const body = {
+    model: model || settings.visionModel,
+    stream: false,
+    messages: requestMessages,
+    max_tokens: numPredict,
+  };
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120000);
   let res;
@@ -791,33 +558,36 @@ async function requestAgentTextChatWithSettings(settings, { messages, model, num
     clearTimeout(timeout);
   }
   const text = await res.text();
-  if (!res.ok) throw new Error(`${settings.source === 'avis' ? 'AI Provider' : 'Ollama'} error ${res.status}: ${text.slice(0, 400)}`);
-  const data = JSON.parse(text || '{}');
-  const reply = data.choices?.[0]?.message?.content || data.message?.content || data.response || '';
-  if (!String(reply).trim()) {
-    throw new Error(`${settings.source === 'avis' ? 'AI Provider' : 'Ollama'} returned an empty text response.`);
+  if (!res.ok) throw new Error(`AI provider error ${res.status}: ${text.slice(0, 400)}`);
+  let data;
+  try {
+    data = JSON.parse(text || '{}');
+  } catch {
+    throw new Error('AI provider returned a non-JSON text response.');
   }
-  return { reply: String(reply).trim(), model: settings.visionModel, source: settings.source };
+  const contentToText = value => {
+    if (typeof value === 'string') return value;
+    if (!Array.isArray(value)) return '';
+    return value
+      .filter(part => part && typeof part === 'object' && typeof part.text === 'string')
+      .map(part => part.text)
+      .join('');
+  };
+  const choiceContent = Array.isArray(data?.choices) && data.choices[0]?.message
+    ? contentToText(data.choices[0].message.content)
+    : '';
+  const nativeContent = data?.message && typeof data.message === 'object'
+    ? contentToText(data.message.content)
+    : '';
+  const reply = choiceContent || nativeContent || (typeof data?.response === 'string' ? data.response : '');
+  if (!reply.trim()) {
+    throw new Error('AI provider returned an empty text response.');
+  }
+  return { reply: reply.trim(), model: settings.visionModel, source: settings.source };
 }
 
 async function requestAgentTextChat(args) {
-  const primarySettings = await getAgentTextRuntimeSettings();
-  try {
-    return await requestAgentTextChatWithSettings(primarySettings, args);
-  } catch (primaryError) {
-    if (primarySettings.source !== 'avis') throw primaryError;
-    const fallbackSettings = await getLegacyAgentTextRuntimeSettings();
-    if (!fallbackSettings.apiKey) throw primaryError;
-    console.warn('[AI-AGENT] Avis text request failed; retrying with local Ollama runtime:', primaryError?.message || primaryError);
-    try {
-      return await requestAgentTextChatWithSettings(fallbackSettings, args);
-    } catch (fallbackError) {
-      throw new Error(
-        `${primaryError?.message || primaryError}; Ollama fallback failed: ${fallbackError?.message || fallbackError}`,
-        { cause: fallbackError },
-      );
-    }
-  }
+  return requestAgentTextChatWithSettings(await getAgentTextRuntimeSettings(), args);
 }
 
 function extractAgentTextStreamDelta(data) {
@@ -886,7 +656,7 @@ function postJsonStreaming(urlString, { headers = {}, body, timeoutMs = 120000, 
 }
 
 async function requestAgentTextChatStream({ event, requestId, messages, model, numPredict = 1000, content }) {
-  let settings = await getAgentTextRuntimeSettings();
+  const settings = await getAgentTextRuntimeSettings();
   const requestMessages = messages || [{ role: 'user', content }];
   const send = (payload) => {
     if (!event?.sender?.isDestroyed?.()) {
@@ -896,19 +666,11 @@ async function requestAgentTextChatStream({ event, requestId, messages, model, n
   let reply = '';
   const streamWithSettings = async (runtimeSettings) => {
     if (!runtimeSettings.apiKey) throw getMissingAgentTextRuntimeError(runtimeSettings);
-    const body = runtimeSettings.format === 'openai'
-      ? {
+      const body = {
         model: model || runtimeSettings.visionModel,
         stream: true,
         messages: requestMessages,
         max_tokens: numPredict,
-      }
-      : {
-        model: model || runtimeSettings.visionModel,
-        stream: true,
-        think: false,
-        options: { num_predict: numPredict },
-        messages: requestMessages,
       };
     await postJsonStreaming(runtimeSettings.apiUrl, {
       headers: {
@@ -916,7 +678,7 @@ async function requestAgentTextChatStream({ event, requestId, messages, model, n
       },
       body,
       timeoutMs: 120000,
-      providerLabel: runtimeSettings.source === 'avis' ? 'External AI' : 'Ollama',
+      providerLabel: 'AI provider',
       onLine(rawLine) {
         let line = rawLine.trim();
         if (!line) return;
@@ -932,30 +694,8 @@ async function requestAgentTextChatStream({ event, requestId, messages, model, n
       },
     });
   };
-  try {
-    await streamWithSettings(settings);
-    if (!reply.trim()) {
-      throw new Error(`${settings.source === 'avis' ? 'AI Provider' : 'Ollama'} returned an empty text stream.`);
-    }
-  } catch (primaryError) {
-    // Never append a second provider response after Avis already emitted text.
-    // The renderer's existing recovery path can replace a partial stream with
-    // one non-stream response, which uses the same safe fallback above.
-    if (settings.source !== 'avis' || reply) throw primaryError;
-    const fallbackSettings = await getLegacyAgentTextRuntimeSettings();
-    if (!fallbackSettings.apiKey) throw primaryError;
-    console.warn('[AI-AGENT] Avis text stream failed before its first delta; retrying with local Ollama runtime:', primaryError?.message || primaryError);
-    settings = fallbackSettings;
-    try {
-      await streamWithSettings(settings);
-      if (!reply.trim()) throw new Error('Ollama returned an empty text stream.');
-    } catch (fallbackError) {
-      throw new Error(
-        `${primaryError?.message || primaryError}; Ollama fallback failed: ${fallbackError?.message || fallbackError}`,
-        { cause: fallbackError },
-      );
-    }
-  }
+  await streamWithSettings(settings);
+  if (!reply.trim()) throw new Error('AI provider returned an empty text stream.');
   const finalReply = reply.trim();
   send({ type: 'done', reply: finalReply, model: settings.visionModel, source: settings.source });
   return { reply: finalReply, model: settings.visionModel, source: settings.source };
@@ -1002,461 +742,6 @@ async function parseModelJson(reply, schemaHint, numPredict = 2200) {
     }
   }
 }
-
-ipcMain.handle('get-ollama-settings', async () => {
-  const settings = await getAgentTextRuntimeSettings();
-  return {
-    apiBase: settings.apiBase,
-    apiUrl: settings.apiUrl,
-    visionModel: settings.visionModel,
-    apiKeySet: settings.apiKeySet,
-    apiKeyPreview: settings.apiKeyPreview,
-    source: settings.source,
-    format: settings.format,
-  };
-});
-
-ipcMain.handle('save-ollama-settings', async (_, params = {}) => {
-  
-  const patch = {};
-  if (typeof params.apiKey === 'string' && params.apiKey.trim()) patch.ollamaApiKey = params.apiKey.trim();
-  if (typeof params.apiBase === 'string' && params.apiBase.trim()) patch.ollamaApiBase = params.apiBase.trim().replace(/\/+$/, '');
-  if (typeof params.visionModel === 'string' && params.visionModel.trim()) patch.ollamaVisionModel = params.visionModel.trim();
-  // Provider selection + Avis overrides (key still resolvable from .secrets/avis.json / env)
-  if (typeof params.provider === 'string' && ['avis', 'ollama', 'auto'].includes(params.provider)) {
-    patch.aiProvider = params.provider === 'auto' ? '' : params.provider;
-  }
-  if (typeof params.avisApiKey === 'string' && params.avisApiKey.trim()) {
-    patch.avisApiKey = params.avisApiKey.trim();
-    patch.avisApiKeyDisabled = false;
-  }
-  if (typeof params.avisApiBase === 'string' && params.avisApiBase.trim()) patch.avisApiBase = params.avisApiBase.trim().replace(/\/+$/, '');
-  if (typeof params.avisModel === 'string' && params.avisModel.trim()) {
-    const requestedModel = params.avisModel.trim();
-    patch.avisModel = AVIS_LEGACY_TEXT_MODELS.has(requestedModel) ? AVIS_DEFAULT_MODEL : requestedModel;
-  }
-  if (Object.keys(patch).length > 0) saveSettings(patch);
-  aiChatConfigCache = { value: null, expiresAt: 0 };
-  avisSecretCache = { value: null, loadedAt: 0 };
-  const settings = await getAgentTextRuntimeSettings();
-  return {
-    apiBase: settings.apiBase,
-    apiUrl: settings.apiUrl,
-    visionModel: settings.visionModel,
-    apiKeySet: settings.apiKeySet,
-    apiKeyPreview: settings.apiKeyPreview,
-    source: settings.source,
-    format: settings.format,
-  };
-});
-
-// ── Avis media generation (image + async video) ──────────────────────────
-// Explicit agent actions; usable whenever an Avis key is configured. See
-// electron/providers/avis for router map + response shapes. NOTE: generation
-// is currently 403-gated ("provider Terms Of Service") on the active key/plan;
-// handlers surface that message verbatim so the UI can explain the gating.
-ipcMain.handle('avis-media-info', async () => {
-  const runtime = getAvisMediaRuntime();
-  const cloudflare = getCloudflareImagesRuntime();
-  return {
-    configured: runtime.configured,
-    cloudflareConfigured: cloudflare.configured,
-    imageModel: runtime.imageModel,
-    videoModel: runtime.videoModel,
-    imageModels: avisProvider.IMAGE_MODELS,
-    videoModels: avisProvider.VIDEO_MODELS,
-  };
-});
-
-// Live model catalog — drives the dynamic renderer catalog (image/video/text
-// model options + their ratios/sizes/durations/resolutions/input roles). The
-// renderer keeps its hardcoded lists as an offline fallback, so when no key is
-// configured or the fetch fails we return an empty list and let it fall back.
-ipcMain.handle('avis-list-models', async (_, opts = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) return { models: [], configured: false, cached: false };
-  const force = opts.force === true;
-  if (!force && avisModelsCache.value && Date.now() < avisModelsCache.expiresAt) {
-    return { models: avisModelsCache.value, configured: true, cached: true };
-  }
-  try {
-    const models = await avisProvider.listModels(runtime, {});
-    avisModelsCache = { value: models, expiresAt: Date.now() + 10 * 60 * 1000 };
-    return { models, configured: true, cached: false };
-  } catch (err) {
-    console.warn('[AVIS] list-models failed:', err?.message || err);
-    // Serve a stale cache if we have one; otherwise signal fallback to renderer.
-    if (avisModelsCache.value) return { models: avisModelsCache.value, configured: true, cached: true, stale: true };
-    return { models: [], configured: true, cached: false, error: String(err?.message || err) };
-  }
-});
-
-ipcMain.handle('avis-list-audio-models', async (_, opts = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) return { models: [], configured: false, cached: false };
-  if (!opts.force && avisAudioModelsCache.value && Date.now() < avisAudioModelsCache.expiresAt) {
-    return { models: avisAudioModelsCache.value, configured: true, cached: true };
-  }
-  try {
-    const models = await avisProvider.listModels(runtime, { output: 'audio' });
-    avisAudioModelsCache = { value: models, expiresAt: Date.now() + 10 * 60 * 1000 };
-    return { models, configured: true, cached: false };
-  } catch (err) {
-    if (avisAudioModelsCache.value) return { models: avisAudioModelsCache.value, configured: true, cached: true, stale: true };
-    return { models: [], configured: true, cached: false, error: String(err?.message || err) };
-  }
-});
-
-ipcMain.handle('avis-list-audio-voices', async (_, opts = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) return { voices: [], configured: false, cached: false };
-  const cacheKey = JSON.stringify({
-    gender: opts.gender || '',
-    age: opts.age || '',
-    category: opts.category || '',
-    language: opts.language || '',
-    resourceId: opts.resourceId || '',
-  });
-  const cached = avisAudioVoicesCache.value?.get?.(cacheKey);
-  if (!opts.force && cached && Date.now() < cached.expiresAt) {
-    return { voices: cached.value, configured: true, cached: true };
-  }
-  try {
-    const voices = await avisProvider.listAudioVoices(runtime, opts);
-    if (!(avisAudioVoicesCache.value instanceof Map)) avisAudioVoicesCache.value = new Map();
-    avisAudioVoicesCache.value.set(cacheKey, { value: voices, expiresAt: Date.now() + 10 * 60 * 1000 });
-    return { voices, configured: true, cached: false };
-  } catch (err) {
-    if (cached) return { voices: cached.value, configured: true, cached: true, stale: true };
-    return { voices: [], configured: true, cached: false, error: String(err?.message || err) };
-  }
-});
-
-// Account balance for the header widget. Read-only, 0 credits. 30s cache with
-// stale-on-error so a transient network blip never blanks the credits display.
-ipcMain.handle('avis-get-balance', async (_, opts = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) return { creditBalance: null, configured: false, cached: false };
-  const force = opts.force === true;
-  if (!force && avisBalanceCache.value && Date.now() < avisBalanceCache.expiresAt) {
-    return { ...avisBalanceCache.value, configured: true, cached: true };
-  }
-  try {
-    const result = await avisProvider.getBalance(runtime);
-    const value = { creditBalance: result.creditBalance };
-    avisBalanceCache = { value, expiresAt: Date.now() + 30 * 1000 };
-    return { ...value, configured: true, cached: false };
-  } catch (err) {
-    console.warn('[AVIS] get-balance failed:', err?.message || err);
-    if (avisBalanceCache.value) return { ...avisBalanceCache.value, configured: true, cached: true, stale: true };
-    return { creditBalance: null, configured: true, cached: false, error: String(err?.message || err) };
-  }
-});
-
-// Usage/generation history for the header dropdown. Read-only, 0 credits. Not
-// cached in main (renderer requests fresh pages on open + pagination).
-ipcMain.handle('avis-get-usage', async (_, opts = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) return { results: [], total: 0, offset: 0, limit: 0, configured: false };
-  try {
-    const result = await avisProvider.getUsage(runtime, { offset: opts.offset, limit: opts.limit });
-    return { ...result, configured: true };
-  } catch (err) {
-    console.warn('[AVIS] get-usage failed:', err?.message || err);
-    return { results: [], total: 0, offset: 0, limit: 0, configured: true, error: String(err?.message || err) };
-  }
-});
-
-// Full native generation history for Media Library. Signed output URLs are
-// intentionally fetched fresh per page and never persisted by the renderer.
-ipcMain.handle('avis-list-generations', async (_, opts = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) return { results: [], total: 0, offset: 0, limit: 0, configured: false };
-  try {
-    const result = await avisProvider.listGenerations(runtime, {
-      offset: opts.offset,
-      limit: opts.limit,
-    });
-    return { ...result, configured: true };
-  } catch (err) {
-    console.warn('[AVIS] list-generations failed:', err?.message || err);
-    return {
-      results: [],
-      total: 0,
-      offset: Math.max(0, Number(opts.offset) || 0),
-      limit: Math.min(100, Math.max(1, Number(opts.limit) || 40)),
-      configured: true,
-      error: String(err?.message || err),
-    };
-  }
-});
-
-// Avis reference upload is intentionally separate from Google Flow upload.
-// Local image bytes go to Cloudflare Images and the returned public variant URL
-// is the only value sent to Avis as firstFrame/referenceImage. Cloudflare Images
-// cannot store video; video references require a separate Stream integration.
-ipcMain.handle('avis-upload-reference', async (_, params = {}) => {
-  if (typeof params.url === 'string' && /^https?:\/\//i.test(params.url)) {
-    return { url: params.url, id: null, size: 0, mimeType: params.mimeType || null, reused: true };
-  }
-  const runtime = getCloudflareImagesRuntime();
-  if (!runtime.configured) {
-    throw new Error('Cloudflare Images chưa cấu hình (không tìm thấy cloudflare.json trong app hoặc userData).');
-  }
-  const bytes = resolveAvisReferenceBytes(params);
-  const mimeType = guessReferenceMimeType(params.fileName || params.filePath, params.mimeType);
-  const result = await cloudflareImagesProvider.uploadImage(runtime, {
-    bytes,
-    fileName: params.fileName || path.basename(String(params.filePath || 'reference.bin')),
-    mimeType,
-  });
-  console.log(`[CLOUDFLARE-IMAGES] Avis reference uploaded: ${result.id || 'unknown'} (${result.size} bytes)`);
-  return result;
-});
-
-ipcMain.handle('avis-upload-video-reference', async (_, params = {}) => {
-  if (typeof params.url === 'string' && /^https?:\/\//i.test(params.url)) {
-    return { url: params.url, key: null, size: 0, mimeType: params.mimeType || null, reused: true };
-  }
-  const rawPath = String(params.filePath || '');
-  const resolvedPath = rawPath.startsWith('file://') ? fileURLToPath(rawPath) : rawPath;
-  if (!resolvedPath || !fs.existsSync(resolvedPath)) throw new Error(`Không tìm thấy video local: ${resolvedPath || '(trống)'}`);
-  const bytes = await fs.promises.readFile(resolvedPath);
-  const mimeType = guessReferenceMimeType(params.fileName || resolvedPath, params.mimeType);
-  if (!mimeType.startsWith('video/')) throw new Error(`File không phải video hợp lệ (${mimeType}).`);
-  const safeName = path.basename(params.fileName || resolvedPath).replace(/[^a-zA-Z0-9._-]+/g, '-');
-  const date = new Date().toISOString().slice(0, 10);
-  const objectKey = `avis-inputs/${date}/${crypto.randomUUID()}-${safeName}`;
-  const result = await cloudflareR2Provider.uploadBuffer(getCloudflareR2Runtime(), {
-    bytes,
-    objectKey,
-    contentType: mimeType,
-  });
-  console.log(`[CLOUDFLARE-R2] Avis video uploaded: ${result.key} (${result.size} bytes)`);
-  return result;
-});
-
-ipcMain.handle('cloudflare-r2-upload-media', async (_, params = {}) => {
-  if (typeof params.url === 'string' && /^https?:\/\//i.test(params.url)) {
-    return { url: params.url, key: null, size: 0, mimeType: params.mimeType || null, reused: true };
-  }
-  const rawPath = String(params.filePath || '');
-  const resolvedPath = rawPath.startsWith('file://') ? fileURLToPath(rawPath) : rawPath;
-  if (!resolvedPath || !fs.existsSync(resolvedPath)) throw new Error(`Không tìm thấy media local: ${resolvedPath || '(trống)'}`);
-  const bytes = await fs.promises.readFile(resolvedPath);
-  const mimeType = guessReferenceMimeType(params.fileName || resolvedPath, params.mimeType);
-  if (!/^(?:image|video)\//i.test(mimeType)) throw new Error(`File không phải hình ảnh hoặc video hợp lệ (${mimeType}).`);
-  const safeName = path.basename(params.fileName || resolvedPath).replace(/[^a-zA-Z0-9._-]+/g, '-');
-  const date = new Date().toISOString().slice(0, 10);
-  const objectKey = `agent-media/${date}/${crypto.randomUUID()}-${safeName}`;
-  const result = await cloudflareR2Provider.uploadBuffer(getCloudflareR2Runtime(), {
-    bytes,
-    objectKey,
-    contentType: mimeType,
-  });
-  console.log(`[CLOUDFLARE-R2] Agent media uploaded: ${result.key} (${result.size} bytes)`);
-  return result;
-});
-
-// Note Text is a non-rendering graph node: it combines a user instruction with
-// upstream image/video/audio context and asks the selected Avis LLM for one
-// production-ready prompt. Images are sent as vision parts; video/audio nodes
-// contribute their source prompt/text and media identity without inventing a
-// transcript that the chat-completions endpoint did not actually produce.
-ipcMain.handle('avis-generate-note-text', async (_, params = {}) => {
-  const runtime = getAvisRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình key.');
-  const instruction = String(params.instruction || '').trim();
-  if (!instruction) throw new Error('Note Text cần nội dung yêu cầu.');
-  const refs = Array.isArray(params.references) ? params.references.slice(0, 8) : [];
-  const content = [{
-    type: 'text',
-    text: [
-      'Create one production-ready generation prompt from the user note and the supplied references.',
-      'Infer visible subjects, composition, identity, props, environment, action, camera, lighting and continuity from images when present.',
-      'For video and audio references, use their supplied source prompt/text and media metadata as authoritative context.',
-      'If the user asks for a video prompt, include shot progression, subject action, camera movement, timing and ending frame.',
-      'Do not explain your reasoning. Return only the final prompt in the same language as the user note.',
-      '',
-      `USER NOTE:\n${instruction}`,
-      refs.length ? `\nREFERENCE INDEX:\n${refs.map((ref, index) => `${index + 1}. [${String(ref.kind || 'reference').toUpperCase()}] ${String(ref.title || ref.kind || 'reference')}${ref.prompt ? ` — source prompt/text: ${String(ref.prompt).slice(0, 1200)}` : ''}${ref.mediaName ? ` — media: ${String(ref.mediaName).slice(0, 300)}` : ''}`).join('\n')}` : '',
-    ].filter(Boolean).join('\n'),
-  }];
-  refs.forEach(ref => {
-    const src = String(ref?.src || '').trim();
-    if (String(ref?.kind || 'image') === 'image' && /^(https?:\/\/|data:image\/)/i.test(src)) {
-      content.push({ type: 'image_url', image_url: { url: src, detail: 'high' } });
-    }
-  });
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000);
-  let response;
-  try {
-    response = await net.fetch(runtime.apiUrl, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${runtime.apiKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: String(params.model || runtime.model || AVIS_DEFAULT_MODEL),
-        stream: false,
-        messages: [{ role: 'user', content }],
-        max_tokens: 2200,
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-  const text = await response.text();
-  if (!response.ok) throw new Error(`Avis Note Text error ${response.status}: ${text.slice(0, 500)}`);
-  const payload = JSON.parse(text || '{}');
-  const output = String(payload?.choices?.[0]?.message?.content || '').trim();
-  if (!output) throw new Error('Cloud AI Note Text không trả nội dung.');
-  return { text: output, model: String(params.model || runtime.model || AVIS_DEFAULT_MODEL), references: refs.length };
-});
-
-ipcMain.handle('avis-analyze-video-story', async (_, params = {}) => {
-  const runtime = getAvisRuntime();
-  const cloudflareRuntime = getCloudflareImagesRuntime();
-  if (!cloudflareRuntime.configured) {
-    throw new Error('Cloudflare Images chưa cấu hình để lưu keyframe Video Story.');
-  }
-  return videoStoryProvider.analyzeVideoStory({
-    source: String(params.source || ''),
-    model: String(params.model || runtime.model || AVIS_DEFAULT_MODEL),
-    runtime,
-    app,
-    fs,
-    path,
-    net,
-    crypto,
-    ffmpegBin: getFfmpegBin(),
-    cloudflareImagesProvider,
-    cloudflareRuntime,
-  });
-});
-
-ipcMain.handle('avis-generate-script-stage', async (event, params = {}) => {
-  const runtime = getAvisRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình key.');
-  const model = String(params.model || runtime.model || AVIS_DEFAULT_MODEL);
-  // Confirm-camera streams server-side (SSE) to beat the Cloudflare edge 504. Relay each
-  // throttled delta to the renderer keyed by progressId so the Script node shows live logs
-  // instead of a time-based fake percentage. Best-effort: a closed sender must not break gen.
-  const progressId = params.progressId ? String(params.progressId) : '';
-  const controller = new AbortController();
-  if (progressId) {
-    activeScriptStageControllers.get(progressId)?.abort();
-    activeScriptStageControllers.set(progressId, controller);
-  }
-  const abortOnRendererClose = () => controller.abort();
-  event.sender.once('destroyed', abortOnRendererClose);
-  const onProgress = progressId ? (payload) => {
-    try {
-      if (event.sender.isDestroyed()) return;
-      event.sender.send('avis-script-stage-progress', { progressId, stage: String(params.stage || ''), ...payload });
-    } catch { /* renderer gone */ }
-  } : undefined;
-  try {
-    return await scriptWorkflowProvider.generateScriptStage({
-      apiUrl: runtime.apiUrl,
-      apiKey: runtime.apiKey,
-      model,
-      fetchImpl: net.fetch.bind(net),
-    }, params, onProgress, controller.signal);
-  } finally {
-    event.sender.removeListener('destroyed', abortOnRendererClose);
-    if (progressId && activeScriptStageControllers.get(progressId) === controller) {
-      activeScriptStageControllers.delete(progressId);
-    }
-  }
-});
-
-ipcMain.handle('avis-cancel-script-stage', async (_, params = {}) => {
-  const progressId = String(params.progressId || '');
-  const controller = progressId ? activeScriptStageControllers.get(progressId) : null;
-  if (!controller) return { cancelled: false };
-  controller.abort();
-  activeScriptStageControllers.delete(progressId);
-  return { cancelled: true };
-});
-
-ipcMain.handle('avis-generate-image', async (event, params = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình API key.');
-  const requestId = String(params.requestId || '').trim();
-  const controller = new AbortController();
-  if (requestId) {
-    activeAvisImageControllers.get(requestId)?.abort();
-    activeAvisImageControllers.set(requestId, controller);
-  }
-  const abortOnRendererClose = () => controller.abort();
-  event.sender.once('destroyed', abortOnRendererClose);
-  try {
-    return await avisProvider.generateImage(runtime, params, controller.signal);
-  } finally {
-    event.sender.removeListener('destroyed', abortOnRendererClose);
-    if (requestId && activeAvisImageControllers.get(requestId) === controller) {
-      activeAvisImageControllers.delete(requestId);
-    }
-  }
-});
-
-ipcMain.handle('avis-cancel-image-generation', async (_, params = {}) => {
-  const requestId = String(params.requestId || '').trim();
-  const controller = requestId ? activeAvisImageControllers.get(requestId) : null;
-  if (!controller) return { cancelled: false };
-  controller.abort();
-  activeAvisImageControllers.delete(requestId);
-  return { cancelled: true };
-});
-
-ipcMain.handle('avis-poll-image', async (_, { generationId } = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình API key.');
-  return await avisProvider.pollImage(runtime, generationId);
-});
-
-ipcMain.handle('avis-create-video', async (_, params = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình API key.');
-  return await avisProvider.createVideo(runtime, params);
-});
-
-ipcMain.handle('avis-poll-video', async (_, { jobId } = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình API key.');
-  return await avisProvider.pollVideo(runtime, jobId);
-});
-
-ipcMain.handle('avis-create-audio', async (_, params = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình API key.');
-  return await avisProvider.createAudio(runtime, params);
-});
-
-ipcMain.handle('avis-poll-audio', async (_, { generationId } = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình API key.');
-  return await avisProvider.pollAudio(runtime, generationId);
-});
-
-ipcMain.handle('avis-get-kyc-status', async () => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình API key riêng của người dùng.');
-  return await avisProvider.getKycStatus(runtime);
-});
-
-ipcMain.handle('avis-create-kyc-asset', async (_, params = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình API key riêng của người dùng.');
-  return await avisProvider.createKycAsset(runtime, params);
-});
-
-ipcMain.handle('avis-get-kyc-asset', async (_, { assetId } = {}) => {
-  const runtime = getAvisMediaRuntime();
-  if (!runtime.configured) throw new Error('Cloud AI chưa được cấu hình API key riêng của người dùng.');
-  return await avisProvider.getKycAsset(runtime, assetId);
-});
 
 ipcMain.handle('ai-agent-chat', async (_, { message, history = [], hasPlan = false } = {}) => {
   if (!message || !String(message).trim()) throw new Error('Missing chat message');
@@ -2033,7 +1318,7 @@ ipcMain.handle('ai-agent-review-output', async (_, { prompt, outputKind = 'image
 // Pipeline:
 //   1. Extract 5 frames evenly spaced across the requested clip range (via
 //      ffmpeg's `select=eq(n\,X)` filter), encoded to small JPEG (256×256).
-//   2. Send the frames to Ollama's hosted vision model (Qwen3-VL by default)
+//   2. Send the frames to the active custom OpenAI-compatible vision provider
 //      with a structured prompt that asks for JSON output.
 //   3. Parse the JSON, normalize the values to our enum, return to renderer.
 //
@@ -2042,12 +1327,8 @@ ipcMain.handle('ai-agent-review-output', async (_, { prompt, outputKind = 'image
 // not "AI processing" — much cheaper, and the model's answer just sets
 // dropdowns the user can override.
 ipcMain.handle('ai-suggest-deflicker', async (_, { videoPath, startTime = 0, endTime = 0 } = {}) => {
-  const apiKey = getOllamaApiKey();
-  if (!apiKey) {
-    throw new Error('OLLAMA_API_KEY missing. Open Settings → AI to add your Ollama Cloud key, or set OLLAMA_API_KEY env var.');
-  }
+  const provider = await getVisionProviderRuntime();
   if (!videoPath) throw new Error('Missing video path for AI flicker analysis');
-  const settings = loadSettings();
 
   const resolved = resolveLocalPath(videoPath);
   if (!fs.existsSync(resolved)) throw new Error(`Video không tồn tại: ${resolved}`);
@@ -2077,7 +1358,7 @@ ipcMain.handle('ai-suggest-deflicker', async (_, { videoPath, startTime = 0, end
       frameFiles.push(out);
     }
 
-    // Step 2: build OpenAI-compatible vision messages and POST to Ollama.
+    // Step 2: build OpenAI-compatible vision messages and POST to the active provider.
     // Using /v1/chat/completions because it has a stable schema for image
     // inputs across many vision models.
     const images = frameFiles.map(f => `data:image/jpeg;base64,${fs.readFileSync(f).toString('base64')}`);
@@ -2101,7 +1382,7 @@ ipcMain.handle('ai-suggest-deflicker', async (_, { videoPath, startTime = 0, end
     ].join('\n');
 
     const body = {
-      model: settings.visionModel,
+      model: provider.visionModel,
       stream: false,
       messages: [{
         role: 'user',
@@ -2112,18 +1393,17 @@ ipcMain.handle('ai-suggest-deflicker', async (_, { videoPath, startTime = 0, end
       }],
     };
 
-    const url = `${settings.apiBase}/v1/chat/completions`;
-    const res = await net.fetch(url, {
+    const res = await net.fetch(provider.apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${provider.apiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
     });
     const text = await res.text();
     if (!res.ok) {
-      throw new Error(`Ollama error ${res.status}: ${text.slice(0, 400)}`);
+      throw new Error(`AI provider error ${res.status}: ${text.slice(0, 400)}`);
     }
     const data = JSON.parse(text || '{}');
     const reply = data.choices?.[0]?.message?.content || '';
@@ -2168,8 +1448,9 @@ ipcMain.handle('lip-sync-video', async (event, {
   const settings = getLipSyncSettings();
   const apiKey = getLipSyncApiKey();
   if (!apiKey) {
-    throw new Error('Missing Sync.so API key. Open Settings → Lip sync to add your key.');
+    throw new Error('Lip-sync provider is not configured. Select a lip-sync provider profile.');
   }
+  if (!settings.apiBase || !settings.model) throw new Error('Lip-sync provider Base URL and model are required.');
   if (!videoPath) throw new Error('Missing video source for Lip sync');
   if (!audioPath && !audioUrl) throw new Error('Missing audio source for Lip sync');
 
@@ -2454,14 +1735,6 @@ ipcMain.handle('concat-with-transitions', async (_, { clips, transitions, scale,
 });
 
 // ── AI: Auto Generate Subtitles ──────────────────────────────────────
-const AI_API_URL = String(
-  process.env.EZAI_API_URL || 'https://ezaiapi.com/v1/chat/completions'
-).trim();
-
-function getLegacyMediaAiApiKey() {
-  return String(process.env.EZAI_API_KEY || process.env.AI_API_KEY || '').trim();
-}
-
 // ── Local audio transcription via Whisper WASM (offline, off-thread) ─
 //
 // Inference is delegated to a Node worker_thread (electron/whisper-worker.js)
@@ -2786,8 +2059,7 @@ ipcMain.handle('ai-generate-subtitles', async (_, { filePath, duration, transcri
   const https = require('https');
   const resolved = filePath.startsWith('file://') ? furl(filePath) : filePath;
   if (!fs.existsSync(resolved)) throw new Error(`File không tồn tại: ${resolved}`);
-  const apiKey = getLegacyMediaAiApiKey();
-  if (!apiKey) throw new Error('Thiếu EZAI_API_KEY cho tính năng tạo phụ đề AI');
+  const provider = await getVisionProviderRuntime();
 
   const ffmpegBin = getFfmpegBin();
 
@@ -2859,16 +2131,16 @@ Let's get started`
 
   // Call Claude API
   const body = JSON.stringify({
-    model: 'claude-sonnet-4-5',
+    model: provider.visionModel,
     messages: [{ role: 'user', content }],
     max_tokens: 4096,
   });
 
   const srtContent = await new Promise((resolve, reject) => {
-    const req = require('https').request(AI_API_URL, {
+    const req = require('https').request(provider.apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${provider.apiKey}`,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
       },
@@ -2905,8 +2177,7 @@ ipcMain.handle('ai-detect-watermark', async (_, { filePath, timeSeconds }) => {
   const { fileURLToPath: furl } = require('url');
   const resolved = filePath.startsWith('file://') ? furl(filePath) : filePath;
   if (!fs.existsSync(resolved)) throw new Error(`File không tồn tại: ${resolved}`);
-  const apiKey = getLegacyMediaAiApiKey();
-  if (!apiKey) throw new Error('Thiếu EZAI_API_KEY cho tính năng nhận diện watermark AI');
+  const provider = await getVisionProviderRuntime();
 
   const ffmpegBin = getFfmpegBin();
 
@@ -2936,7 +2207,7 @@ ipcMain.handle('ai-detect-watermark', async (_, { filePath, timeSeconds }) => {
 
   // Call Claude Vision API
   const body = JSON.stringify({
-    model: 'claude-sonnet-4-5',
+    model: provider.visionModel,
     messages: [{
       role: 'user',
       content: [
@@ -2971,10 +2242,10 @@ Example output:
   });
 
   const result = await new Promise((resolve, reject) => {
-    const req = require('https').request(AI_API_URL, {
+    const req = require('https').request(provider.apiUrl, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${provider.apiKey}`,
         'Content-Type': 'application/json',
         'Content-Length': Buffer.byteLength(body),
       },
@@ -3002,5 +2273,5 @@ Example output:
   return { regions: result, videoWidth: vidW, videoHeight: vidH };
 });
 
-  return { getAvisMediaRuntime, localPiperTextToSpeech };
+  return { localPiperTextToSpeech };
 };

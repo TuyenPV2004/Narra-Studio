@@ -20,8 +20,6 @@ module.exports = function createSupportRuntime(dependencies) {
     pathToFileURL,
     fileURLToPath,
     captchaBridge,
-    avisProvider,
-    cloudflareImagesProvider,
   } = dependencies;
 
 // ── FFmpeg binary resolver (ffmpeg-static bundled) ─────────────────────
@@ -168,6 +166,21 @@ function getImageOutputDir() {
   const s = loadSettings();
   return s.imageOutputPath || path.join(app.getPath('pictures'), 'VEO3Flow', 'images');
 }
+function getVoiceOutputDir() {
+  const s = loadSettings();
+  return s.voiceOutputPath || path.join(app.getPath('music'), 'Narra Studio', 'Voice');
+}
+function getVoiceOutputRoots() {
+  const settings = loadSettings();
+  const historical = Array.isArray(settings.voiceOutputPaths)
+    ? settings.voiceOutputPaths.filter(value => typeof value === 'string' && value.trim())
+    : [];
+  return [...new Set([
+    getVoiceOutputDir(),
+    ...historical,
+    path.join(app.getPath('userData'), 'xtts-v2', 'output'),
+  ].map(value => path.resolve(value)))];
+}
 
 // Generate sequential filename: p-DD-MM-NNN.ext
 // In-memory counter để cấp filename atomic — tránh race condition khi concurrent downloads
@@ -223,6 +236,8 @@ function getNextFilename(dir, ext) {
     saveSettings,
     getVideoOutputDir,
     getImageOutputDir,
+    getVoiceOutputDir,
+    getVoiceOutputRoots,
     getNextFilename,
   };
 };

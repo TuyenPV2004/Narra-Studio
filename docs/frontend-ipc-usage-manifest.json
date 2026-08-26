@@ -1,0 +1,2726 @@
+{
+  "schemaVersion": 2,
+  "guard": {
+    "name": "static frontend IPC surface guard",
+    "protects": [
+      "direct static frontend adapter method-name surface",
+      "methods missing from preload baseline",
+      "static dynamic import target baseline"
+    ],
+    "doesNotProtect": [
+      "argument order or count",
+      "payload schema",
+      "response schema",
+      "callback semantics",
+      "indirect or aliased API access",
+      "backend handler semantics"
+    ]
+  },
+  "rendererRoot": "apps/desktop/src/ui",
+  "preloadFile": "apps/desktop/src/electron/preload.js",
+  "summary": {
+    "usedMethods": 171,
+    "usedApiMethods": 171,
+    "usedElectronApiMethods": 0,
+    "exposedPreloadMethods": 237,
+    "missingFromPreload": 0,
+    "missingFromPreloadDistinctMethodCount": 0,
+    "missingFromPreloadCallSiteCount": 0,
+    "exposedButUnused": 66,
+    "dynamicImports": 15,
+    "missingDynamicImports": 0
+  },
+  "methods": [
+    {
+      "global": "api",
+      "method": "aiAgentChat",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiAgentChatStream",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p",
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiAgentDeepAnalyze",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiAgentIntent",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiAgentPolishWorkflow",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiAgentReviewOutput",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiAgentWorkflow",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiDetectWatermark",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiGenerateSubtitles",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileDelete",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileList",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileModels",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileSave",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileSetActive",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiProviderProfileTest",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiSuggestDeflicker",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "applyVideoFilters",
+      "businessArea": "Media / Generation",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts",
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "authorizeFilePath",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 8,
+      "files": [
+        "apps/desktop/src/ui/pages/Video/VideoGeneratorPage.tsx",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "file"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "cancelDepthAnythingVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "cancelVideoAudioDemux",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "cancelVideoAudioSeparation",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "changeImageOutputFolder",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "changeOutputFolder",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "changeVoiceOutputFolder",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "concatVideos",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "concatVideosWithTransitions",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "concatWithTransitions",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "copyToClipboard",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 3,
+      "files": [
+        "apps/desktop/src/ui/pages/GoogleFlow/GoogleFlowPage.tsx",
+        "apps/desktop/src/ui/pages/Voice/VoicePage.tsx",
+        "apps/desktop/src/ui/services/electron-api/captcha.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "text"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "createAIAgentStoryProject",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/director.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "createFlowProject",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "cropVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "deleteFile",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "deleteVideoProject",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "id"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "demuxVideoAudio",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "depthAnythingVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "downloadVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "editImage",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/image.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "exportUserPresetTemplate",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/user-presets.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "params"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "extractAudio",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "generateImage",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/image.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "generatePinholeGif",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "generateVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "generateVideoEditVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "generateVideoReferenceImages",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "generateVideoStartEndImage",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "generateVideoStartImage",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "getAllSlots",
+      "businessArea": "Google Flow / Session",
+      "callCount": 4,
+      "files": [
+        "apps/desktop/src/ui/pages/Image/ImageEditorPage.tsx",
+        "apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
+        "apps/desktop/src/ui/pages/Video/VideoGeneratorPage.tsx",
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "getAudioInfo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "getCaptchaBridgeStatus",
+      "businessArea": "CAPTCHA / Extension",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/captcha.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "getCredits",
+      "businessArea": "Google Flow / Session",
+      "callCount": 3,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/provider.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "params"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "getDashboardStats",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/dashboard.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "getFilePath",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 3,
+      "files": [
+        "apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
+        "apps/desktop/src/ui/services/electron-api/image.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "file"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "getFlowProjectInitialData",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/image.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "getImageOutputPath",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "getVideoDuration",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "getVideoInfo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "getVideoOutputPath",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "getVoiceOutputPath",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "importSkillFolder",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/skills.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "importUserPresetFile",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/user-presets.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "lipSyncVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "listDirectorScenes",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/director.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "listImageFiles",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "listVideoFiles",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "listVideoProjects",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "listVoiceFiles",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "loadDirectorScene",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/director.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "loadHistory",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/history.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "key"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "loadUserPresets",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/user-presets.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "loadVideoProject",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "id"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "logoutSlot",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onAutoEnteredProject",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onDepthAnythingProgress",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "callback"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onFlowProjectChanged",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onSlotEmailUpdated",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onSlotLoggedOut",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onSlotLoginDone",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onSlotSessionUpdated",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onVideoAudioDemuxProgress",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "callback"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onVideoAudioSeparationProgress",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "callback"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onVideoDownloaded",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onVideoDownloadFailed",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "cb"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "onXttsProgress",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "callback"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "openExtensionFolder",
+      "businessArea": "CAPTCHA / Extension",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/captcha.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "openExternalUrl",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/captcha.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "url"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "openFlowSession",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "openIncognitoLogin",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "openOutputFolder",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media.ts",
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "path"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "pickRandomSlot",
+      "businessArea": "Google Flow / Session",
+      "callCount": 3,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/image.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "pollVideoStatus",
+      "businessArea": "Media / Generation",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "projectsDelete",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "id"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "projectsDuplicate",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "id",
+          "newName"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "projectsGet",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "id"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "projectsList",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "projectsRename",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "id",
+          "name"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "projectsSave",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "project"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "providerGetActive",
+      "businessArea": "Provider",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/provider.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "providerGetCredential",
+      "businessArea": "Provider",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/provider.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "providerGetStatus",
+      "businessArea": "Provider",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/provider.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "providerSetActive",
+      "businessArea": "Provider",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/provider.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "queueVideoDownload",
+      "businessArea": "Media / Generation",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "readSkillFiles",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/skills.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "resolveDownloadedVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "mediaName"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "resolveVideoUrl",
+      "businessArea": "Media / Generation",
+      "callCount": 3,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/image.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "saveDirectorCapture",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/director.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "saveDirectorScene",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/director.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "saveFileDialog",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent-conversations.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "saveHistory",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/history.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "key",
+          "items"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "saveImageLocally",
+      "businessArea": "Media / Generation",
+      "callCount": 5,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/image.ts",
+        "apps/desktop/src/ui/services/electron-api/media.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "saveUserPresets",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/user-presets.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "payload"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "saveVideoProject",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "selectAgentCanvasMediaFiles",
+      "businessArea": "Media / Generation",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts",
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "selectAudioFile",
+      "businessArea": "Media / Generation",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts",
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "selectFiles",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "selectMediaFiles",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "selectOutputFolder",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "selectSrtFile",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "selectVideoFiles",
+      "businessArea": "Media / Generation",
+      "callCount": 3,
+      "files": [
+        "apps/desktop/src/ui/pages/Video/VideoGeneratorPage.tsx",
+        "apps/desktop/src/ui/services/electron-api/media.ts",
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "separateVideoAudioStems",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "setManualAuth",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "d"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "showInFolder",
+      "businessArea": "Desktop / Local utility",
+      "callCount": 5,
+      "files": [
+        "apps/desktop/src/ui/pages/Image/ImageEditorPage.tsx",
+        "apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
+        "apps/desktop/src/ui/services/electron-api/editor.ts",
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "filePath"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "syncSlotSession",
+      "businessArea": "Google Flow / Session",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasArchive",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasCreate",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasDelete",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasEpisodesReorder",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasEpisodeUpdate",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasGet",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasList",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasRename",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasRestore",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasRevisions",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamCanvasSync",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamMediaUpload",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamNodeComplete",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamNodeLock",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamNodeRelease",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceAssetArchive",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceAssetCloneRecord",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceAssetList",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceAssetUpsert",
+      "businessArea": "Workspace",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceCreate",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceDelete",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceList",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceRename",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceToolboxDelete",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceToolboxList",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "teamWorkspaceToolboxUpsert",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "testCaptchaExtension",
+      "businessArea": "CAPTCHA / Extension",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/captcha.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "textToSpeech",
+      "businessArea": "Other frontend runtime",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts",
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "textToSpeechCancel",
+      "businessArea": "Other frontend runtime",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "transformImage",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/image.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "trimAudio",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "trimVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/media.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "uploadImage",
+      "businessArea": "Media / Generation",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/image.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "uploadImageFromPath",
+      "businessArea": "Media / Generation",
+      "callCount": 2,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/image.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "uploadOmniVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "upscaleImage",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/image.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "upscaleVideo",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/video.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "workspaceBackupLocal",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "workspaceBackupVerify",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "workspaceExportJson",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "workspaceImportMediaRead",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "workspaceImportPrepare",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    },
+    {
+      "global": "api",
+      "method": "workspaceImportRelease",
+      "businessArea": "Workspace",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsCancel",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsGenerate",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsImportReference",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsReleaseReferences",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsShowInFolder",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "xttsStatus",
+      "businessArea": "Media / Generation",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": []
+      }
+    }
+  ],
+  "missingFromPreload": [],
+  "exposedButUnused": [
+    "aiTranscribeAudio",
+    "aiTranscribeCancel",
+    "captureRegion",
+    "downloadMediaToTemp",
+    "downloadVoiceAsset",
+    "extractThumbnail",
+    "getAppArch",
+    "getAppVersion",
+    "getAuthInfo",
+    "getLastProjectUrl",
+    "getLipSyncSettings",
+    "getLocalLipSyncStatus",
+    "getLocalTtsStatus",
+    "getUiLanguage",
+    "imageGridSegment",
+    "imageThumbnail",
+    "importDirectorAsset",
+    "importSlotCookies",
+    "listVoiceAssetsCached",
+    "loadMediaLibrary",
+    "onAuthCaptured",
+    "onExportProgress",
+    "onSttProgress",
+    "onTeamPresence",
+    "onVoiceAssetProgress",
+    "openDevTools",
+    "openLoginWindow",
+    "prepareLocalLipSyncEngine",
+    "prepareLocalTtsEngine",
+    "providersList",
+    "readLocalAudioFile",
+    "readSkillFolder",
+    "saveFile",
+    "saveLipSyncSettings",
+    "saveMediaLibrary",
+    "selectAudioUploadFile",
+    "selectDirectorAssets",
+    "selectFile",
+    "selectImageFolder",
+    "setUiLanguage",
+    "syncSession",
+    "teamNodeAuditAppend",
+    "teamNodeAuditList",
+    "teamPresenceConnect",
+    "teamPresenceCursor",
+    "teamPresenceDisconnect",
+    "teamPresenceDocUpdate",
+    "teamPresenceWalClear",
+    "teamPresenceWalStatus",
+    "teamWorkspaceAccept",
+    "teamWorkspaceActivity",
+    "teamWorkspaceGet",
+    "teamWorkspaceInvite",
+    "teamWorkspaceMemberRole",
+    "teamWorkspaceRemoveMember",
+    "teamWorkspaceTransferOwner",
+    "ttsDefaultVoices",
+    "ttsDialogue",
+    "ttsHistory",
+    "ttsHistoryDelete",
+    "ttsHistoryRetry",
+    "ttsLanguages",
+    "ttsMinimaxVoices",
+    "ttsModels",
+    "ttsSharedVoices",
+    "ttsVoiceChanger"
+  ],
+  "dynamicImports": {
+    "entries": [
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/AIAgent/AIAgentSourcePage",
+        "target": "apps/desktop/src/ui/pages/AIAgent/AIAgentSourcePage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/CapcutEditor/CapcutEditorPage",
+        "target": "apps/desktop/src/ui/pages/CapcutEditor/CapcutEditorPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/CaptchaSetup/CaptchaSetupPage",
+        "target": "apps/desktop/src/ui/pages/CaptchaSetup/CaptchaSetupPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/Dashboard/DashboardPage",
+        "target": "apps/desktop/src/ui/pages/Dashboard/DashboardPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/GoogleFlow/GoogleFlowPage",
+        "target": "apps/desktop/src/ui/pages/GoogleFlow/GoogleFlowPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/Guide/GuidePage",
+        "target": "apps/desktop/src/ui/pages/Guide/GuidePage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/Image/ImageEditorPage",
+        "target": "apps/desktop/src/ui/pages/Image/ImageEditorPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/Image/ImageGeneratorPage",
+        "target": "apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/MediaLibrary/MediaLibraryPage",
+        "target": "apps/desktop/src/ui/pages/MediaLibrary/MediaLibraryPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/ProviderAccount/ProviderConnectionsPage",
+        "target": "apps/desktop/src/ui/pages/ProviderAccount/ProviderConnectionsPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/SceneMerge/SceneMergePage",
+        "target": "apps/desktop/src/ui/pages/SceneMerge/SceneMergePage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/Settings/SettingsPage",
+        "target": "apps/desktop/src/ui/pages/Settings/SettingsPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/Video/VideoGeneratorPage",
+        "target": "apps/desktop/src/ui/pages/Video/VideoGeneratorPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/VideoEditor/VideoEditorPage",
+        "target": "apps/desktop/src/ui/pages/VideoEditor/VideoEditorPage.tsx",
+        "exists": true
+      },
+      {
+        "importer": "apps/desktop/src/ui/app/App.tsx",
+        "specifier": "@/pages/Voice/VoicePage",
+        "target": "apps/desktop/src/ui/pages/Voice/VoicePage.tsx",
+        "exists": true
+      }
+    ],
+    "missing": []
+  }
+}

@@ -1,9 +1,13 @@
 node_modules/
 .pnpm-store/
 .smoke/
+.playwright-cli/
+.runtime-smoke-build/
+.runtime-source-smoke-build/
 .codex-build/
 dist/
 dist-electron/
+/apps/desktop/dist-source-renderer/
 /apps/desktop/config/
 coverage/
 .vite/

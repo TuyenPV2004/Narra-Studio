@@ -2,6 +2,16 @@
 
 const { downloadRemoteMediaToFile } = require('../runtime/workspaceBackupMedia');
 const { brand } = require('../runtime/brand');
+const { isValidImageBuffer, validateGoogleMediaUrl } = require('../runtime/mediaSecurity');
+
+const MAX_SAVED_IMAGE_BYTES = 25 * 1024 * 1024;
+const ALLOWED_SAVED_IMAGE_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'application/octet-stream',
+]);
 
 module.exports = function registerStorageIpc(dependencies) {
   const {
@@ -23,8 +33,6 @@ module.exports = function registerStorageIpc(dependencies) {
     pathToFileURL,
     fileURLToPath,
     captchaBridge,
-    avisProvider,
-    cloudflareImagesProvider,
     runtime,
     getFfmpegBin,
     maybePromoteFilterComplexToScript,
@@ -38,6 +46,8 @@ module.exports = function registerStorageIpc(dependencies) {
     saveSettings,
     getVideoOutputDir,
     getImageOutputDir,
+    getVoiceOutputDir,
+    getVoiceOutputRoots,
     getNextFilename,
     buildCleanUserAgent,
     DEFAULTS,
@@ -63,7 +73,6 @@ module.exports = function registerStorageIpc(dependencies) {
     isDryRunActive,
     makeApiRequest,
     RECAPTCHA_SITE_KEY,
-    findFlowWebview,
     findChromePath,
     httpGetJson,
     createCdpClient,
@@ -73,8 +82,6 @@ module.exports = function registerStorageIpc(dependencies) {
     makeApiRequestViaChrome,
     reloadFlowWebviewForSlot,
     reloadChromeCdpLabs,
-    makeApiRequestViaWebview,
-    setActiveWebviewSlot,
     getChromeRuntime,
   } = dependencies;
 
@@ -87,8 +94,8 @@ ipcMain.handle('get-video-output-path', async () => {
 ipcMain.handle('open-output-folder', async (_, folderPath) => {
   const dir = folderPath || getVideoOutputDir();
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  await shell.openPath(dir);
-  return true;
+  const openError = await shell.openPath(dir);
+  return { ok: !openError, error: openError || null };
 });
 
 // ── Director's Desk persistence ──────────────────────────────────────
@@ -292,6 +299,26 @@ ipcMain.handle('change-image-output-folder', async () => {
   return newPath;
 });
 
+// ── Voice output path ─────────────────────────────────────────────────
+ipcMain.handle('get-voice-output-path', async () => {
+  return getVoiceOutputDir();
+});
+
+ipcMain.handle('change-voice-output-folder', async () => {
+  const previousPath = getVoiceOutputDir();
+  const result = await dialog.showOpenDialog(runtime.mainWindow, {
+    title: 'Chọn thư mục lưu Voice',
+    defaultPath: getVoiceOutputDir(),
+    properties: ['openDirectory', 'createDirectory'],
+  });
+  if (result.canceled || !result.filePaths.length) return null;
+  const newPath = result.filePaths[0];
+  const trustedPaths = [...new Set([...getVoiceOutputRoots(), previousPath, newPath])].slice(-20);
+  saveSettings({ voiceOutputPath: newPath, voiceOutputPaths: trustedPaths });
+  console.log(`[SETTINGS] Voice output path changed to: ${newPath}`);
+  return newPath;
+});
+
 // ── List saved images from image output directory ─────────────────────
 ipcMain.handle('list-image-files', async () => {
   const dir = getImageOutputDir();
@@ -305,7 +332,8 @@ ipcMain.handle('list-image-files', async () => {
         const stat = fs.statSync(fp);
         return {
           name: f,
-          path: pathToFileURL(fp).toString(),
+          path: fp,
+          fileUrl: pathToFileURL(fp).toString(),
           size: stat.size,
           time: stat.mtimeMs,
         };
@@ -337,6 +365,39 @@ ipcMain.handle('list-video-files', async () => {
       .sort((a, b) => b.time - a.time);
     return files;
   } catch { return []; }
+});
+
+// ── List voice / audio files in output folder ─────────────────────────
+ipcMain.handle('list-voice-files', async () => {
+  const roots = typeof getVoiceOutputRoots === 'function'
+    ? getVoiceOutputRoots()
+    : [typeof getVoiceOutputDir === 'function' ? getVoiceOutputDir() : null].filter(Boolean);
+  const exts = ['.wav', '.mp3', '.m4a', '.flac', '.ogg', '.aac', '.opus'];
+  const seenPaths = new Set();
+  const allFiles = [];
+  for (const dir of roots) {
+    if (!dir || !fs.existsSync(dir)) continue;
+    try {
+      const entries = fs.readdirSync(dir);
+      for (const f of entries) {
+        if (!exts.includes(path.extname(f).toLowerCase())) continue;
+        const fp = path.join(dir, f);
+        if (seenPaths.has(fp)) continue;
+        seenPaths.add(fp);
+        const stat = fs.statSync(fp);
+        if (!stat.isFile()) continue;
+        allFiles.push({
+          name: f,
+          path: fp,
+          fileUrl: pathToFileURL(fp).toString(),
+          size: stat.size,
+          time: stat.mtimeMs,
+        });
+      }
+    } catch { /* ignore directory read error */ }
+  }
+  allFiles.sort((a, b) => b.time - a.time);
+  return allFiles;
 });
 
 // ── Dashboard stats ───────────────────────────────────────────────────
@@ -937,39 +998,84 @@ ipcMain.handle('capture-region', async (_, rect) => {
 });
 
 // ── Save image locally (download from URL or save base64) ─────────────
-ipcMain.handle('save-image-locally', async (_, { src, fileName }) => {
+ipcMain.handle('save-image-locally', async (_, { src, fileName, slotId = 0 } = {}) => {
   const imagesDir = getImageOutputDir();
   if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
 
-  const ext = (fileName || 'image.png').split('.').pop() || 'png';
+  const requestedExt = path.extname(fileName || '').slice(1).toLowerCase();
+  const ext = ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(requestedExt)
+    ? requestedExt
+    : 'png';
   const uniqueName = getNextFilename(imagesDir, ext);
   const filepath = path.join(imagesDir, uniqueName);
 
+  if (typeof src !== 'string' || !src.trim()) {
+    throw new Error('Dữ liệu nguồn ảnh không hợp lệ.');
+  }
+
   if (src.startsWith('data:')) {
-    // base64 data URL
-    const base64Data = src.replace(/^data:image\/\w+;base64,/, '');
-    fs.writeFileSync(filepath, Buffer.from(base64Data, 'base64'));
-  } else if (src.startsWith('http')) {
-    // Download from URL using Electron session downloadURL
-    const ses = session.fromPartition(SESSION_PARTITION);
+    const match = /^data:(image\/(?:jpeg|png|webp|gif));base64,([a-zA-Z0-9+/=]+)$/.exec(src);
+    if (!match) throw new Error('Data URL ảnh không hợp lệ hoặc không được hỗ trợ.');
+    const buffer = Buffer.from(match[2], 'base64');
+    if (buffer.length === 0 || buffer.length > MAX_SAVED_IMAGE_BYTES) {
+      throw new Error('Dung lượng ảnh lưu local vượt quá giới hạn 25MB.');
+    }
+    if (!isValidImageBuffer(buffer)) {
+      throw new Error('Dữ liệu lưu local không phải hình ảnh hợp lệ.');
+    }
+    fs.writeFileSync(filepath, buffer);
+  } else if (src.startsWith('https:')) {
+    validateGoogleMediaUrl(src);
+    // Download from URL using Electron session downloadURL with matching slot partition
+    const targetPartition = `persist:slot-${slotId ?? 0}`;
+    const ses = session.fromPartition(targetPartition);
     await new Promise((resolve, reject) => {
       let done = false;
+      let activeItem = null;
+      let timeoutId = null;
       const finish = (err) => {
         if (done) return;
         done = true;
+        if (timeoutId) clearTimeout(timeoutId);
         if (err) reject(err); else resolve(null);
       };
 
       // Use will-download to intercept and save
       const handler = (event, item) => {
+        const initialChain = typeof item.getURLChain === 'function' ? item.getURLChain() : [];
+        const initialUrl = typeof item.getURL === 'function' ? item.getURL() : '';
+        if (initialChain.length > 0 ? !initialChain.includes(src) : initialUrl && initialUrl !== src) return;
+        activeItem = item;
         item.setSavePath(filepath);
+        item.on('updated', () => {
+          if (item.getReceivedBytes() > MAX_SAVED_IMAGE_BYTES) item.cancel();
+        });
         item.on('done', (e, state) => {
           ses.removeListener('will-download', handler);
           if (state === 'completed') {
-            console.log(`[IMAGE] Downloaded: ${filepath} (${item.getTotalBytes()} bytes)`);
-            finish(null);
+            try {
+              const urlChain = typeof item.getURLChain === 'function' ? item.getURLChain() : [src];
+              urlChain.forEach(validateGoogleMediaUrl);
+              const mimeType = typeof item.getMimeType === 'function' ? item.getMimeType().toLowerCase() : '';
+              const buffer = fs.readFileSync(filepath);
+              if (buffer.length === 0 || buffer.length > MAX_SAVED_IMAGE_BYTES) {
+                throw new Error('Dung lượng ảnh tải về vượt quá giới hạn 25MB.');
+              }
+              if (mimeType && !ALLOWED_SAVED_IMAGE_MIME_TYPES.has(mimeType)) {
+                throw new Error(`MIME ảnh tải về không được hỗ trợ: ${mimeType}`);
+              }
+              if (!isValidImageBuffer(buffer)) {
+                throw new Error('Nội dung tải về không phải hình ảnh hợp lệ.');
+              }
+              console.log(`[IMAGE] Downloaded: ${filepath} (${buffer.length} bytes)`);
+              finish(null);
+            } catch (error) {
+              try { fs.unlinkSync(filepath); } catch {}
+              finish(error);
+            }
           } else {
             console.error(`[IMAGE] Download failed: ${state}`);
+            try { fs.unlinkSync(filepath); } catch {}
             finish(new Error(`Download ${state}`));
           }
         });
@@ -980,15 +1086,14 @@ ipcMain.handle('save-image-locally', async (_, { src, fileName }) => {
       ses.downloadURL(src);
 
       // Safety timeout
-      setTimeout(() => {
+      timeoutId = setTimeout(() => {
         ses.removeListener('will-download', handler);
+        try { activeItem?.cancel(); } catch {}
+        try { fs.unlinkSync(filepath); } catch {}
         finish(new Error('Download timeout 60s'));
       }, 60000);
     });
-  } else {
-    // Already a local file path
-    return src;
-  }
+  } else throw new Error('Nguồn ảnh phải là HTTPS hoặc data URL hợp lệ.');
 
   return pathToFileURL(filepath).toString();
 });

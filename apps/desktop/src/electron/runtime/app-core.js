@@ -22,8 +22,6 @@ module.exports = function createAppCore(dependencies) {
     pathToFileURL,
     fileURLToPath,
     captchaBridge,
-    avisProvider,
-    cloudflareImagesProvider,
     runtime,
     getFfmpegBin,
     maybePromoteFilterComplexToScript,
@@ -140,10 +138,16 @@ function pickRandomSlot() {
   return available[0];
 }
 
+const {
+  AUTH_COOKIE_NAMES,
+  hasAuthenticationCookie,
+  classifySessionFetchResult,
+  evaluateSlotStatus,
+} = require('./flowSessionPolicy');
+
 async function refreshCapturedCookies(slotId = 0) {
   const slot = getSlot(slotId);
   try {
-    const { session } = require('electron');
     const ses = session.fromPartition(slot.partition);
     const [googleCookies, labsCookies] = await Promise.all([
       ses.cookies.get({ domain: '.google.com' }),
@@ -157,44 +161,119 @@ async function refreshCapturedCookies(slotId = 0) {
   }
 }
 
-// Fetch session info (name, email, avatar) from labs.google/session endpoint
+// Fetch session info with structured classification (authenticated, unauthenticated, transient-error, server-error, network-error)
 async function fetchSlotSession(slotId) {
-  try {
-    const wv = findFlowWebview(slotId);
-    if (wv) {
-      const result = await wv.executeJavaScript(`
-        (async () => {
-          try {
-            const r = await fetch('https://labs.google/fx/api/auth/session', {
-              credentials: 'include',
-              headers: { 'accept': 'application/json' }
-            });
-            if (!r.ok) return null;
-            const d = await r.json();
-            if (d && d.user) return { email: d.user.email, name: d.user.name, avatar: d.user.image };
-          } catch(e) {}
-          return null;
-        })()
-      `);
-      if (result) return result;
+  const slot = getSlot(slotId);
+  if (!slot) return { ok: false, kind: 'unauthenticated' };
+
+  // 1. Google OAuth UserInfo API via Bearer token (fastest & most reliable if token active)
+  if (slot.bearerToken) {
+    try {
+      const token = slot.bearerToken.replace(/^(Bearer\s+)+/i, 'Bearer ');
+      const userinfoResp = await net.fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: {
+          'Authorization': token,
+          'Accept': 'application/json',
+        },
+      });
+      if (userinfoResp.ok) {
+        const data = await userinfoResp.json().catch(() => null);
+        if (data && (data.email || data.name)) {
+          const user = {
+            email: data.email || null,
+            name: data.name || data.given_name || (data.email ? data.email.split('@')[0] : null),
+            avatar: data.picture || null,
+          };
+          if (user.email) slot.email = user.email;
+          if (user.name) slot.displayName = user.name;
+          if (user.avatar) slot.avatar = user.avatar;
+          console.log(`[SLOT-${slotId}][PROFILE] ✅ Fetched via googleapis userinfo: email=${user.email}, name=${user.name}`);
+          if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+            runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...user });
+          }
+          return { ok: true, kind: 'authenticated', user, status: 200 };
+        }
+      } else if (userinfoResp.status === 401 || userinfoResp.status === 403) {
+        // Bearer token expired in RAM — invalidate it but DO NOT exit early; fall through to test persistent cookie session!
+        console.warn(`[SLOT-${slotId}][PROFILE] Stale Bearer token returned ${userinfoResp.status}, resetting token in memory and falling back to persistent cookie session check...`);
+        slot.bearerToken = null;
+      }
+    } catch (e) {
+      console.warn(`[SLOT-${slotId}][PROFILE] OAuth userinfo fetch failed:`, e.message);
     }
-  } catch (e) { }
-  return null;
+  }
+
+  // 2. Direct fetch using slot partition cookies (labs.google/fx/api/auth/session)
+  try {
+    const ses = session.fromPartition(slot.partition || `persist:slot-${slotId}`);
+    const all = await ses.cookies.get({}).catch(() => []);
+    if (all.length > 0) {
+      const cookieHeader = all.map(c => `${c.name}=${c.value}`).join('; ');
+      const cleanUA = buildCleanUserAgent();
+      try {
+        const resp = await net.fetch('https://labs.google/fx/api/auth/session', {
+          headers: {
+            'accept': 'application/json',
+            'cookie': cookieHeader,
+            'user-agent': cleanUA,
+            'origin': 'https://labs.google',
+            'referer': 'https://labs.google/fx/tools/flow',
+          },
+        });
+
+        const d = await resp.json().catch(() => null);
+        const classified = classifySessionFetchResult({ status: resp.status, data: d });
+
+        if (classified.kind === 'authenticated' && classified.user) {
+          const user = classified.user;
+          if (user.email) slot.email = user.email;
+          if (user.name) slot.displayName = user.name;
+          if (user.avatar) slot.avatar = user.avatar;
+          console.log(`[SLOT-${slotId}][PROFILE] ✅ Fetched via net.fetch labs session: email=${user.email}, name=${user.name}`);
+          if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+            runtime.mainWindow.webContents.send('slot-session-updated', { slotId, ...user });
+          }
+          return { ok: true, kind: 'authenticated', user, status: resp.status };
+        }
+
+        return { ok: false, ...classified };
+      } catch (fetchErr) {
+        console.warn(`[SLOT-${slotId}][PROFILE] net.fetch request error:`, fetchErr.message);
+        return { ok: false, kind: 'network-error', error: fetchErr.message };
+      }
+    }
+  } catch (e) {
+    console.warn(`[SLOT-${slotId}][PROFILE] net.fetch failed:`, e.message);
+    return { ok: false, kind: 'network-error', error: e.message };
+  }
+
+  return { ok: false, kind: 'unauthenticated' };
 }
 
-async function clearSlotSessionData(slotId, { reloadWebview = true } = {}) {
+async function clearSlotSessionData(slotId) {
   const slot = getSlot(slotId);
   const ses = session.fromPartition(slot.partition);
 
-  const allCookies = await ses.cookies.get({});
-  await Promise.all(allCookies.map(c => {
-    const url = `${c.secure ? 'https' : 'http'}://${c.domain.replace(/^\./, '')}${c.path || '/'}`;
-    return ses.cookies.remove(url, c.name).catch(() => {});
-  }));
+  const allCookies = await ses.cookies.get({}).catch(() => []);
+  await Promise.all(
+    allCookies.map((c) => {
+      const url = `${c.secure ? "https" : "http"}://${c.domain.replace(/^\./, "")}${c.path || "/"}`;
+      return ses.cookies.remove(url, c.name).catch(() => {});
+    })
+  );
 
-  await ses.clearStorageData({
-    storages: ['cookies', 'localstorage', 'sessionstorage', 'indexdb', 'cachestorage', 'serviceworkers'],
-  }).catch(() => {});
+  await ses
+    .clearStorageData({
+      storages: [
+        "cookies",
+        "localstorage",
+        "sessionstorage",
+        "indexdb",
+        "cachestorage",
+        "serviceworkers",
+      ],
+    })
+    .catch(() => {});
 
   await ses.clearCache().catch(() => {});
 
@@ -213,11 +292,95 @@ async function clearSlotSessionData(slotId, { reloadWebview = true } = {}) {
   slot.lastCaptured = null;
   slot.status = 'empty';
 
-  if (reloadWebview) {
-    try {
-      const wv = findFlowWebview(slotId);
-      if (wv) wv.loadURL('https://labs.google/fx/tools/flow');
-    } catch (e) {}
+}
+
+// ── Silent Session Hydration & Restoration ───────────────────────────
+// Khôi phục trạng thái session từ persistent partition sau khi khởi động lại app.
+// Tuyệt đối không lưu token/cookie ra file JSON; dùng trực tiếp Chromium partition.
+async function restoreSlotSession(slotId) {
+  const slot = getSlot(slotId);
+  if (!slot) return { status: 'empty' };
+
+  try {
+    const ses = session.fromPartition(slot.partition || `persist:slot-${slotId}`);
+
+    // 1. Kiểm tra cookie trong partition
+    const [googleCookies, labsCookies] = await Promise.all([
+      ses.cookies.get({ domain: '.google.com' }).catch(() => []),
+      ses.cookies.get({ domain: 'labs.google' }).catch(() => []),
+    ]);
+    const allCookies = [...googleCookies, ...labsCookies];
+
+    if (!allCookies.length) {
+      slot.status = 'empty';
+      slot.cookies = '';
+      return { status: 'empty' };
+    }
+
+    slot.cookies = allCookies.map(c => `${c.name}=${c.value}`).join('; ');
+    slot.status = 'restoring';
+    const hasAuthCookies = hasAuthenticationCookie(allCookies);
+
+    // 2. Xác minh session hợp lệ qua endpoint với response phân loại
+    const sessionRes = await fetchSlotSession(slotId);
+
+    const calculatedStatus = evaluateSlotStatus({
+      cookiesCount: allCookies.length,
+      hasAuthCookies,
+      hasBearerToken: Boolean(slot.bearerToken),
+      sessionClassification: sessionRes,
+      previousStatus: slot.status === 'restoring' ? 'empty' : slot.status,
+    });
+
+    slot.status = calculatedStatus;
+
+    if (sessionRes && sessionRes.user) {
+      if (sessionRes.user.email) slot.email = sessionRes.user.email;
+      if (sessionRes.user.name) slot.displayName = sessionRes.user.name;
+      if (sessionRes.user.avatar) slot.avatar = sessionRes.user.avatar;
+      if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+        runtime.mainWindow.webContents.send('slot-session-updated', {
+          slotId,
+          email: slot.email,
+          name: slot.displayName,
+          avatar: slot.avatar,
+        });
+      }
+    }
+
+    console.log(`[SLOT-${slotId}][RESTORE] Evaluated status: "${slot.status}" (email: ${slot.email || 'none'})`);
+    return {
+      status: slot.status,
+      email: slot.email,
+      displayName: slot.displayName,
+      avatar: slot.avatar,
+    };
+  } catch (err) {
+    console.warn(`[SLOT-${slotId}][RESTORE] Check failed:`, err.message);
+    slot.status = slot.cookies ? 'error' : 'empty';
+    return { status: slot.status, error: err.message };
+  }
+}
+
+let isRestoringAllSessions = false;
+function getIsRestoringSessions() {
+  return isRestoringAllSessions;
+}
+
+async function restoreAllSlotSessions() {
+  if (isRestoringAllSessions) return;
+  isRestoringAllSessions = true;
+  console.log('[FLOW-SESSION] 🔄 Starting silent session hydration for all slots...');
+  try {
+    for (let i = 0; i < MAX_SLOTS; i += 1) {
+      await restoreSlotSession(i);
+    }
+    console.log('[FLOW-SESSION] ✅ Completed silent session hydration.');
+    if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
+      runtime.mainWindow.webContents.send('slot-session-updated', { all: true });
+    }
+  } finally {
+    isRestoringAllSessions = false;
   }
 }
 
@@ -247,7 +410,6 @@ function createWindow() {
       preload: path.join(__dirname, '..', 'preload.js'),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true,
       webSecurity: false,
       // Performance tweaks
       backgroundThrottling: true,
@@ -395,59 +557,6 @@ function setupRequestInterception() {
 
   console.log('[AUTH] Request interception active - monitoring all slot partitions');
 
-  // Poll webview URL để extract projectId khi user navigate vào project (không cần API request).
-  // PERF: giãn từ 3s → 6s (URL đổi rất hiếm, chỉ khi user vào/ra project) và LƯU handle
-  // để clear khi cửa sổ đóng / setup chạy lại — trước đây interval chạy mãi không cleanup.
-  const projectIdPollTimer = setInterval(() => {
-    try {
-      const wv = findFlowWebview();
-      if (!wv) return;
-      const url = wv.getURL();
-      if (url && url.includes('/project/')) {
-        const m = url.match(/\/project\/([a-zA-Z0-9_-]+)/);
-        if (m && m[1] && m[1] !== capturedAuth.projectId) {
-          capturedAuth.projectId = m[1];
-          console.log('[AUTH] ✅ ProjectId extracted from webview URL:', capturedAuth.projectId);
-          if (capturedAuth.bearerToken && runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
-            runtime.mainWindow.webContents.send('auto-entered-project');
-          }
-        }
-      }
-    } catch (e) { }
-  }, 6000);
-  webviewBackgroundTimers.push(projectIdPollTimer);
-
-  // Auto-diagnose page structure after webview loads
-  setTimeout(async () => {
-    try {
-      const wv = findFlowWebview();
-      if (!wv) { console.log('[DIAGNOSE] WebView not found yet'); return; }
-      const result = await wv.executeJavaScript(`
-        (function() {
-          var textareas = Array.from(document.querySelectorAll('textarea')).map(function(t) {
-            return { tag: 'textarea', id: t.id, className: (t.className||'').substring(0,120), placeholder: t.placeholder, ariaLabel: t.getAttribute('aria-label') };
-          });
-          var buttons = Array.from(document.querySelectorAll('button')).map(function(b) {
-            return { text: (b.textContent||'').trim().substring(0,60), id: b.id, className: (b.className||'').substring(0,120), ariaLabel: b.getAttribute('aria-label'), disabled: b.disabled, tagName: b.tagName };
-          });
-          var editables = Array.from(document.querySelectorAll('[contenteditable="true"]')).map(function(e) {
-            return { tag: e.tagName, id: e.id, className: (e.className||'').substring(0,120), role: e.getAttribute('role'), ariaLabel: e.getAttribute('aria-label') };
-          });
-          var recaptchaScripts = Array.from(document.querySelectorAll('script[src*="recaptcha"]')).map(function(s) { return s.src; });
-          return { textareas: textareas, buttons: buttons.filter(function(b){ return b.text.length > 0; }).slice(0,25), editables: editables, recaptchaScripts: recaptchaScripts, url: window.location.href };
-        })()
-      `);
-      console.log('[DIAGNOSE] ===== PAGE STRUCTURE =====');
-      console.log('[DIAGNOSE] URL:', result.url);
-      console.log('[DIAGNOSE] Textareas:', JSON.stringify(result.textareas, null, 2));
-      console.log('[DIAGNOSE] Editables:', JSON.stringify(result.editables, null, 2));
-      console.log('[DIAGNOSE] reCAPTCHA scripts:', JSON.stringify(result.recaptchaScripts));
-      console.log('[DIAGNOSE] Buttons with text:');
-      result.buttons.forEach((b, i) => console.log(`  [${i}] "${b.text}" | id=${b.id} | aria=${b.ariaLabel} | disabled=${b.disabled}`));
-      console.log('[DIAGNOSE] ===== END =====');
-    } catch (e) { console.log('[DIAGNOSE] Error:', e.message); }
-  }, 10000);
-
   // ── Auto-inject upload-video spy into webview ──
   // Automatically installs fetch interceptor to capture the browser's upload protocol
   async function autoInjectUploadSpy() {
@@ -537,9 +646,6 @@ function setupRequestInterception() {
   // Inject after 12s (after diagnose), then re-inject periodically (in case page reloads).
   // PERF: giãn re-inject 30s → 60s và lưu handle để cleanup. Guard __uploadSpyActive
   // khiến lần re-inject thường là no-op nên 60s vẫn đủ bắt trường hợp page reload.
-  const spyInjectTimeout = setTimeout(() => { autoInjectUploadSpy(); attachSpyConsoleListener(); }, 12000);
-  const spyInjectInterval = setInterval(() => { autoInjectUploadSpy(); attachSpyConsoleListener(); }, 60000);
-  webviewBackgroundTimers.push(spyInjectTimeout, spyInjectInterval);
 
   // Auto-enter a project after login (so user doesn't have to manually click)
   let autoEnterAttempted = false;
@@ -670,11 +776,6 @@ function setupRequestInterception() {
   // Try auto-enter at 12s, 20s, 30s (user may still be logging in).
   // Guard autoEnterAttempted khiến các lần sau là no-op; lưu handle để cleanup nếu
   // cửa sổ đóng trước khi kịp chạy.
-  webviewBackgroundTimers.push(
-    setTimeout(tryAutoEnterProject, 12000),
-    setTimeout(tryAutoEnterProject, 20000),
-    setTimeout(tryAutoEnterProject, 30000),
-  );
 }
 
 function teardownRequestInterception() {
@@ -816,6 +917,9 @@ function findFlowWebview(slotId = null) {
   });
   if (byPartition) return byPartition;
 
+  // If a specific slotId was requested, DO NOT fallback to other slots' webviews
+  if (slotId !== null) return null;
+
   // Fallback: find any webview on labs.google
   return all.find(wc => {
     try {
@@ -838,6 +942,9 @@ function findFlowWebview(slotId = null) {
     pickRandomSlot,
     refreshCapturedCookies,
     fetchSlotSession,
+    restoreSlotSession,
+    restoreAllSlotSessions,
+    getIsRestoringSessions,
     clearSlotSessionData,
     fetchSlotEmail,
     createWindow,

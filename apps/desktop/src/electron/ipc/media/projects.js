@@ -1,5 +1,7 @@
 'use strict';
 
+const { grantLocalFileCapability } = require('../../runtime/localFileCapabilities');
+
 /**
  * Video project files on disk (list/save/load/delete), media file pickers,
  * and file deletion.
@@ -12,11 +14,15 @@ module.exports = function registerMediaProjectsIpc(dependencies) {
     app,
     ipcMain,
     dialog,
+    shell,
     path,
     fs,
     pathToFileURL,
     fileURLToPath,
     runtime,
+    getImageOutputDir,
+    getVideoOutputDir,
+    loadSettings,
   } = dependencies;
 
 // ── Select video files dialog ─────────────────────────────────────────
@@ -109,7 +115,10 @@ ipcMain.handle('select-video-files', async () => {
     ],
   });
   if (result.canceled || !result.filePaths.length) return null;
-  const urls = result.filePaths.map(p => pathToFileURL(p).toString());
+  const urls = result.filePaths
+    .map(grantLocalFileCapability)
+    .filter(Boolean)
+    .map(p => pathToFileURL(p).toString());
   // Return array if multi, string if single (backward compat)
   return urls.length === 1 ? urls[0] : urls;
 });
@@ -138,7 +147,10 @@ ipcMain.handle('select-media-files', async () => {
     ],
   });
   if (result.canceled || !result.filePaths.length) return null;
-  const urls = result.filePaths.map(p => pathToFileURL(p).toString());
+  const urls = result.filePaths
+    .map(grantLocalFileCapability)
+    .filter(Boolean)
+    .map(p => pathToFileURL(p).toString());
   return urls.length === 1 ? urls[0] : urls;
 });
 
@@ -195,17 +207,31 @@ ipcMain.handle('select-agent-canvas-media-files', async () => {
   return selectedMedia;
 });
 
-// ── Delete file ───────────────────────────────────────────────────────
+// ── Delete file (Move to OS Recycle Bin with boundary and realpath checks) ──
+const { validateMediaDeleteTarget } = require('../../runtime/mediaSecurity');
+
 ipcMain.handle('delete-file', async (_, filePath) => {
   try {
-    const { fileURLToPath } = require('url');
-    const resolved = filePath.startsWith('file://') ? fileURLToPath(filePath) : filePath;
-    if (fs.existsSync(resolved)) {
-      fs.unlinkSync(resolved);
-      console.log(`[FILE] Deleted: ${resolved}`);
-      return true;
+    const validation = validateMediaDeleteTarget(filePath, dependencies);
+    if (!validation.valid) {
+      console.warn(`[FILE] Rejected delete: ${validation.reason} (target: "${filePath}")`);
+      return false;
     }
-    return false;
+
+    const resolvedPath = validation.resolvedPath;
+    console.log(`[FILE] Deleting target: "${filePath}" -> resolved: "${resolvedPath}"`);
+    if (shell && typeof shell.trashItem === 'function') {
+      try {
+        await shell.trashItem(resolvedPath);
+        console.log(`[FILE] Moved to Recycle Bin: ${resolvedPath}`);
+        return true;
+      } catch (trashErr) {
+        console.warn('[FILE] trashItem failed, falling back to unlinkSync:', trashErr);
+      }
+    }
+    fs.unlinkSync(resolvedPath);
+    console.log(`[FILE] Deleted: ${resolvedPath}`);
+    return true;
   } catch (err) {
     console.error('[FILE] Delete error:', err);
     throw err;

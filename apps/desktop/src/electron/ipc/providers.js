@@ -4,16 +4,16 @@ const registry = require('../providers/registry');
 
 module.exports = function registerProviderIpc(dependencies) {
   const {
+    app,
     ipcMain,
     loadSettings,
     saveSettings,
     accountSlots,
-    avisProvider,
-    getAvisMediaRuntime,
     setupRequestInterception,
     teardownRequestInterception,
     captchaBridge,
     refreshCapturedCookies,
+    openAiProvider,
   } = dependencies;
   let veo3CookieRefreshTimer = null;
   let veo3InitialCookieRefreshTimer = null;
@@ -29,10 +29,20 @@ module.exports = function registerProviderIpc(dependencies) {
   };
 
   const startVeo3Runtime = () => {
-    setupRequestInterception?.();
     try { captchaBridge?.start?.(); } catch (error) {
       console.warn('[PROVIDER][VEO3] CAPTCHA bridge start failed:', error?.message || error);
     }
+    if (app && typeof app.isReady === 'function' && !app.isReady()) {
+      app.whenReady().then(() => {
+        setupRequestInterception?.();
+        if (veo3CookieRefreshTimer) clearInterval(veo3CookieRefreshTimer);
+        if (veo3InitialCookieRefreshTimer) clearTimeout(veo3InitialCookieRefreshTimer);
+        veo3InitialCookieRefreshTimer = setTimeout(() => refreshCapturedCookies?.(), 5000);
+        veo3CookieRefreshTimer = setInterval(() => refreshCapturedCookies?.(), 30 * 60 * 1000);
+      });
+      return;
+    }
+    setupRequestInterception?.();
     if (veo3CookieRefreshTimer) clearInterval(veo3CookieRefreshTimer);
     if (veo3InitialCookieRefreshTimer) clearTimeout(veo3InitialCookieRefreshTimer);
     veo3InitialCookieRefreshTimer = setTimeout(() => refreshCapturedCookies?.(), 5000);
@@ -41,19 +51,32 @@ module.exports = function registerProviderIpc(dependencies) {
 
   ipcMain.handle('providers-list', async () => registry.listProviders());
 
+  ipcMain.handle('ai-provider-profile-list', async () => openAiProvider.list());
+  ipcMain.handle('ai-provider-profile-save', async (_event, payload) => openAiProvider.save(payload));
+  ipcMain.handle('ai-provider-profile-delete', async (_event, { id } = {}) => openAiProvider.remove(id));
+  ipcMain.handle('ai-provider-profile-set-active', async (_event, { id, capability = 'text' } = {}) => openAiProvider.setActive(id, capability));
+  ipcMain.handle('ai-provider-profile-test', async (_event, payload) => {
+    try {
+      return await openAiProvider.test(payload);
+    } catch (error) {
+      return { connected: false, error: error?.message || String(error) };
+    }
+  });
+  ipcMain.handle('ai-provider-profile-models', async (_event, payload) => {
+    try {
+      return await openAiProvider.models(payload);
+    } catch (error) {
+      return { connected: false, error: error?.message || String(error), models: [] };
+    }
+  });
+
   ipcMain.handle('provider-get-active', async () => {
     return registry.normalizeProviderId(loadSettings().activeProvider);
   });
 
   ipcMain.handle('provider-set-active', async (_event, { providerId, activate = true } = {}) => {
     const id = registry.normalizeProviderId(providerId);
-    // Provider selection is the application-level routing boundary. Keep the
-    // AI text route aligned with its media runtime instead of allowing a
-    // hidden mixed-provider session after switching from the startup hub.
-    saveSettings({
-      activeProvider: id,
-      aiProvider: id === 'avis' ? 'avis' : 'ollama',
-    });
+    saveSettings({ activeProvider: id });
     // Tear down the previous provider before validating/starting the next one.
     // This also guarantees a failed license check cannot leave VEO3 running.
     stopVeo3Runtime();
@@ -65,33 +88,18 @@ module.exports = function registerProviderIpc(dependencies) {
 
   ipcMain.handle('provider-get-status', async (_event, { providerId } = {}) => {
     const adapter = registry.getProviderAdapter(providerId);
-    return adapter.getStatus({ accountSlots, avisProvider, getAvisMediaRuntime });
+    return adapter.getStatus({ accountSlots });
   });
 
   ipcMain.handle('provider-get-credential', async (_event, { providerId } = {}) => {
-    const id = registry.normalizeProviderId(providerId);
-    if (id !== 'avis') return { configured: false, value: '' };
-    const runtime = getAvisMediaRuntime();
-    return {
-      configured: !!runtime?.configured,
-      value: String(runtime?.apiKey || ''),
-    };
+    registry.normalizeProviderId(providerId);
+    return { configured: false, value: '' };
   });
 
-  ipcMain.handle('provider-clear-credential', async (_event, { providerId } = {}) => {
-    const id = registry.normalizeProviderId(providerId);
-    if (id !== 'avis') {
-      throw new Error(`Provider ${id} không hỗ trợ xóa credential bằng API này.`);
-    }
-    // Keep an explicit disabled marker so an imported key stays disconnected
-    // even when a developer environment or legacy secret file contains a
-    // fallback AVIS_API_KEY.
-    saveSettings({
-      avisApiKey: '',
-      avisApiKeyDisabled: true,
-    });
-    return { cleared: true };
-  });
+  const initialActive = registry.normalizeProviderId(loadSettings().activeProvider);
+  if (initialActive === 'veo3') {
+    startVeo3Runtime();
+  }
 
   return registry;
 };

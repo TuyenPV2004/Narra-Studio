@@ -1,0 +1,306 @@
+import {
+  AudioLines,
+  Folder,
+  FolderOpen,
+  Image,
+  KeyRound,
+  Save,
+  Settings,
+  Video,
+} from "lucide-react";
+import { useEffect, useState, type ReactNode } from "react";
+import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import { Tabs, type TabOption } from "@/components/ui/Tabs";
+import { toast } from "@/components/ui/Toast";
+import { captchaApi, settingsApi } from "@/services/electron-api";
+import type { ProviderId } from "@/types/electron-api";
+
+type SettingsTab = "advanced" | "output";
+
+interface SettingsPageProps {
+  activeProvider: ProviderId;
+}
+
+export function SettingsPage({ activeProvider }: SettingsPageProps) {
+  const [tab, setTab] = useState<SettingsTab>("output");
+  const [videoPath, setVideoPath] = useState("");
+  const [imagePath, setImagePath] = useState("");
+  const [voicePath, setVoicePath] = useState("");
+  const [authToken, setAuthToken] = useState("");
+  const [busy, setBusy] = useState(false);
+  const tabs: readonly TabOption<SettingsTab>[] = [
+    {
+      value: "output",
+      label: "Thư mục lưu",
+      icon: <Folder size={16} aria-hidden="true" />,
+    },
+    ...(activeProvider === "veo3"
+      ? [
+          {
+            value: "advanced" as const,
+            label: "Nâng cao",
+            icon: <KeyRound size={16} aria-hidden="true" />,
+          },
+        ]
+      : []),
+  ];
+
+  useEffect(() => {
+    let cancelled = false;
+    void settingsApi
+      .getOutputPaths()
+      .then((paths) => {
+        if (!cancelled) {
+          setVideoPath(paths.video);
+          setImagePath(paths.image);
+          setVoicePath(paths.voice);
+        }
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          const msg = error instanceof Error ? error.message : String(error);
+          toast.error("Không thể tải đường dẫn lưu", { description: msg });
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (activeProvider !== "veo3" && tab === "advanced") setTab("output");
+  }, [activeProvider, tab]);
+
+  const changeFolder = async (kind: "image" | "video" | "voice") => {
+    setBusy(true);
+    try {
+      let path = "";
+      if (kind === "video") path = await settingsApi.changeVideoOutputFolder();
+      else if (kind === "image")
+        path = await settingsApi.changeImageOutputFolder();
+      else path = await settingsApi.changeVoiceOutputFolder();
+      if (path) {
+        if (kind === "video") setVideoPath(path);
+        else if (kind === "image") setImagePath(path);
+        else setVoicePath(path);
+        toast.success("Đã cập nhật thư mục lưu thành công!", {
+          description: path,
+        });
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error("Không thể đổi thư mục lưu", { description: msg });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveAuth = async () => {
+    if (!authToken.trim()) {
+      toast.warning("Vui lòng dán mã xác thực trước khi lưu.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await settingsApi.setManualAuth(authToken.trim());
+      setAuthToken("");
+      toast.success("Đã lưu mã xác thực Google thành công!");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error("Lưu mã xác thực thất bại", { description: msg });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openFolder = async (path: string) => {
+    try {
+      const result = await settingsApi.openOutputFolder(path);
+      const failed =
+        result === false ||
+        (typeof result === "object" && result !== null && result.ok === false);
+      if (failed) {
+        const error =
+          typeof result === "object" && result !== null ? result.error : null;
+        throw new Error(error || "Không thể mở thư mục");
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error("Không thể mở thư mục", { description: msg });
+    }
+  };
+
+  const testCaptcha = async () => {
+    setBusy(true);
+    try {
+      const status = await captchaApi.getBridgeStatus();
+      const connected =
+        typeof status === "object" &&
+        status !== null &&
+        "connected" in status &&
+        (status as Record<string, unknown>).connected === true;
+      if (!connected) {
+        toast.error("CAPTCHA bridge chưa kết nối", {
+          description: "Hãy mở Google Flow và kiểm tra Extension trong Chrome.",
+        });
+        return;
+      }
+      toast.success("Kết nối CAPTCHA hoạt động.");
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      toast.error("Kiểm tra CAPTCHA thất bại", { description: msg });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <section className="source-settings-page" aria-labelledby="settings-title">
+      <header className="source-settings-hero">
+        <div className="source-settings-hero__left">
+          <span className="source-settings-hero__icon">
+            <Settings size={28} aria-hidden="true" />
+          </span>
+          <div>
+            <h1 id="settings-title">Cài đặt</h1>
+            <p>Tùy chỉnh thư mục lưu trữ và các thiết lập hệ thống.</p>
+          </div>
+        </div>
+      </header>
+      <Tabs
+        value={tab}
+        options={tabs}
+        onChange={setTab}
+        ariaLabel="Các mục cài đặt"
+      />
+      {tab === "output" && (
+        <section
+          className="source-settings-section"
+          aria-labelledby="output-title"
+        >
+          <header>
+            <h2 id="output-title">Thư mục lưu</h2>
+            <p>Chọn thư mục dễ tìm cho hình ảnh, video và Voice đã tạo.</p>
+          </header>
+          <div className="source-folder-list">
+            <FolderRow
+              icon={<Video size={24} aria-hidden="true" />}
+              label="Video"
+              path={videoPath}
+              busy={busy}
+              onChange={() => void changeFolder("video")}
+              onOpen={() => void openFolder(videoPath)}
+            />
+            <FolderRow
+              icon={<Image size={24} aria-hidden="true" />}
+              label="Hình ảnh"
+              path={imagePath}
+              busy={busy}
+              onChange={() => void changeFolder("image")}
+              onOpen={() => void openFolder(imagePath)}
+            />
+            <FolderRow
+              icon={<AudioLines size={24} aria-hidden="true" />}
+              label="Voice"
+              path={voicePath}
+              busy={busy}
+              onChange={() => void changeFolder("voice")}
+              onOpen={() => void openFolder(voicePath)}
+            />
+          </div>
+        </section>
+      )}
+      {tab === "advanced" && activeProvider === "veo3" && (
+        <section
+          className="source-settings-section"
+          aria-labelledby="advanced-title"
+        >
+          <header>
+            <h2 id="advanced-title">Nâng cao</h2>
+            <p>
+              Thiết lập xác thực thủ công khi phiên Google Flow cần được cập
+              nhật.
+            </p>
+          </header>
+          <div className="source-settings-auth">
+            <label htmlFor="manual-auth">Mã xác thực Google</label>
+            <div>
+              <Input
+                id="manual-auth"
+                type="password"
+                value={authToken}
+                onChange={(event) => setAuthToken(event.target.value)}
+                placeholder="Dán mã xác thực"
+                autoComplete="off"
+              />
+              <Button
+                disabled={busy || !authToken.trim()}
+                onClick={() => void saveAuth()}
+              >
+                <Save size={16} aria-hidden="true" />
+                Lưu
+              </Button>
+            </div>
+          </div>
+          <details className="source-settings-details">
+            <summary>Kiểm tra xác minh trình duyệt</summary>
+            <Button
+              variant="secondary"
+              disabled={busy}
+              onClick={() => void testCaptcha()}
+            >
+              Kiểm tra kết nối
+            </Button>
+          </details>
+        </section>
+      )}
+    </section>
+  );
+}
+
+interface FolderRowProps {
+  busy: boolean;
+  icon: ReactNode;
+  label: string;
+  onChange: () => void;
+  onOpen: () => void;
+  path: string;
+}
+
+function FolderRow({
+  busy,
+  icon,
+  label,
+  onChange,
+  onOpen,
+  path,
+}: FolderRowProps) {
+  return (
+    <article className="source-folder-row">
+      <span className="source-folder-row__icon">{icon}</span>
+      <div>
+        <strong>{label}</strong>
+        <code title={path}>{path || "Đang tải..."}</code>
+      </div>
+      <Button
+        variant="secondary"
+        className="source-folder-row__btn-change"
+        disabled={busy}
+        onClick={onChange}
+      >
+        <FolderOpen size={16} aria-hidden="true" />
+        Đổi thư mục
+      </Button>
+      <Button
+        variant="primary"
+        className="source-folder-row__btn-open"
+        disabled={!path}
+        onClick={onOpen}
+      >
+        <Folder size={16} aria-hidden="true" />
+        Mở
+      </Button>
+    </article>
+  );
+}
