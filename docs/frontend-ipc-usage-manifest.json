@@ -16,7 +16,7 @@
       "backend handler semantics"
     ]
   },
-  "rendererRoot": "apps/desktop/src/renderer-source",
+  "rendererRoot": "apps/desktop/src/ui",
   "preloadFile": "apps/desktop/src/electron/preload.js",
   "summary": {
     "usedMethods": 171,
@@ -37,7 +37,7 @@
       "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -52,7 +52,7 @@
       "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -68,7 +68,7 @@
       "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -83,7 +83,7 @@
       "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -98,7 +98,7 @@
       "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -113,7 +113,7 @@
       "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -128,7 +128,7 @@
       "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts"
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
       ],
       "preload": {
         "exposed": true,
@@ -143,7 +143,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -158,7 +158,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -173,7 +173,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
       ],
       "preload": {
         "exposed": true,
@@ -188,7 +188,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
       ],
       "preload": {
         "exposed": true,
@@ -201,7 +201,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
       ],
       "preload": {
         "exposed": true,
@@ -216,7 +216,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
       ],
       "preload": {
         "exposed": true,
@@ -231,7 +231,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
       ],
       "preload": {
         "exposed": true,
@@ -246,7 +246,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/ai-providers.ts"
+        "apps/desktop/src/ui/services/electron-api/ai-providers.ts"
       ],
       "preload": {
         "exposed": true,
@@ -261,7 +261,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -276,8 +276,8 @@
       "businessArea": "Media / Generation",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts",
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -292,8 +292,8 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 8,
       "files": [
-        "apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/pages/Video/VideoGeneratorPage.tsx",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -308,7 +308,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -323,7 +323,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -338,7 +338,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -353,7 +353,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -366,7 +366,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -379,7 +379,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -392,7 +392,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
+        "apps/desktop/src/ui/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -407,7 +407,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -422,7 +422,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -437,9 +437,9 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 3,
       "files": [
-        "apps/desktop/src/renderer-source/pages/GoogleFlow/GoogleFlowPage.tsx",
-        "apps/desktop/src/renderer-source/pages/Voice/VoicePage.tsx",
-        "apps/desktop/src/renderer-source/services/electron-api/captcha.ts"
+        "apps/desktop/src/ui/pages/GoogleFlow/GoogleFlowPage.tsx",
+        "apps/desktop/src/ui/pages/Voice/VoicePage.tsx",
+        "apps/desktop/src/ui/services/electron-api/captcha.ts"
       ],
       "preload": {
         "exposed": true,
@@ -454,7 +454,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/director.ts"
+        "apps/desktop/src/ui/services/electron-api/director.ts"
       ],
       "preload": {
         "exposed": true,
@@ -469,7 +469,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -484,7 +484,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -499,7 +499,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
+        "apps/desktop/src/ui/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -514,7 +514,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -529,7 +529,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -544,7 +544,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -559,7 +559,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -574,7 +574,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
+        "apps/desktop/src/ui/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -589,7 +589,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/user-presets.ts"
+        "apps/desktop/src/ui/services/electron-api/user-presets.ts"
       ],
       "preload": {
         "exposed": true,
@@ -604,7 +604,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -619,7 +619,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
+        "apps/desktop/src/ui/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -634,7 +634,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -649,7 +649,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -664,7 +664,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -679,7 +679,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -694,7 +694,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -709,7 +709,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -724,10 +724,10 @@
       "businessArea": "Google Flow / Session",
       "callCount": 4,
       "files": [
-        "apps/desktop/src/renderer-source/pages/Image/ImageEditorPage.tsx",
-        "apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
-        "apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/pages/Image/ImageEditorPage.tsx",
+        "apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
+        "apps/desktop/src/ui/pages/Video/VideoGeneratorPage.tsx",
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -740,7 +740,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -755,8 +755,8 @@
       "businessArea": "CAPTCHA / Extension",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/captcha.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/captcha.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -769,8 +769,8 @@
       "businessArea": "Google Flow / Session",
       "callCount": 3,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/provider.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/provider.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -785,7 +785,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/dashboard.ts"
+        "apps/desktop/src/ui/services/electron-api/dashboard.ts"
       ],
       "preload": {
         "exposed": true,
@@ -798,9 +798,9 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 3,
       "files": [
-        "apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
+        "apps/desktop/src/ui/services/electron-api/image.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -815,7 +815,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
+        "apps/desktop/src/ui/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -830,7 +830,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -843,7 +843,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -858,7 +858,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -873,7 +873,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -886,7 +886,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -899,7 +899,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/skills.ts"
+        "apps/desktop/src/ui/services/electron-api/skills.ts"
       ],
       "preload": {
         "exposed": true,
@@ -912,7 +912,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/user-presets.ts"
+        "apps/desktop/src/ui/services/electron-api/user-presets.ts"
       ],
       "preload": {
         "exposed": true,
@@ -925,7 +925,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -940,7 +940,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/director.ts"
+        "apps/desktop/src/ui/services/electron-api/director.ts"
       ],
       "preload": {
         "exposed": true,
@@ -953,7 +953,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
+        "apps/desktop/src/ui/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -966,7 +966,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
+        "apps/desktop/src/ui/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -979,7 +979,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -992,7 +992,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
+        "apps/desktop/src/ui/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1005,7 +1005,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/director.ts"
+        "apps/desktop/src/ui/services/electron-api/director.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1020,7 +1020,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/history.ts"
+        "apps/desktop/src/ui/services/electron-api/history.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1035,7 +1035,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/user-presets.ts"
+        "apps/desktop/src/ui/services/electron-api/user-presets.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1048,7 +1048,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1063,7 +1063,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1078,7 +1078,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1093,7 +1093,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1108,7 +1108,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1123,7 +1123,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1138,7 +1138,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1153,7 +1153,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1168,7 +1168,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1183,7 +1183,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1198,7 +1198,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1213,7 +1213,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1228,7 +1228,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1243,7 +1243,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1258,7 +1258,7 @@
       "businessArea": "CAPTCHA / Extension",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/captcha.ts"
+        "apps/desktop/src/ui/services/electron-api/captcha.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1271,7 +1271,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/captcha.ts"
+        "apps/desktop/src/ui/services/electron-api/captcha.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1286,7 +1286,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1301,7 +1301,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1316,8 +1316,8 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
+        "apps/desktop/src/ui/services/electron-api/media.ts",
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1332,8 +1332,8 @@
       "businessArea": "Google Flow / Session",
       "callCount": 3,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/image.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1346,7 +1346,7 @@
       "businessArea": "Media / Generation",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1361,7 +1361,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1376,7 +1376,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1392,7 +1392,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1407,7 +1407,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1420,7 +1420,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1436,7 +1436,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1451,7 +1451,7 @@
       "businessArea": "Provider",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
+        "apps/desktop/src/ui/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1464,7 +1464,7 @@
       "businessArea": "Provider",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
+        "apps/desktop/src/ui/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1479,7 +1479,7 @@
       "businessArea": "Provider",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
+        "apps/desktop/src/ui/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1494,7 +1494,7 @@
       "businessArea": "Provider",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/provider.ts"
+        "apps/desktop/src/ui/services/electron-api/provider.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1509,7 +1509,7 @@
       "businessArea": "Media / Generation",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1524,7 +1524,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/skills.ts"
+        "apps/desktop/src/ui/services/electron-api/skills.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1539,7 +1539,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1554,7 +1554,7 @@
       "businessArea": "Media / Generation",
       "callCount": 3,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
+        "apps/desktop/src/ui/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1569,7 +1569,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/director.ts"
+        "apps/desktop/src/ui/services/electron-api/director.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1584,7 +1584,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/director.ts"
+        "apps/desktop/src/ui/services/electron-api/director.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1599,7 +1599,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent-conversations.ts"
+        "apps/desktop/src/ui/services/electron-api/agent-conversations.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1614,7 +1614,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/history.ts"
+        "apps/desktop/src/ui/services/electron-api/history.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1630,9 +1630,9 @@
       "businessArea": "Media / Generation",
       "callCount": 5,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/image.ts",
+        "apps/desktop/src/ui/services/electron-api/media.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1647,7 +1647,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/user-presets.ts"
+        "apps/desktop/src/ui/services/electron-api/user-presets.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1662,7 +1662,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1677,8 +1677,8 @@
       "businessArea": "Media / Generation",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts",
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1691,8 +1691,8 @@
       "businessArea": "Media / Generation",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts",
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1705,7 +1705,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
+        "apps/desktop/src/ui/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1718,7 +1718,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1731,7 +1731,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1744,7 +1744,7 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1757,9 +1757,9 @@
       "businessArea": "Media / Generation",
       "callCount": 3,
       "files": [
-        "apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts"
+        "apps/desktop/src/ui/pages/Video/VideoGeneratorPage.tsx",
+        "apps/desktop/src/ui/services/electron-api/media.ts",
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1772,7 +1772,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1787,7 +1787,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/settings.ts"
+        "apps/desktop/src/ui/services/electron-api/settings.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1802,11 +1802,11 @@
       "businessArea": "Desktop / Local utility",
       "callCount": 5,
       "files": [
-        "apps/desktop/src/renderer-source/pages/Image/ImageEditorPage.tsx",
-        "apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video-editor.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/pages/Image/ImageEditorPage.tsx",
+        "apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
+        "apps/desktop/src/ui/services/electron-api/editor.ts",
+        "apps/desktop/src/ui/services/electron-api/video-editor.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1821,7 +1821,7 @@
       "businessArea": "Google Flow / Session",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/flow.ts"
+        "apps/desktop/src/ui/services/electron-api/flow.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1836,7 +1836,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1851,7 +1851,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1866,7 +1866,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1881,7 +1881,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1896,7 +1896,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1911,7 +1911,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1926,7 +1926,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1941,7 +1941,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1956,7 +1956,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1971,7 +1971,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -1986,7 +1986,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2001,7 +2001,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2016,7 +2016,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2031,7 +2031,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2046,7 +2046,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2061,7 +2061,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2076,7 +2076,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2091,7 +2091,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2106,7 +2106,7 @@
       "businessArea": "Workspace",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2121,7 +2121,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2136,7 +2136,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2151,7 +2151,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2164,7 +2164,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2179,7 +2179,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2194,7 +2194,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2209,7 +2209,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2224,7 +2224,7 @@
       "businessArea": "CAPTCHA / Extension",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/captcha.ts"
+        "apps/desktop/src/ui/services/electron-api/captcha.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2237,8 +2237,8 @@
       "businessArea": "Other frontend runtime",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/agent.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/agent.ts",
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2253,7 +2253,7 @@
       "businessArea": "Other frontend runtime",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/editor.ts"
+        "apps/desktop/src/ui/services/electron-api/editor.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2268,7 +2268,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
+        "apps/desktop/src/ui/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2283,7 +2283,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media-tools.ts"
+        "apps/desktop/src/ui/services/electron-api/media-tools.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2298,7 +2298,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/media.ts"
+        "apps/desktop/src/ui/services/electron-api/media.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2313,8 +2313,8 @@
       "businessArea": "Media / Generation",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/image.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2329,8 +2329,8 @@
       "businessArea": "Media / Generation",
       "callCount": 2,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts",
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/image.ts",
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2345,7 +2345,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2360,7 +2360,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/image.ts"
+        "apps/desktop/src/ui/services/electron-api/image.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2375,7 +2375,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/video.ts"
+        "apps/desktop/src/ui/services/electron-api/video.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2390,7 +2390,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2405,7 +2405,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2418,7 +2418,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2433,7 +2433,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2448,7 +2448,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2461,7 +2461,7 @@
       "businessArea": "Workspace",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/workspace.ts"
+        "apps/desktop/src/ui/services/electron-api/workspace.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2476,7 +2476,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2491,7 +2491,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2506,7 +2506,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2521,7 +2521,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2536,7 +2536,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2551,7 +2551,7 @@
       "businessArea": "Media / Generation",
       "callCount": 1,
       "files": [
-        "apps/desktop/src/renderer-source/services/electron-api/voice.ts"
+        "apps/desktop/src/ui/services/electron-api/voice.ts"
       ],
       "preload": {
         "exposed": true,
@@ -2631,93 +2631,93 @@
   "dynamicImports": {
     "entries": [
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/AIAgent/AIAgentSourcePage",
-        "target": "apps/desktop/src/renderer-source/pages/AIAgent/AIAgentSourcePage.tsx",
+        "target": "apps/desktop/src/ui/pages/AIAgent/AIAgentSourcePage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/CapcutEditor/CapcutEditorPage",
-        "target": "apps/desktop/src/renderer-source/pages/CapcutEditor/CapcutEditorPage.tsx",
+        "target": "apps/desktop/src/ui/pages/CapcutEditor/CapcutEditorPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/CaptchaSetup/CaptchaSetupPage",
-        "target": "apps/desktop/src/renderer-source/pages/CaptchaSetup/CaptchaSetupPage.tsx",
+        "target": "apps/desktop/src/ui/pages/CaptchaSetup/CaptchaSetupPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/Dashboard/DashboardPage",
-        "target": "apps/desktop/src/renderer-source/pages/Dashboard/DashboardPage.tsx",
+        "target": "apps/desktop/src/ui/pages/Dashboard/DashboardPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/GoogleFlow/GoogleFlowPage",
-        "target": "apps/desktop/src/renderer-source/pages/GoogleFlow/GoogleFlowPage.tsx",
+        "target": "apps/desktop/src/ui/pages/GoogleFlow/GoogleFlowPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/Guide/GuidePage",
-        "target": "apps/desktop/src/renderer-source/pages/Guide/GuidePage.tsx",
+        "target": "apps/desktop/src/ui/pages/Guide/GuidePage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/Image/ImageEditorPage",
-        "target": "apps/desktop/src/renderer-source/pages/Image/ImageEditorPage.tsx",
+        "target": "apps/desktop/src/ui/pages/Image/ImageEditorPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/Image/ImageGeneratorPage",
-        "target": "apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
+        "target": "apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/MediaLibrary/MediaLibraryPage",
-        "target": "apps/desktop/src/renderer-source/pages/MediaLibrary/MediaLibraryPage.tsx",
+        "target": "apps/desktop/src/ui/pages/MediaLibrary/MediaLibraryPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/ProviderAccount/ProviderConnectionsPage",
-        "target": "apps/desktop/src/renderer-source/pages/ProviderAccount/ProviderConnectionsPage.tsx",
+        "target": "apps/desktop/src/ui/pages/ProviderAccount/ProviderConnectionsPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/SceneMerge/SceneMergePage",
-        "target": "apps/desktop/src/renderer-source/pages/SceneMerge/SceneMergePage.tsx",
+        "target": "apps/desktop/src/ui/pages/SceneMerge/SceneMergePage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/Settings/SettingsPage",
-        "target": "apps/desktop/src/renderer-source/pages/Settings/SettingsPage.tsx",
+        "target": "apps/desktop/src/ui/pages/Settings/SettingsPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/Video/VideoGeneratorPage",
-        "target": "apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
+        "target": "apps/desktop/src/ui/pages/Video/VideoGeneratorPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/VideoEditor/VideoEditorPage",
-        "target": "apps/desktop/src/renderer-source/pages/VideoEditor/VideoEditorPage.tsx",
+        "target": "apps/desktop/src/ui/pages/VideoEditor/VideoEditorPage.tsx",
         "exists": true
       },
       {
-        "importer": "apps/desktop/src/renderer-source/app/App.tsx",
+        "importer": "apps/desktop/src/ui/app/App.tsx",
         "specifier": "@/pages/Voice/VoicePage",
-        "target": "apps/desktop/src/renderer-source/pages/Voice/VoicePage.tsx",
+        "target": "apps/desktop/src/ui/pages/Voice/VoicePage.tsx",
         "exists": true
       }
     ],

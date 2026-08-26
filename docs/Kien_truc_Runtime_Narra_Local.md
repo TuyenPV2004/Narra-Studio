@@ -43,7 +43,7 @@ Narra Studio là ứng dụng Electron single-user. Renderer chính được bui
 
 - Source runtime: `apps/desktop/src`.
 - Electron Main: `apps/desktop/src/electron/main.js`.
-- Renderer React/TypeScript: `apps/desktop/src/renderer-source`.
+- Renderer React/TypeScript: `apps/desktop/src/ui`.
 - Vite build renderer source vào `dist`; Electron Main/config được sao chép nguyên trạng vào `dist-electron` và `config`.
 - `.package-stage`, `release` và `release-*` là output tái tạo được, không phải source.
 

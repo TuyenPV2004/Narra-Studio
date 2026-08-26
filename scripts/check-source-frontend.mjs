@@ -3,7 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const sourceRoot = path.join(repositoryRoot, 'apps', 'desktop', 'src', 'renderer-source');
+const sourceRoot = path.join(repositoryRoot, 'apps', 'desktop', 'src', 'ui');
 const electronRoot = path.join(repositoryRoot, 'apps', 'desktop', 'src', 'electron');
 const preloadFile = path.join(electronRoot, 'preload.js');
 const sourceBuildFile = path.join(repositoryRoot, 'scripts', 'build-source-desktop.mjs');
@@ -149,13 +149,13 @@ if (JSON.stringify(actualSourcePageIds) !== JSON.stringify(expectedSourcePageIds
 const electronFiles = collectFiles(electronRoot, (file) => /\.js$/u.test(file));
 for (const file of electronFiles) {
   const source = readFileSync(file, 'utf8');
-  if (/(?:renderer-source|dist-source-renderer)/u.test(source)) {
+  if (/(?:src[\\/]+ui|dist-source-renderer)/u.test(source)) {
     failures.push(`Electron runtime references the parallel source renderer: ${path.relative(repositoryRoot, file)}`);
   }
 }
 
 const sourceBuildSource = readFileSync(sourceBuildFile, 'utf8');
-if (!/renderer-source/u.test(sourceBuildSource) || /src["', ]*,?\s*["']renderer["']/u.test(sourceBuildSource)) failures.push('Production source build does not isolate renderer-source from the recovered renderer.');
+if (!/path\.join\(sourceRoot,\s*["']ui["']\)/u.test(sourceBuildSource) || /src["', ]*,?\s*["']renderer["']/u.test(sourceBuildSource)) failures.push('Production source build does not isolate the maintained UI from the recovered renderer.');
 
 const rootPackage = JSON.parse(readFileSync(path.join(repositoryRoot, 'package.json'), 'utf8'));
 const desktopPackage = JSON.parse(readFileSync(path.join(repositoryRoot, 'apps', 'desktop', 'package.json'), 'utf8'));

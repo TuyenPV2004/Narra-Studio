@@ -10,7 +10,7 @@ const sourceRoot = path.join(
   "apps",
   "desktop",
   "src",
-  "renderer-source",
+  "ui",
 );
 const read = (relative) =>
   fs.readFileSync(path.join(sourceRoot, relative), "utf8");

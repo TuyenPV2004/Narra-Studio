@@ -55,6 +55,22 @@ Thiết kế documentary/Remotion/SQLite/Codex pipeline cũ không còn là ki�
   source of truth hoặc lệnh kiểm tra của dự án. Nếu skill không khả dụng, tiếp tục theo các rule này và
   nêu rõ giới hạn trong báo cáo.
 
+## Front-End Checklist MCP
+
+- Khi review, audit, debug hoặc thay đổi frontend trong `apps/desktop/src/ui`, nếu MCP
+  `frontendchecklist` khả dụng thì dùng nó như một quality gate bổ sung cho accessibility, performance,
+  HTML/CSS/JavaScript, security, images và testing.
+- Với code đã dán hoặc đã đọc, gọi `review_code` trước; sau đó dùng `search_rules`, `get_rule`, `check_rule`,
+  `explain_rule` hoặc `fix_rule` để đối chiếu sâu các phát hiện liên quan. Kết quả không có issue chỉ có nghĩa
+  là chưa phát hiện được lỗi bằng heuristic tĩnh, không phải bằng chứng frontend hoàn toàn đạt chuẩn.
+- Với audit rộng, lấy `get_workflow` hoặc `get_checklist_rules` trước khi kiểm tra từng rule. Chỉ dùng
+  `audit_url` cho URL công khai mà công cụ có thể truy cập; với renderer Electron/local, phải kiểm tra bằng
+  source, test và trình duyệt/runtime phù hợp.
+- Khuyến nghị từ MCP phải được đối chiếu với source of truth, kiến trúc Electron, convention hiện có và hành vi
+  runtime của Narra Studio. Không gửi secret, token, cookie, dữ liệu người dùng hoặc nội dung `.env` vào MCP.
+- Front-End Checklist MCP không thay thế `pnpm typecheck`, `pnpm test`, `pnpm build`, kiểm thử trình duyệt hoặc
+  xác minh runtime. Khi bàn giao, nêu rõ thao tác MCP đã dùng, phát hiện đã xử lý và phần chưa thể xác minh.
+
 ## Phạm vi sản phẩm
 
 - Narra Studio là ứng dụng Electron local, single-user, dựa trên runtime đã khôi phục và local hóa.
@@ -73,7 +89,7 @@ Thiết kế documentary/Remotion/SQLite/Codex pipeline cũ không còn là ki�
 ## Quy tắc code
 
 - Source desktop hiện hành nằm trong `apps/desktop/src`.
-- Renderer production được build từ React/TypeScript source trong `apps/desktop/src/renderer-source` bằng Vite.
+- Renderer production được build từ React/TypeScript source trong `apps/desktop/src/ui` bằng Vite.
 - Thay đổi renderer phải thực hiện trong source React/TypeScript hiện hành; không khôi phục hoặc sửa lại recovered/compiled renderer cũ làm source runtime.
 - Cấu hình nhạy cảm đặt trong `.env`; `.env.example` chỉ chứa tên biến và giá trị mẫu không bí mật.
 - Giữ IPC Main/Preload đồng bộ và không làm mất các API Google Flow đang được renderer gọi.

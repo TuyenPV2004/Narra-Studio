@@ -113,7 +113,7 @@ export function WorkspaceToolboxPanel({
           <Button
             key={group}
             type="button"
-            variant="ghost"
+            variant="secondary"
             onClick={() =>
               void saveGroup(group).catch((value) =>
                 setError(
@@ -144,7 +144,7 @@ export function WorkspaceToolboxPanel({
           </Button>
           <Button
             type="button"
-            variant="ghost"
+            variant="secondary"
             aria-label={`Xóa toolbox ${item.name}`}
             onClick={() =>
               void remove(item).catch((value) =>

@@ -6,7 +6,7 @@ import {fileURLToPath} from 'node:url';
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const desktopRoot = path.join(repositoryRoot, 'apps', 'desktop');
 const sourceRoot = path.join(desktopRoot, 'src');
-const rendererSource = path.join(sourceRoot, 'renderer-source');
+const rendererSource = path.join(sourceRoot, 'ui');
 const rendererOutput = path.join(desktopRoot, 'dist');
 const viteCli = path.join(repositoryRoot, 'node_modules', 'vite', 'bin', 'vite.js');
 const viteConfig = path.join(rendererSource, 'vite.config.mts');

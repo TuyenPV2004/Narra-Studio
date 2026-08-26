@@ -1,6 +1,7 @@
 import { Camera, Clapperboard, FolderPlus, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
 import {
   directorApi,
   type DirectorSceneMeta,
@@ -100,10 +101,11 @@ export function DirectorPanel() {
   return (
     <section className="source-director-panel">
       <aside className="narra-card">
-        <header>
-          <h2>Director scenes</h2>
+        <header className="source-director-aside-header">
+          <h2>Danh sách Scene</h2>
           <Button
-            variant="ghost"
+            type="button"
+            variant="secondary"
             aria-label="Scene mới"
             onClick={() => {
               setSceneId(undefined);
@@ -111,44 +113,55 @@ export function DirectorPanel() {
               setDescription("");
             }}
           >
-            <Clapperboard size={16} />
+            <Clapperboard size={15} />
+            Scene mới
           </Button>
         </header>
-        {scenes.map((scene) => (
-          <button
-            type="button"
-            key={scene.id}
-            data-active={scene.id === sceneId}
-            onClick={() =>
-              void load(scene.id).catch((value) => setError(String(value)))
-            }
-          >
-            <strong>{scene.name}</strong>
-            <small>{new Date(scene.updatedAt).toLocaleString("vi-VN")}</small>
-          </button>
-        ))}
-        {!scenes.length && <p>Chưa có scene được lưu.</p>}
+        <div className="source-director-scene-list">
+          {scenes.map((scene) => (
+            <button
+              type="button"
+              key={scene.id}
+              className="source-director-scene-item"
+              data-active={scene.id === sceneId}
+              onClick={() =>
+                void load(scene.id).catch((value) => setError(String(value)))
+              }
+            >
+              <strong>{scene.name}</strong>
+              <small>{new Date(scene.updatedAt).toLocaleString("vi-VN")}</small>
+            </button>
+          ))}
+          {!scenes.length && (
+            <p className="source-director-empty-text">
+              Chưa có scene được lưu.
+            </p>
+          )}
+        </div>
       </aside>
       <main className="narra-card">
-        <header>
+        <header className="source-director-main-header">
           <div>
-            <small>DIRECTOR DESK</small>
+            <small className="source-agent-hero__tag">DIRECTOR DESK</small>
             <h2>
-              <Camera size={19} />
+              <Camera size={18} />
               {name}
             </h2>
           </div>
-          <div>
+          <div className="source-director-main-actions">
             <Button
+              type="button"
               variant="secondary"
               onClick={() =>
                 void capture().catch((value) => setError(String(value)))
               }
             >
               <Camera size={15} />
-              Capture
+              Chụp frame
             </Button>
             <Button
+              type="button"
+              variant="primary"
               onClick={() =>
                 void save().catch((value) => setError(String(value)))
               }
@@ -158,45 +171,55 @@ export function DirectorPanel() {
             </Button>
           </div>
         </header>
-        <label>
-          Tên scene
-          <input
+        <div className="source-control-field">
+          <span className="source-control-label-text">
+            Tên scene <span className="source-required-mark">*</span>
+          </span>
+          <Input
             value={name}
             onChange={(event) => setName(event.target.value)}
+            placeholder="Ví dụ: Scene 1"
           />
-        </label>
-        <label>
-          Mô tả
+        </div>
+        <div className="source-control-field">
+          <span className="source-control-label-text">Mô tả phân cảnh</span>
           <textarea
+            rows={3}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
+            placeholder="Mô tả hành động, góc máy, ánh sáng, diễn viên..."
           />
-        </label>
-        <div>
-          <label>
-            Camera
-            <input
+        </div>
+        <div className="source-director-camera-lighting-grid">
+          <div className="source-control-field">
+            <span className="source-control-label-text">Góc máy (Camera)</span>
+            <Input
               value={camera}
               onChange={(event) => setCamera(event.target.value)}
+              placeholder="Ví dụ: Wide cinematic shot, close-up..."
             />
-          </label>
-          <label>
-            Lighting
-            <input
+          </div>
+          <div className="source-control-field">
+            <span className="source-control-label-text">
+              Ánh sáng (Lighting)
+            </span>
+            <Input
               value={lighting}
               onChange={(event) => setLighting(event.target.value)}
+              placeholder="Ví dụ: Soft key light, golden hour..."
             />
-          </label>
+          </div>
         </div>
         <section className="source-director-preview">
           <span>DIRECTOR PREVIEW</span>
           <h3>{name}</h3>
-          <p>{description || "Mô tả scene sẽ hiển thị tại đây."}</p>
+          <p>{description || "Mô tả phân cảnh sẽ hiển thị tại đây."}</p>
           <small>
             {camera} · {lighting}
           </small>
         </section>
         <Button
+          type="button"
           variant="secondary"
           onClick={() =>
             void createProject().catch((value) => setError(String(value)))

@@ -106,7 +106,8 @@ export function CanvasRevisionPanel({
                   </small>
                 </div>
                 <Button
-                  variant="ghost"
+                  type="button"
+                  variant="secondary"
                   disabled={busy}
                   onClick={() => void restore(revision.version)}
                 >
@@ -129,6 +130,7 @@ export function CanvasRevisionPanel({
         </summary>
         <div className="source-workspace-package-actions">
           <Button
+            type="button"
             variant="secondary"
             disabled={busy}
             onClick={() => void exportWorkspace(false)}
@@ -137,6 +139,7 @@ export function CanvasRevisionPanel({
             Xuất JSON
           </Button>
           <Button
+            type="button"
             variant="secondary"
             disabled={busy}
             onClick={() => void exportWorkspace(true)}
@@ -145,7 +148,8 @@ export function CanvasRevisionPanel({
             Backup thư mục
           </Button>
           <Button
-            variant="ghost"
+            type="button"
+            variant="secondary"
             disabled={busy}
             onClick={() => void importWorkspace()}
           >

@@ -9,6 +9,13 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
 
 export type CanvasNodeKind = "audio" | "image" | "note" | "video";
 export interface CanvasNode extends Record<string, unknown> {
@@ -288,24 +295,30 @@ export function CanvasGraphPanel({
               </label>
               <label>
                 Phụ thuộc
-                <select
-                  aria-label={`Node phụ thuộc của ${node.displayTitle}`}
-                  value={node.dependsOnSceneId || ""}
-                  onChange={(event) =>
+                <Select
+                  value={node.dependsOnSceneId || "none"}
+                  onValueChange={(val) =>
                     update(node.id, {
-                      dependsOnSceneId: event.target.value || undefined,
+                      dependsOnSceneId: val === "none" ? undefined : val,
                     })
                   }
                 >
-                  <option value="">Không phụ thuộc</option>
-                  {nodes
-                    .filter((item) => item.id !== node.id)
-                    .map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.displayTitle}
-                      </option>
-                    ))}
-                </select>
+                  <SelectTrigger
+                    aria-label={`Node phụ thuộc của ${node.displayTitle}`}
+                  >
+                    <SelectValue placeholder="Không phụ thuộc" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Không phụ thuộc</SelectItem>
+                    {nodes
+                      .filter((item) => item.id !== node.id)
+                      .map((item) => (
+                        <SelectItem key={item.id} value={item.id}>
+                          {item.displayTitle}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
               </label>
               <label>
                 Nhóm

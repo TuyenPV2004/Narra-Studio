@@ -372,7 +372,7 @@ assert.equal(
 // ── 8. Verify Video Post-Processing Slot Propagation ─────────────────
 const videoTsPath = path.resolve(
   __dirname,
-  "../apps/desktop/src/renderer-source/services/electron-api/video.ts",
+  "../apps/desktop/src/ui/services/electron-api/video.ts",
 );
 const videoTsContent = fs.readFileSync(videoTsPath, "utf8");
 
@@ -410,12 +410,12 @@ assert.equal(
 
 const useVideoQueuePath = path.resolve(
   __dirname,
-  "../apps/desktop/src/renderer-source/pages/Video/useVideoQueue.ts",
+  "../apps/desktop/src/ui/pages/Video/useVideoQueue.ts",
 );
 const useVideoQueueContent = fs.readFileSync(useVideoQueuePath, "utf8");
 const appPath = path.resolve(
   __dirname,
-  "../apps/desktop/src/renderer-source/app/App.tsx",
+  "../apps/desktop/src/ui/app/App.tsx",
 );
 const appContent = fs.readFileSync(appPath, "utf8");
 assert.equal(
@@ -440,7 +440,7 @@ assert.equal(
 );
 const videoPagePath = path.resolve(
   __dirname,
-  "../apps/desktop/src/renderer-source/pages/Video/VideoGeneratorPage.tsx",
+  "../apps/desktop/src/ui/pages/Video/VideoGeneratorPage.tsx",
 );
 const videoPageContent = fs.readFileSync(videoPagePath, "utf8");
 assert.equal(
@@ -484,7 +484,7 @@ assert.equal(
 // ── 10. Verify Image Queue & UI Invariants ─────────────────────────────
 const imageTsPath = path.resolve(
   __dirname,
-  "../apps/desktop/src/renderer-source/services/electron-api/image.ts",
+  "../apps/desktop/src/ui/services/electron-api/image.ts",
 );
 const imageTsContent = fs.readFileSync(imageTsPath, "utf8");
 
@@ -521,12 +521,12 @@ assert.equal(
 
 const imageGenPagePath = path.resolve(
   __dirname,
-  "../apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
+  "../apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
 );
 const imageGenPageContent = fs.readFileSync(imageGenPagePath, "utf8");
 const imageQueuePath = path.resolve(
   __dirname,
-  "../apps/desktop/src/renderer-source/pages/Image/useImageQueue.ts",
+  "../apps/desktop/src/ui/pages/Image/useImageQueue.ts",
 );
 const imageQueueContent = fs.readFileSync(imageQueuePath, "utf8");
 
@@ -1858,14 +1858,14 @@ registerGenerationIpc({
   const imageServiceContent = fs.readFileSync(
     path.resolve(
       __dirname,
-      "../apps/desktop/src/renderer-source/services/electron-api/image.ts",
+      "../apps/desktop/src/ui/services/electron-api/image.ts",
     ),
     "utf8",
   );
   const flowServiceContent = fs.readFileSync(
     path.resolve(
       __dirname,
-      "../apps/desktop/src/renderer-source/services/electron-api/flow.ts",
+      "../apps/desktop/src/ui/services/electron-api/flow.ts",
     ),
     "utf8",
   );
@@ -1901,7 +1901,7 @@ registerGenerationIpc({
 
   const imagePagePath = path.resolve(
     __dirname,
-    "../apps/desktop/src/renderer-source/pages/Image/ImageGeneratorPage.tsx",
+    "../apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
   );
   const imagePageContent = fs.readFileSync(imagePagePath, "utf8");
   assert.equal(

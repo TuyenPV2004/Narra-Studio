@@ -268,7 +268,7 @@ function testSetupUsesBundledExtension() {
   const setupAsset = fs.readFileSync(
     path.join(
       repositoryRoot,
-      'apps', 'desktop', 'src', 'renderer-source', 'pages', 'CaptchaSetup',
+      'apps', 'desktop', 'src', 'ui', 'pages', 'CaptchaSetup',
       'CaptchaSetupPage.tsx',
     ),
     'utf8',
@@ -277,7 +277,7 @@ function testSetupUsesBundledExtension() {
   assert.equal(setupAsset.includes('endpoints.updatesBase'), false);
   assert.equal(setupAsset.includes('captchaApi.openExtensionFolder()'), true);
   const captchaAdapter = fs.readFileSync(
-    path.join(repositoryRoot, 'apps', 'desktop', 'src', 'renderer-source', 'services', 'electron-api', 'captcha.ts'),
+    path.join(repositoryRoot, 'apps', 'desktop', 'src', 'ui', 'services', 'electron-api', 'captcha.ts'),
     'utf8',
   );
   assert.equal(captchaAdapter.includes("getElectronApi().openExtensionFolder()"), true);

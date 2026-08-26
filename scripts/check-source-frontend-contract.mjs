@@ -3,7 +3,7 @@ import path from 'node:path';
 import {fileURLToPath} from 'node:url';
 
 const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const rendererRoot = path.join(repositoryRoot, 'apps', 'desktop', 'src', 'renderer-source');
+const rendererRoot = path.join(repositoryRoot, 'apps', 'desktop', 'src', 'ui');
 const preloadFile = path.join(repositoryRoot, 'apps', 'desktop', 'src', 'electron', 'preload.js');
 const manifestFile = path.join(repositoryRoot, 'docs', 'frontend-ipc-usage-manifest.json');
 const writeManifest = process.argv.includes('--write-manifest');

@@ -16,6 +16,13 @@ import {
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
+import {
   workspaceApi,
   type Canvas,
   type Workspace,
@@ -551,19 +558,23 @@ export function WorkspacePanel({ providerId }: { providerId: ProviderId }) {
               <div className="source-workspace-canvas-actions">
                 <label>
                   Trạng thái
-                  <select
-                    aria-label="Trạng thái Episode"
+                  <Select
                     value={activeCanvas.episodeStatus || "draft"}
-                    onChange={(event) =>
-                      void updateEpisodeStatus(event.target.value).catch(
-                        (value) => setError(String(value)),
+                    onValueChange={(val) =>
+                      void updateEpisodeStatus(val).catch((value) =>
+                        setError(String(value)),
                       )
                     }
                   >
-                    <option value="draft">Bản nháp</option>
-                    <option value="ready">Sẵn sàng</option>
-                    <option value="published">Hoàn tất</option>
-                  </select>
+                    <SelectTrigger aria-label="Trạng thái Episode">
+                      <SelectValue placeholder="Chọn trạng thái" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="draft">Bản nháp</SelectItem>
+                      <SelectItem value="ready">Sẵn sàng</SelectItem>
+                      <SelectItem value="published">Hoàn tất</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </label>
                 <Button
                   onClick={() =>

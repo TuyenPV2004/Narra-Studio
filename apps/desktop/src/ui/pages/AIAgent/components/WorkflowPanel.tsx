@@ -1,6 +1,23 @@
-import { CheckCircle2, Play, Sparkles, WandSparkles } from "lucide-react";
+import {
+  CheckCircle2,
+  Film,
+  Image as ImageIcon,
+  Layers2,
+  Play,
+  Sparkles,
+  Square,
+  WandSparkles,
+} from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { Input } from "@/components/ui/Input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/Select";
 import { agentApi } from "@/services/electron-api/agent";
 import { imageApi } from "@/services/electron-api/image";
 import { videoApi } from "@/services/electron-api/video";
@@ -39,61 +56,43 @@ const materializePlan = (value: unknown): WorkflowRunItem[] => {
               ? scene.title
               : `Scene ${index + 1}`,
           prompt,
-          status: "queued" as const,
+          status: "queued",
         },
       ];
     });
-  const images = Array.isArray(plan.imagePrompts) ? plan.imagePrompts : [];
-  const videos = Array.isArray(plan.videoPrompts) ? plan.videoPrompts : [];
-  return [
-    ...images.flatMap((prompt, index) =>
-      typeof prompt === "string" && prompt.trim()
-        ? [
-            {
-              id: `image-${index + 1}`,
-              kind: "image" as const,
-              title: `Image ${index + 1}`,
-              prompt,
-              status: "queued" as const,
-            },
-          ]
-        : [],
-    ),
-    ...videos.flatMap((prompt, index) =>
-      typeof prompt === "string" && prompt.trim()
-        ? [
-            {
-              id: `video-${index + 1}`,
-              kind: "video" as const,
-              title: `Video ${index + 1}`,
-              prompt,
-              status: "queued" as const,
-            },
-          ]
-        : [],
-    ),
-  ];
+  const items = Array.isArray(plan.runItems) ? plan.runItems.map(object) : [];
+  return items.flatMap((item, index) => {
+    const prompt = typeof item.prompt === "string" ? item.prompt.trim() : "";
+    if (!prompt) return [];
+    return [
+      {
+        id: typeof item.id === "string" ? item.id : `run-${index + 1}`,
+        kind: item.kind === "image" ? "image" : "video",
+        title:
+          typeof item.title === "string" ? item.title : `Task ${index + 1}`,
+        prompt,
+        status: "queued",
+      },
+    ];
+  });
 };
 
-export function WorkflowPanel({
-  providerId = "veo3",
-}: {
-  providerId?: ProviderId;
-}) {
+export function WorkflowPanel({ providerId }: { providerId: ProviderId }) {
   const [brief, setBrief] = useState("");
   const [instruction, setInstruction] = useState("");
   const [kind, setKind] = useState<"campaign" | "image" | "video">("campaign");
   const [aspect, setAspect] = useState<"landscape" | "portrait">("landscape");
   const [outputKind, setOutputKind] = useState<"image" | "video">("image");
   const [outputUrl, setOutputUrl] = useState("");
-  const [plan, setPlan] = useState<unknown>();
+  const [running, setRunning] = useState<WorkflowAction>();
   const [result, setResult] = useState<unknown>();
+  const [plan, setPlan] = useState<unknown>();
   const [runItems, setRunItems] = useState<WorkflowRunItem[]>([]);
   const [approved, setApproved] = useState(false);
-  const [running, setRunning] = useState<WorkflowAction>();
   const [error, setError] = useState<string>();
+
   const run = async (action: WorkflowAction) => {
-    if (!brief.trim()) return;
+    if (running) return;
     setRunning(action);
     setError(undefined);
     try {
@@ -189,136 +188,193 @@ export function WorkflowPanel({
       <div className="source-agent-workflow__form narra-card">
         <h2>
           <WandSparkles size={18} />
-          Creative workflow
+          Workflow sáng tạo
         </h2>
-        <label htmlFor="workflow-brief">Creative brief</label>
-        <textarea
-          id="workflow-brief"
-          value={brief}
-          onChange={(event) => setBrief(event.target.value)}
-          placeholder="Mục tiêu, đối tượng, phong cách, số lượng nội dung..."
-        />
-        <label htmlFor="workflow-instruction">Yêu cầu cuối cùng</label>
-        <textarea
-          id="workflow-instruction"
-          rows={3}
-          value={instruction}
-          onChange={(event) => setInstruction(event.target.value)}
-          placeholder="Điều chỉnh hoặc phạm vi đã chốt..."
-        />
+        <div className="source-control-field">
+          <span className="source-control-label-text">
+            Ý tưởng / Creative brief{" "}
+            <span className="source-required-mark">*</span>
+          </span>
+          <textarea
+            id="workflow-brief"
+            value={brief}
+            onChange={(event) => setBrief(event.target.value)}
+            placeholder="Mô tả mục tiêu, phong cách, nhân vật, bối cảnh..."
+          />
+        </div>
+        <div className="source-control-field">
+          <span className="source-control-label-text">Yêu cầu bổ sung</span>
+          <textarea
+            id="workflow-instruction"
+            rows={2}
+            value={instruction}
+            onChange={(event) => setInstruction(event.target.value)}
+            placeholder="Ghi chú điều chỉnh hoặc phạm vi thực thi..."
+          />
+        </div>
         <div className="source-agent-workflow__controls">
-          <label>
-            Loại
-            <select
+          <div className="source-control-field">
+            <span className="source-control-label-text">
+              <Layers2 size={15} />
+              Thể loại
+            </span>
+            <Select
               value={kind}
-              onChange={(event) => setKind(event.target.value as typeof kind)}
+              onValueChange={(val) => setKind(val as typeof kind)}
             >
-              <option value="campaign">Campaign</option>
-              <option value="image">Image</option>
-              <option value="video">Video</option>
-            </select>
-          </label>
-          <label>
-            Tỷ lệ
-            <select
+              <SelectTrigger aria-label="Thể loại">
+                <SelectValue placeholder="Chọn thể loại" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="campaign">Chiến dịch (Campaign)</SelectItem>
+                <SelectItem value="image">Bộ ảnh (Image)</SelectItem>
+                <SelectItem value="video">Video ngắn (Video)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="source-control-field">
+            <span className="source-control-label-text">
+              <Square size={15} />
+              Tỷ lệ khung hình
+            </span>
+            <Select
               value={aspect}
-              onChange={(event) =>
-                setAspect(event.target.value as typeof aspect)
-              }
+              onValueChange={(val) => setAspect(val as typeof aspect)}
             >
-              <option value="landscape">Landscape</option>
-              <option value="portrait">Portrait</option>
-            </select>
-          </label>
+              <SelectTrigger aria-label="Tỷ lệ khung hình">
+                <SelectValue placeholder="Chọn tỷ lệ" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="landscape">Ngang (16:9)</SelectItem>
+                <SelectItem value="portrait">Dọc (9:16)</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
         <div className="source-agent-workflow__actions">
           <Button
+            type="button"
             variant="secondary"
             disabled={!brief.trim() || Boolean(running)}
             onClick={() => void run("intent")}
           >
+            <Sparkles size={14} />
             Phân loại ý định
           </Button>
           <Button
+            type="button"
             variant="secondary"
             disabled={!brief.trim() || Boolean(running)}
             onClick={() => void run("analyze")}
           >
+            <WandSparkles size={14} />
             Phân tích sâu
           </Button>
           <Button
+            type="button"
+            variant="primary"
             disabled={!brief.trim() || Boolean(running)}
             onClick={() => void run("workflow")}
           >
-            <Sparkles size={15} />
+            <Play size={14} />
             Tạo workflow
           </Button>
           <Button
+            type="button"
             variant="secondary"
             disabled={!plan || Boolean(running)}
             onClick={() => void run("polish")}
           >
-            Polish workflow
+            <Sparkles size={14} />
+            Chuốt prompt
           </Button>
         </div>
         {runItems.length > 0 && (
           <div className="source-workflow-render">
-            <label>
+            <label className="source-workflow-render__confirm">
               <input
                 type="checkbox"
                 checked={approved}
                 onChange={(event) => setApproved(event.target.checked)}
               />
-              Tôi xác nhận chạy {runItems.length} tác vụ và có thể sử dụng
-              credit provider.
+              <span>
+                Xác nhận tạo tự động {runItems.length} tác vụ bằng provider.
+              </span>
             </label>
             <Button
+              type="button"
+              variant="primary"
               aria-label="Render toàn bộ workflow"
               disabled={!approved || Boolean(running)}
               onClick={() => void renderWorkflow()}
             >
               <Play size={15} />
-              Render workflow
+              Render {runItems.length} tác vụ
             </Button>
-            <ol>
+            <ol className="source-workflow-render__list">
               {runItems.map((item) => (
-                <li key={item.id} data-status={item.status}>
-                  <span>{item.title}</span>
-                  <small>{item.status}</small>
+                <li
+                  key={item.id}
+                  className="source-workflow-render__item"
+                  data-status={item.status}
+                >
+                  <div className="source-workflow-render__item-info">
+                    <strong>{item.title}</strong>
+                    <span className="source-workflow-render__item-prompt">
+                      {item.prompt}
+                    </span>
+                  </div>
+                  <span className="source-workflow-render__item-badge">
+                    {item.status === "done"
+                      ? "Hoàn tất"
+                      : item.status === "processing"
+                        ? "Đang chạy"
+                        : "Đang chờ"}
+                  </span>
                   {item.error && <em>{item.error}</em>}
                 </li>
               ))}
             </ol>
           </div>
         )}
-        <details>
-          <summary>Review prompt/output</summary>
-          <label>
-            Loại output
-            <select
-              value={outputKind}
-              onChange={(event) =>
-                setOutputKind(event.target.value as typeof outputKind)
-              }
+        <details className="source-workflow-review-details">
+          <summary>Đánh giá &amp; Kiểm tra output</summary>
+          <div className="source-workflow-review-form">
+            <div className="source-control-field">
+              <span className="source-control-label-text">Loại output</span>
+              <Select
+                value={outputKind}
+                onValueChange={(val) => setOutputKind(val as typeof outputKind)}
+              >
+                <SelectTrigger aria-label="Loại output">
+                  <SelectValue placeholder="Chọn loại output" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="image">Ảnh (Image)</SelectItem>
+                  <SelectItem value="video">Video</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="source-control-field">
+              <span className="source-control-label-text">
+                Output URL hoặc đường dẫn
+              </span>
+              <Input
+                value={outputUrl}
+                onChange={(event) => setOutputUrl(event.target.value)}
+                placeholder="https://... hoặc đường dẫn file"
+              />
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              disabled={!brief.trim() || Boolean(running)}
+              onClick={() => void run("review")}
             >
-              <option value="image">Image</option>
-              <option value="video">Video</option>
-            </select>
-          </label>
-          <label>
-            Output URL (tùy chọn)
-            <input
-              value={outputUrl}
-              onChange={(event) => setOutputUrl(event.target.value)}
-            />
-          </label>
-          <Button
-            variant="secondary"
-            disabled={!brief.trim() || Boolean(running)}
-            onClick={() => void run("review")}
-          >
-            Review output
-          </Button>
+              <CheckCircle2 size={14} />
+              Đánh giá output
+            </Button>
+          </div>
         </details>
         {running && <p role="status">Đang xử lý {running}...</p>}
         {error && (
@@ -329,19 +385,29 @@ export function WorkflowPanel({
         <ScriptStudioPanel />
       </div>
       <div className="source-agent-workflow__result narra-card">
-        <h2>
-          <CheckCircle2 size={18} />
-          Kết quả có cấu trúc
-        </h2>
+        <header className="source-agent-workflow__result-header">
+          <h2>
+            <CheckCircle2 size={18} />
+            Kết quả phân tích &amp; Workflow
+          </h2>
+          {Boolean(result) && (
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                void navigator.clipboard.writeText(format(result));
+              }}
+            >
+              Sao chép JSON
+            </Button>
+          )}
+        </header>
         {result ? (
           <pre>{format(result)}</pre>
         ) : (
           <div className="source-generation-empty">
             <Sparkles size={28} />
-            <p>
-              Kết quả intent, analysis, workflow hoặc review sẽ hiển thị tại
-              đây.
-            </p>
+            <p>Kết quả phân tích và kế hoạch workflow sẽ xuất hiện tại đây.</p>
           </div>
         )}
       </div>

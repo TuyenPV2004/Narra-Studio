@@ -1,4 +1,4 @@
-import { Pause, Play, RotateCcw, RotateCw } from "lucide-react";
+import { Pause, Play, SkipBack, SkipForward } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 interface VoiceAudioCardProps {
@@ -133,7 +133,7 @@ export function VoiceAudioCard({
           aria-label="Lùi 10 giây"
           title="Lùi 10s"
         >
-          <RotateCcw size={14} aria-hidden="true" />
+          <SkipBack size={15} aria-hidden="true" />
         </button>
 
         <button
@@ -162,7 +162,7 @@ export function VoiceAudioCard({
           aria-label="Tiến 10 giây"
           title="Tiến 10s"
         >
-          <RotateCw size={14} aria-hidden="true" />
+          <SkipForward size={15} aria-hidden="true" />
         </button>
       </div>
 

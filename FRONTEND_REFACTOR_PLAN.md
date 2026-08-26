@@ -481,7 +481,7 @@ The production renderer remains `apps/desktop/src/renderer`, copied by `scripts/
 ### Phase 5 — Frontend source architecture bootstrap
 
 - **Goal:** Establish a real React/TypeScript/Vite source tree, typed route/page inventory, shared token source and thin frontend-only Electron API boundary without changing the production renderer entry.
-- **Files allowed:** `apps/desktop/src/renderer-source/**`, its isolated generated output ignore rule, frontend-only validation scripts, package manifests/lockfile and this plan.
+- **Files allowed:** `apps/desktop/src/ui/**`, its isolated generated output ignore rule, frontend-only validation scripts, package manifests/lockfile and this plan.
 - **Files prohibited:** `apps/desktop/src/electron/**`, `apps/desktop/src/renderer/**`, preload/IPC contracts, recovered routes/chunks/assets and visual baselines.
 - **Exact changes:** Add a parallel Vite build and strict TypeScript config; bootstrap `app`, `components/ui`, `pages`, `services/electron-api`, `styles` and `types`; carry the verified recovered allowed-page inventory as compatibility data; add provider/CAPTCHA adapters that forward exact existing calls; extend validation to typecheck/build and statically guard source IPC usage and runtime isolation.
 - **Runtime coexistence:** Source output is generated to a non-production directory. Neither Electron Main nor `build-recovered-desktop.mjs` loads or packages it in Phase 5.
@@ -553,7 +553,7 @@ Migrate AI Agent near the end and split it by verified vertical boundaries rathe
 Cut Electron from recovered `dist/index.html` to the source-built renderer only after active-page parity, source typecheck/build/tests, all relevant runtime/visual smoke, local-asset checks, IPC surface checks and backend diff gates pass. Recovered files remain available for rollback in the cutover checkpoint.
 
 - **Current status:** `RUNTIME_VERIFIED`; production loader is `CUT_OVER` to source and the reachable active-capability audit is complete for the maintained source routes
-- **Implementation:** `apps/desktop` production build now runs `scripts/build-source-desktop.mjs`; Vite emits `apps/desktop/dist/index.html` from `renderer-source` while the Electron Main/preload/config inputs remain unchanged
+- **Implementation:** `apps/desktop` production build now runs `scripts/build-source-desktop.mjs`; Vite emits `apps/desktop/dist/index.html` from `ui` while the Electron Main/preload/config inputs remain unchanged
 - **Evidence:** The production `.runtime-smoke-build` passed all 15 route smokes, expanded/collapsed App Shell assertions, visual baselines, local persistence checks and zero renderer/network/console-error gates
 
 ### Phase 12 — Recovered runtime removal
@@ -585,7 +585,7 @@ This audit is why the source frontend is runtime-complete for all reachable prod
 
 | Component/Page | Recovered source | New source | Status | Behavior parity | Visual parity | IPC parity | Legacy dependency | Cutover status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| Source frontend | N/A | `apps/desktop/src/renderer-source` | `RUNTIME_VERIFIED` | Production build, 17-page typed inventory and reachable active-capability audit PASS | 15 runtime route baselines MATCH | 163 direct adapter methods exposed by preload | None | Production runtime |
+| Source frontend | N/A | `apps/desktop/src/ui` | `RUNTIME_VERIFIED` | Production build, 17-page typed inventory and reachable active-capability audit PASS | 15 runtime route baselines MATCH | 163 direct adapter methods exposed by preload | None | Production runtime |
 | Recovered runtime oracle | `apps/desktop/src/renderer` | N/A | `LEGACY_REMOVED` | Historical Phase 0–10 evidence retained above | Replaced by source baselines | Historical manifest replaced by source manifest | None | Removed |
 | AppShell / Sidebar / Header | Recovered main bundle + compatibility CSS | `app/AppShell.tsx`, `components/Sidebar`, `components/Header` | `CUT_OVER` | Routing/gates/collapse/provider state verified | 236px/66px baselines MATCH | Guarded adapters only | None | Production runtime |
 | Settings / CAPTCHA | Recovered lazy chunks | `pages/Settings`, `pages/CaptchaSetup` | `CUT_OVER` | Folder/auth/four-step setup/verification recovered | Dedicated baselines MATCH | Exact Settings/CAPTCHA adapters | OS/external actions manually verified only | Production runtime |
@@ -603,7 +603,7 @@ This audit is why the source frontend is runtime-complete for all reachable prod
 ### Phase 5 status
 
 - **Status:** `SOURCE_READY`; not cut over to Electron runtime
-- **Architecture:** Added a parallel source tree under `apps/desktop/src/renderer-source` with `app`, `components/ui`, `pages`, `services/electron-api`, `styles` and `types`. `App.tsx`, bootstrap and a typed source-only route registry compile from readable React/TypeScript
+- **Architecture:** Added a parallel source tree under `apps/desktop/src/ui` with `app`, `components/ui`, `pages`, `services/electron-api`, `styles` and `types`. `App.tsx`, bootstrap and a typed source-only route registry compile from readable React/TypeScript
 - **Build system:** React 19.2.8, TypeScript 7.0.2, Vite 8.2.1 and `@vitejs/plugin-react` 6.0.5 are root development dependencies. `pnpm build:source` emits an isolated relative-base build to ignored `apps/desktop/dist-source-renderer`; the deployable desktop package retains its original production dependencies and recovered build command
 - **Type strategy:** Strict TypeScript with bundler resolution, DOM/ES2022 libraries, exact optional properties and unchecked-index protection. Provider/CAPTCHA response shapes remain `unknown`; only confirmed request payloads and provider IDs are typed
 - **Frontend API boundary:** Added a single guarded preload accessor plus Provider and CAPTCHA adapters. Eight direct adapter method names with existing recovered callers are checked against the actual preload surface. No adapter changes argument order, payload shape or response semantics, and direct `window.api` access outside the adapter client is rejected statically
@@ -611,7 +611,7 @@ This audit is why the source frontend is runtime-complete for all reachable prod
 - **Route inventory:** The source compatibility inventory freezes the 16 recovered allowed page IDs. The four missing lazy targets remain separate legacy debt and are not migrated or removed
 - **Runtime coexistence:** Electron Main still loads recovered `dist/index.html`; source output is absent from Electron files, recovered build input and recovered package staging. The packaged production dependency tree does not contain source-only React
 - **Tests added:** `scripts/check-source-frontend.mjs` verifies required source boundaries, rejects direct API usage outside the adapter, rejects recovered imports, checks adapter method names against preload, freezes the allowed-page inventory and fails on any Electron/recovered-build source cutover
-- **Files changed:** Root/desktop package manifests and lockfile; `.gitignore`; `scripts/check-source-frontend.mjs`; `apps/desktop/src/renderer-source/**`; this plan
+- **Files changed:** Root/desktop package manifests and lockfile; `.gitignore`; `scripts/check-source-frontend.mjs`; `apps/desktop/src/ui/**`; this plan
 - **Validation:** `pnpm validate` PASS including source typecheck/build; `pnpm check:frontend-contract` PASS; `pnpm package:electron-smoke` PASS; Settings Electron smoke PASS with expanded/collapsed baselines at 0 differing pixels; CAPTCHA Electron smoke PASS with expanded/collapsed baselines at 5/0 differing pixels within the existing tolerance; no renderer errors or failed requests; Electron backend diff empty
 - **Known risks:** The source bootstrap page is intentionally not an Electron production route and therefore has build evidence, not Electron runtime parity. Adapter response schemas and behavior are not validated by the static surface guard. No AppShell or active page has migrated yet
 - **Deferred:** Phase 6 recovers AppShell/Sidebar/Header and adds runtime comparison for the new source entry without changing active feature behavior
