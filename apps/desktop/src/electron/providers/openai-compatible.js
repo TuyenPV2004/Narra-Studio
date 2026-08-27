@@ -152,13 +152,30 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
     return { baseUrl, apiKey };
   };
 
+  const safeFetch = async (url, options) => {
+    if (typeof globalThis.fetch === 'function') {
+      try {
+        return await globalThis.fetch(url, options);
+      } catch (err) {
+        if (typeof net?.fetch === 'function') {
+          return await net.fetch(url, options);
+        }
+        throw err;
+      }
+    }
+    if (typeof net?.fetch === 'function') {
+      return await net.fetch(url, options);
+    }
+    throw new Error('No fetch implementation available.');
+  };
+
   const fetchModels = async payload => {
     const { baseUrl, apiKey } = resolveConnection(payload);
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     let response;
     try {
-      response = await net.fetch(`${baseUrl}/models`, {
+      response = await safeFetch(`${baseUrl}/models`, {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -211,7 +228,7 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     let response;
     try {
-      response = await net.fetch(`${baseUrl}/chat/completions`, {
+      response = await safeFetch(`${baseUrl}/chat/completions`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${apiKey}`,
@@ -390,7 +407,9 @@ module.exports = function createOpenAiCompatibleProvider({ loadSettings, saveSet
         apiKeySet: true,
         apiKeyPreview: `••••••${apiKey.slice(-4)}`,
         apiKey,
-        source: `openai-compatible:${profile.id}`,
+        source: profile.name || `openai-compatible:${profile.id}`,
+        providerName: profile.name || 'AI Provider',
+        profileId: profile.id,
         format: 'openai',
         capability,
         protocol: profile.protocol || 'openai-compatible',

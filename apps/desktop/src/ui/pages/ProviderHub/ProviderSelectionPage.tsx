@@ -45,8 +45,8 @@ export function ProviderSelectionPage({
           <div>
             <h2>AI Provider độc lập</h2>
             <p>
-              Sau khi vào ứng dụng, mở Tài khoản provider để nhập Base URL, API
-              key và chọn model cho AI Agent.
+              Sau khi vào ứng dụng, mở Provider để nhập Base URL, API key và
+              chọn model cho AI Agent.
             </p>
           </div>
         </Surface>

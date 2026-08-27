@@ -19,10 +19,10 @@
   "rendererRoot": "apps/desktop/src/ui",
   "preloadFile": "apps/desktop/src/electron/preload.js",
   "summary": {
-    "usedMethods": 171,
-    "usedApiMethods": 171,
+    "usedMethods": 172,
+    "usedApiMethods": 172,
     "usedElectronApiMethods": 0,
-    "exposedPreloadMethods": 237,
+    "exposedPreloadMethods": 238,
     "missingFromPreload": 0,
     "missingFromPreloadDistinctMethodCount": 0,
     "missingFromPreloadCallSiteCount": 0,
@@ -36,6 +36,21 @@
       "method": "aiAgentChat",
       "businessArea": "AI Agent",
       "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiAgentChatCancel",
+      "businessArea": "AI Agent",
+      "callCount": 3,
       "files": [
         "apps/desktop/src/ui/services/electron-api/agent.ts"
       ],
@@ -435,9 +450,11 @@
       "global": "api",
       "method": "copyToClipboard",
       "businessArea": "Desktop / Local utility",
-      "callCount": 3,
+      "callCount": 5,
       "files": [
         "apps/desktop/src/ui/pages/GoogleFlow/GoogleFlowPage.tsx",
+        "apps/desktop/src/ui/pages/Image/ImageGeneratorPage.tsx",
+        "apps/desktop/src/ui/pages/Video/VideoGeneratorPage.tsx",
         "apps/desktop/src/ui/pages/Voice/VoicePage.tsx",
         "apps/desktop/src/ui/services/electron-api/captcha.ts"
       ],
@@ -1269,8 +1286,9 @@
       "global": "api",
       "method": "openExternalUrl",
       "businessArea": "Desktop / Local utility",
-      "callCount": 1,
+      "callCount": 2,
       "files": [
+        "apps/desktop/src/ui/pages/AIAgent/components/AgentMarkdownRenderer.tsx",
         "apps/desktop/src/ui/services/electron-api/captcha.ts"
       ],
       "preload": {

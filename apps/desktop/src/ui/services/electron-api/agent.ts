@@ -10,6 +10,7 @@ export interface AgentMessage extends Record<string, unknown> {
   model?: string | undefined;
   provider?: string | undefined;
   planProposal?: unknown | undefined;
+  createdAt?: number | undefined;
 }
 
 export interface WorkflowContextPayload {
@@ -45,8 +46,15 @@ const streamChat = async (
   onCancelReady?: (cancel: () => void) => void,
   hasPlan = false,
   workflowContext?: WorkflowContextPayload,
-  onMeta?: (meta: { model?: string | undefined; source?: string | undefined }) => void,
-): Promise<{ reply: string; model?: string | undefined; source?: string | undefined }> => {
+  onMeta?: (meta: {
+    model?: string | undefined;
+    source?: string | undefined;
+  }) => void,
+): Promise<{
+  reply: string;
+  model?: string | undefined;
+  source?: string | undefined;
+}> => {
   let content = "";
   const stream = getElectronApi().aiAgentChatStream(
     {
@@ -85,7 +93,9 @@ const streamChat = async (
 
   const abortLocalAndRemote = () => {
     stream.cancel();
-    getElectronApi().aiAgentChatCancel({ requestId }).catch(() => {});
+    getElectronApi()
+      .aiAgentChatCancel({ requestId })
+      .catch(() => {});
   };
 
   activeRequests.set(requestId, abortLocalAndRemote);
@@ -137,8 +147,15 @@ export const agentApi = {
     onCancelReady?: (cancel: () => void) => void,
     hasPlan = false,
     workflowContext?: WorkflowContextPayload,
-    onMeta?: (meta: { model?: string | undefined; source?: string | undefined }) => void,
-  ): Promise<{ reply: string; model?: string | undefined; source?: string | undefined }> {
+    onMeta?: (meta: {
+      model?: string | undefined;
+      source?: string | undefined;
+    }) => void,
+  ): Promise<{
+    reply: string;
+    model?: string | undefined;
+    source?: string | undefined;
+  }> {
     return streamChat(
       message,
       history,
@@ -155,7 +172,9 @@ export const agentApi = {
     if (requestId && activeRequests.has(requestId)) {
       activeRequests.get(requestId)?.();
       activeRequests.delete(requestId);
-      getElectronApi().aiAgentChatCancel({ requestId }).catch(() => {});
+      getElectronApi()
+        .aiAgentChatCancel({ requestId })
+        .catch(() => {});
     } else {
       for (const [id, cancel] of activeRequests.entries()) {
         try {
@@ -164,7 +183,9 @@ export const agentApi = {
           // ignore
         }
         activeRequests.delete(id);
-        getElectronApi().aiAgentChatCancel({ requestId: id }).catch(() => {});
+        getElectronApi()
+          .aiAgentChatCancel({ requestId: id })
+          .catch(() => {});
       }
     }
   },

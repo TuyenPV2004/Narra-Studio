@@ -597,6 +597,7 @@ function extractAgentTextStreamDelta(data) {
   const choice = data.choices?.[0];
   if (choice) {
     if (typeof choice.delta?.content === 'string') return choice.delta.content;
+    if (typeof choice.delta?.text === 'string') return choice.delta.text;
     if (Array.isArray(choice.delta?.content)) {
       return choice.delta.content.map(p => typeof p === 'string' ? p : p?.text || '').join('');
     }
@@ -608,6 +609,8 @@ function extractAgentTextStreamDelta(data) {
   }
   if (typeof data.message?.content === 'string') return data.message.content;
   if (typeof data.response === 'string') return data.response;
+  if (typeof data.content === 'string') return data.content;
+  if (typeof data.text === 'string') return data.text;
   return '';
 }
 
@@ -648,10 +651,34 @@ function postJsonStreaming(urlString, { headers = {}, body, timeoutMs = 120000, 
         buffer += chunk;
         const lines = buffer.split(/\r?\n/);
         buffer = lines.pop() || '';
-        for (const line of lines) onLine(line);
+        for (const line of lines) {
+          try {
+            onLine(line);
+          } catch (err) {
+            if (!settled) {
+              settled = true;
+              try { req.destroy(err); } catch {}
+              try { res.destroy(); } catch {}
+              reject(err);
+            }
+            return;
+          }
+        }
       });
       res.on('end', () => {
-        if (buffer.trim()) onLine(buffer);
+        if (buffer.trim()) {
+          try {
+            onLine(buffer);
+          } catch (err) {
+            if (!settled) {
+              settled = true;
+              try { req.destroy(err); } catch {}
+              try { res.destroy(); } catch {}
+              reject(err);
+            }
+            return;
+          }
+        }
         if (!settled) {
           settled = true;
           resolve();
@@ -743,7 +770,24 @@ async function requestAgentTextChatStream({ event, requestId, messages, model, n
 
   try {
     await streamWithSettings(settings);
-    if (!reply.trim()) throw new Error('AI provider returned an empty text stream.');
+    if (!reply.trim()) {
+      try {
+        const fallbackOut = await requestAgentTextChatWithSettings(settings, {
+          messages: requestMessages,
+          model: model || settings.visionModel,
+          numPredict,
+        });
+        if (fallbackOut?.reply?.trim()) {
+          const fallbackReply = fallbackOut.reply.trim();
+          send({ type: 'delta', delta: fallbackReply, model: fallbackOut.model || settings.visionModel, source: fallbackOut.source || settings.source });
+          send({ type: 'done', reply: fallbackReply, model: fallbackOut.model || settings.visionModel, source: fallbackOut.source || settings.source });
+          return { reply: fallbackReply, model: fallbackOut.model || settings.visionModel, source: fallbackOut.source || settings.source };
+        }
+      } catch (fallbackErr) {
+        console.warn('[AI-AGENT-STREAM] Non-stream fallback failed:', fallbackErr?.message || fallbackErr);
+      }
+      throw new Error('AI provider returned an empty text stream.');
+    }
     const finalReply = reply.trim();
     send({ type: 'done', reply: finalReply, model: settings.visionModel, source: settings.source });
     return { reply: finalReply, model: settings.visionModel, source: settings.source };

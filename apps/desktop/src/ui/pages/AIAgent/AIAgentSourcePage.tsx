@@ -2,10 +2,10 @@ import {
   Check,
   Copy,
   Download,
+  Eraser,
   ListTodo,
   Plus,
   RotateCcw,
-  Send,
   Sparkles,
   Square,
   Trash2,
@@ -13,7 +13,14 @@ import {
   UserRound,
 } from "lucide-react";
 import chatbotAvatarUrl from "@/assets/chatbot-icon.svg";
-import { FormEvent, KeyboardEvent, UIEvent, useEffect, useRef, useState } from "react";
+import {
+  FormEvent,
+  KeyboardEvent,
+  UIEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import { Button } from "@/components/ui/Button";
 import {
   Dialog,
@@ -34,11 +41,13 @@ import {
 import { Tabs } from "@/components/ui/Tabs";
 import { agentApi, type AgentMessage } from "@/services/electron-api/agent";
 import { conversationPackageApi } from "@/services/electron-api/agent-conversations";
+import { aiProviderApi } from "@/services/electron-api/ai-providers";
 import { WorkspacePanel } from "@/pages/AIAgent/components/WorkspacePanel";
 import { WorkflowPanel } from "@/pages/AIAgent/components/WorkflowPanel";
 import { SkillsPanel } from "@/pages/AIAgent/components/SkillsPanel";
 import { DirectorPanel } from "@/pages/AIAgent/components/DirectorPanel";
 import { MediaToolsPanel } from "@/pages/AIAgent/components/MediaToolsPanel";
+import { AgentMarkdownRenderer } from "@/pages/AIAgent/components/AgentMarkdownRenderer";
 import { useAgentConversationLibrary } from "@/pages/AIAgent/useAgentConversationLibrary";
 import type { ProviderId } from "@/types/electron-api";
 
@@ -50,6 +59,15 @@ const welcome: AgentMessage = {
   status: "completed",
 };
 
+const formatMessageTime = (timestamp?: number): string => {
+  if (!timestamp || typeof timestamp !== "number") return "";
+  const date = new Date(timestamp);
+  if (isNaN(date.getTime())) return "";
+  const hours = date.getHours().toString().padStart(2, "0");
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+  return `${hours}:${minutes}`;
+};
+
 export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
   const [view, setView] = useState<
     "chat" | "director" | "media" | "skills" | "workflow" | "workspace"
@@ -58,14 +76,40 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string>();
+  const [activeProviderName, setActiveProviderName] = useState<string>("");
   const [activeModel, setActiveModel] = useState<string>("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    let unmounted = false;
+    const loadActiveProvider = async () => {
+      try {
+        const { activeByCapability, activeId, profiles } =
+          await aiProviderApi.list();
+        if (unmounted) return;
+        const textActiveId = activeByCapability.text || activeId;
+        const found =
+          profiles.find((p) => p.id === textActiveId) || profiles[0];
+        if (found) {
+          if (found.name) setActiveProviderName(found.name);
+          if (found.model) setActiveModel(found.model);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    void loadActiveProvider();
+    return () => {
+      unmounted = true;
+    };
+  }, [providerId]);
   const [confirmModal, setConfirmModal] = useState<"clear" | "delete" | null>(
     null,
   );
   const importRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const streamCancelRef = useRef<(() => void) | null>(null);
+  const lastSubmittedInputRef = useRef<string>("");
   const chatContainerRef = useRef<HTMLElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
@@ -73,9 +117,25 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
   // Auto-scroll to bottom only when user is already near the bottom
   useEffect(() => {
     if (view === "chat" && isNearBottomRef.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView({
+        behavior: sending ? "auto" : "smooth",
+      });
     }
   }, [conversation.messages, sending, view]);
+
+  // Tự động co giãn chiều cao khung nhập theo nội dung text
+  useEffect(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(220, Math.max(52, textarea.scrollHeight));
+    textarea.style.height = `${nextHeight}px`;
+    if (textarea.scrollHeight > 220) {
+      textarea.style.overflowY = "auto";
+    } else {
+      textarea.style.overflowY = "hidden";
+    }
+  }, [input, view]);
 
   const handleScroll = (event: UIEvent<HTMLElement>) => {
     const target = event.currentTarget;
@@ -105,39 +165,62 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
       streamCancelRef.current = null;
     }
     agentApi.cancelChat();
-    conversation.setMessages(
-      (current) =>
-        current.map((message, index) =>
+
+    // Khôi phục lại text đã gõ vào ô nhập để người dùng không mất ý tưởng
+    if (lastSubmittedInputRef.current) {
+      setInput(lastSubmittedInputRef.current);
+    }
+
+    // Giữ lại tin nhắn user, đánh dấu phản hồi assistant dở dang là cancelled
+    conversation.setMessages((current) => {
+      return current.map((message, index) => {
+        if (
           index === current.length - 1 &&
           message.role === "assistant" &&
           message.status === "streaming"
-            ? { ...message, status: "cancelled" }
-            : message,
-        ),
-      true,
-    );
+        ) {
+          return { ...message, status: "cancelled" };
+        }
+        return message;
+      });
+    }, true);
+
     setSending(false);
+    setError(undefined);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
   };
 
-  const handleSendMessage = async (textToSend: string) => {
+  const handleSendMessage = async (
+    textToSend: string,
+    historyOverride?: AgentMessage[],
+  ) => {
     const content = textToSend.trim();
     if (!content || sending || !conversation.hydrated) return;
 
+    lastSubmittedInputRef.current = content;
+    const baseHistory = historyOverride ?? conversation.messages;
+    const now = Date.now();
     const userMessage: AgentMessage = {
-      id: `usr-${Date.now()}`,
+      id: `usr-${now}`,
       role: "user",
       content,
       status: "completed",
+      createdAt: now,
     };
     const assistantPlaceholder: AgentMessage = {
-      id: `ast-${Date.now()}`,
+      id: `ast-${now + 1}`,
       role: "assistant",
       content: "",
       status: "streaming",
+      createdAt: now + 1,
     };
 
-    conversation.setMessages((current) => [
-      ...current,
+    const assistantId = assistantPlaceholder.id;
+
+    conversation.setMessages(() => [
+      ...baseHistory,
       userMessage,
       assistantPlaceholder,
     ]);
@@ -151,11 +234,11 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
       const runItems = conversation.activeConversation.runItems;
       const res = await agentApi.chatStream(
         content,
-        conversation.messages,
+        baseHistory,
         (next) =>
           conversation.setMessages((current) =>
-            current.map((message, index) =>
-              index === current.length - 1
+            current.map((message) =>
+              message.id === assistantId
                 ? { ...message, content: next, status: "streaming" }
                 : message,
             ),
@@ -172,13 +255,17 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
         },
         ({ model, source }) => {
           if (model) setActiveModel(model);
+          if (source && !source.startsWith("openai-compatible:")) {
+            setActiveProviderName(source);
+          }
         },
       );
 
+      lastSubmittedInputRef.current = "";
       conversation.setMessages(
         (current) =>
-          current.map((message, index) =>
-            index === current.length - 1
+          current.map((message) =>
+            message.id === assistantId
               ? {
                   ...message,
                   content: res.reply,
@@ -196,24 +283,25 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
         errMsg.toLowerCase().includes("cancel") ||
         errMsg.toLowerCase().includes("abort");
 
-      conversation.setMessages(
-        (current) =>
-          current
-            .map((message, index) => {
-              if (index !== current.length - 1 || message.role !== "assistant") {
-                return message;
-              }
-              if (isCancelled) {
-                return { ...message, status: "cancelled" };
-              }
-              if (message.content) {
-                return { ...message, status: "failed", error: errMsg };
-              }
-              return null;
-            })
-            .filter(Boolean) as AgentMessage[],
-        true,
-      );
+      conversation.setMessages((current) => {
+        const exists = current.some((m) => m.id === assistantId);
+        if (!exists) return current;
+
+        return current
+          .map((message) => {
+            if (message.id !== assistantId) {
+              return message;
+            }
+            if (isCancelled) {
+              return { ...message, status: "cancelled" };
+            }
+            if (message.content) {
+              return { ...message, status: "failed", error: errMsg };
+            }
+            return null;
+          })
+          .filter(Boolean) as AgentMessage[];
+      }, true);
       if (!isCancelled) {
         setError(errMsg);
       }
@@ -239,12 +327,9 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
     const userMsg = history[targetUserIndex];
     if (!userMsg?.content) return;
 
-    // Prune subsequent assistant messages
-    conversation.setMessages(
-      history.slice(0, targetUserIndex),
-      false,
-    );
-    await handleSendMessage(userMsg.content);
+    // Prune subsequent messages and retry with clean historySnapshot
+    const historySnapshot = history.slice(0, targetUserIndex);
+    await handleSendMessage(userMsg.content, historySnapshot);
   };
 
   const copyMessageContent = async (text: string, index: number) => {
@@ -259,14 +344,20 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
 
   const applyIdeaToWorkflow = (content: string) => {
     conversation.updateActiveConversationWorkflow({
-      title: content.slice(0, 60).replace(/[\r\n]+/g, " ").trim(),
+      title: content
+        .slice(0, 60)
+        .replace(/[\r\n]+/g, " ")
+        .trim(),
     });
     setView("workflow");
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === "Enter" && !event.shiftKey) {
-      if (event.nativeEvent.isComposing || (event as unknown as { isComposing?: boolean }).isComposing) {
+      if (
+        event.nativeEvent.isComposing ||
+        (event as unknown as { isComposing?: boolean }).isComposing
+      ) {
         return;
       }
       event.preventDefault();
@@ -327,7 +418,10 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
   };
 
   return (
-    <section className="source-tool-page source-agent-page" aria-labelledby="agent-title">
+    <section
+      className="source-tool-page source-agent-page"
+      aria-labelledby="agent-title"
+    >
       <header className="source-agent-hero">
         <div className="source-agent-hero__left">
           <span className="source-agent-hero__icon">
@@ -401,55 +495,84 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
                 onBlur={conversation.normalizeActiveTitle}
                 placeholder="Tên cuộc trò chuyện..."
               />
-              <span
-                className="source-agent-chat-status"
-                data-hydrated={conversation.hydrated}
-              >
+              {conversation.hydrated ? (
+                <>
+                  {activeProviderName && (
+                    <span
+                      className="source-agent-chat-status source-agent-chat-status--provider"
+                      title={`AI Provider: ${activeProviderName}`}
+                    >
+                      <span
+                        className="source-agent-chat-status__dot source-agent-chat-status__dot--provider"
+                        aria-hidden="true"
+                      />
+                      Provider: {activeProviderName}
+                    </span>
+                  )}
+                  {activeModel && (
+                    <span
+                      className="source-agent-chat-status source-agent-chat-status--model"
+                      title={`AI Model: ${activeModel}`}
+                    >
+                      <span
+                        className="source-agent-chat-status__dot source-agent-chat-status__dot--model"
+                        aria-hidden="true"
+                      />
+                      Model: {activeModel}
+                    </span>
+                  )}
+                </>
+              ) : (
                 <span
-                  className="source-agent-chat-status__dot"
-                  aria-hidden="true"
-                />
-                {conversation.hydrated
-                  ? activeModel
-                    ? `Model: ${activeModel}`
-                    : "Lịch sử được lưu cục bộ"
-                  : "Đang tải lịch sử..."}
-              </span>
+                  className="source-agent-chat-status"
+                  data-hydrated="false"
+                >
+                  <span
+                    className="source-agent-chat-status__dot"
+                    aria-hidden="true"
+                  />
+                  Đang tải lịch sử...
+                </span>
+              )}
             </div>
             <div className="source-agent-chat-toolbar__actions">
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
+                className="source-agent-toolbar-btn source-agent-toolbar-btn--new"
                 title="Tạo cuộc trò chuyện mới"
                 aria-label="Cuộc trò chuyện mới"
                 disabled={!conversation.hydrated || sending}
                 onClick={handleCreateNew}
               >
-                <Plus size={15} />
+                <Plus size={16} />
               </Button>
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
+                className="source-agent-toolbar-btn source-agent-toolbar-btn--import"
                 title="Nhập cuộc trò chuyện (JSON)"
                 aria-label="Import conversation JSON"
                 disabled={!conversation.hydrated || sending}
                 onClick={() => importRef.current?.click()}
               >
-                <Upload size={15} />
+                <Upload size={16} />
               </Button>
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
+                className="source-agent-toolbar-btn source-agent-toolbar-btn--export"
                 title="Xuất cuộc trò chuyện (JSON)"
                 aria-label="Export conversation JSON"
                 disabled={!conversation.hydrated || sending}
                 onClick={() => void exportConversation()}
               >
-                <Download size={15} />
+                <Download size={16} />
               </Button>
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
+                className="source-agent-toolbar-btn source-agent-toolbar-btn--clear"
                 title="Xóa nội dung tin nhắn trong cuộc trò chuyện"
                 aria-label="Xóa trao đổi"
                 onClick={() => setConfirmModal("clear")}
@@ -459,18 +582,18 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
                   conversation.messages.length <= 1
                 }
               >
-                <Trash2 size={15} />
-                Xóa trao đổi
+                <Eraser size={16} />
               </Button>
               <Button
                 type="button"
-                variant="secondary"
+                variant="ghost"
+                className="source-agent-toolbar-btn source-agent-toolbar-btn--delete"
                 title="Xóa cuộc trò chuyện này"
                 aria-label="Xóa conversation"
                 onClick={() => setConfirmModal("delete")}
                 disabled={!conversation.hydrated || sending}
               >
-                <Trash2 size={15} />
+                <Trash2 size={16} />
               </Button>
             </div>
             <input
@@ -516,17 +639,32 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
                     className="source-agent-chat__ai-avatar"
                   />
                 ) : (
-                  <span aria-hidden="true">
-                    <UserRound size={17} />
+                  <span
+                    aria-hidden="true"
+                    className="source-agent-chat__user-avatar"
+                  >
+                    <UserRound size={20} />
                   </span>
                 )}
                 <div className="source-agent-chat__bubble">
-                  <p>
-                    {message.content ||
-                      (sending && index === conversation.messages.length - 1
-                        ? "Đang suy nghĩ..."
-                        : "")}
-                  </p>
+                  {message.content ? (
+                    message.role === "assistant" ? (
+                      <div className="source-agent-chat__bubble-body">
+                        <AgentMarkdownRenderer content={message.content} />
+                      </div>
+                    ) : (
+                      <p>{message.content}</p>
+                    )
+                  ) : sending && index === conversation.messages.length - 1 ? (
+                    <div
+                      className="source-agent-typing"
+                      aria-label="AI đang suy nghĩ"
+                    >
+                      <span className="source-agent-typing__dot" />
+                      <span className="source-agent-typing__dot" />
+                      <span className="source-agent-typing__dot" />
+                    </div>
+                  ) : null}
 
                   {message.status === "cancelled" && (
                     <div className="source-agent-msg-tag source-agent-msg-tag--cancelled">
@@ -540,49 +678,73 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
                     </div>
                   )}
 
-                  {message.role === "assistant" && message.content && (
-                    <div className="source-agent-msg-actions">
-                      <button
-                        type="button"
-                        className="source-agent-msg-btn"
-                        title="Sao chép nội dung"
-                        onClick={() =>
-                          void copyMessageContent(message.content, index)
-                        }
-                      >
-                        {copiedIndex === index ? (
-                          <>
-                            <Check size={12} /> Đã chép
-                          </>
-                        ) : (
-                          <>
-                            <Copy size={12} /> Sao chép
-                          </>
+                  {message.role === "user" ? (
+                    <span className="source-agent-msg-time">
+                      {formatMessageTime(
+                        message.createdAt ||
+                          (message.id?.startsWith("usr-")
+                            ? Number(message.id.replace("usr-", ""))
+                            : undefined),
+                      )}
+                    </span>
+                  ) : (
+                    <div className="source-agent-msg-footer">
+                      <span className="source-agent-msg-time">
+                        {formatMessageTime(
+                          message.createdAt ||
+                            (message.id?.startsWith("ast-")
+                              ? Number(message.id.replace("ast-", ""))
+                              : undefined),
                         )}
-                      </button>
+                      </span>
 
-                      {index === conversation.messages.length - 1 &&
-                        (message.status === "failed" ||
-                          message.status === "cancelled") && (
+                      {message.content && (
+                        <div className="source-agent-msg-actions">
                           <button
                             type="button"
                             className="source-agent-msg-btn"
-                            title="Thử lại"
-                            onClick={() => void retryLastMessage()}
+                            title="Sao chép nội dung"
+                            onClick={() =>
+                              void copyMessageContent(message.content, index)
+                            }
                           >
-                            <RotateCcw size={12} /> Thử lại
+                            {copiedIndex === index ? (
+                              <>
+                                <Check size={12} /> Đã chép
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={12} /> Sao chép
+                              </>
+                            )}
                           </button>
-                        )}
 
-                      {message.content.length > 40 && !sending && (
-                        <button
-                          type="button"
-                          className="source-agent-msg-btn"
-                          title="Chuyển ý tưởng này sang Workflow"
-                          onClick={() => applyIdeaToWorkflow(message.content)}
-                        >
-                          <ListTodo size={12} /> Mở trong Workflow
-                        </button>
+                          {index === conversation.messages.length - 1 &&
+                            (message.status === "failed" ||
+                              message.status === "cancelled") && (
+                              <button
+                                type="button"
+                                className="source-agent-msg-btn"
+                                title="Thử lại"
+                                onClick={() => void retryLastMessage()}
+                              >
+                                <RotateCcw size={12} /> Thử lại
+                              </button>
+                            )}
+
+                          {message.content.length > 40 && !sending && (
+                            <button
+                              type="button"
+                              className="source-agent-msg-btn"
+                              title="Chuyển ý tưởng này sang Workflow"
+                              onClick={() =>
+                                applyIdeaToWorkflow(message.content)
+                              }
+                            >
+                              <ListTodo size={12} /> Mở trong Workflow
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
@@ -601,7 +763,7 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
                 ref={textareaRef}
                 id="agent-message"
                 aria-label="Nội dung tin nhắn hoặc yêu cầu"
-                rows={3}
+                rows={1}
                 value={input}
                 disabled={!conversation.hydrated || sending}
                 onChange={(event) => setInput(event.target.value)}
@@ -609,44 +771,33 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
                 placeholder={
                   !conversation.hydrated
                     ? "Đang tải dữ liệu lịch sử..."
-                    : "Nhập yêu cầu sáng tạo, kịch bản hoặc câu hỏi..."
+                    : "Nhập yêu cầu sáng tạo, kịch bản hoặc câu hỏi... (Enter để gửi · Shift+Enter để xuống dòng)"
                 }
               />
+              {sending && (
+                <button
+                  type="button"
+                  className="source-agent-chat-stop-icon-btn"
+                  onClick={stopStreaming}
+                  title="Nhấn để dừng phản hồi"
+                  aria-label="Dừng phản hồi"
+                >
+                  <Square
+                    size={11}
+                    fill="#ffffff"
+                    color="#ffffff"
+                    aria-hidden="true"
+                  />
+                </button>
+              )}
             </div>
-            <div className="source-agent-chat-form__footer">
-              {error || conversation.persistenceError ? (
+            {(error || conversation.persistenceError) && (
+              <div className="source-agent-chat-form__footer">
                 <p role="alert" className="source-generation-error">
                   {error || conversation.persistenceError}
                 </p>
-              ) : (
-                <span className="source-agent-chat-hint">
-                  Enter để gửi · Shift+Enter để xuống dòng
-                </span>
-              )}
-              <div className="source-agent-chat-form__actions">
-                {sending ? (
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={stopStreaming}
-                    title="Dừng phản hồi"
-                  >
-                    <Square size={13} fill="currentColor" />
-                    Dừng
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    variant="primary"
-                    disabled={!conversation.hydrated || !input.trim()}
-                    title="Gửi tin nhắn"
-                  >
-                    <Send size={14} />
-                    Gửi
-                  </Button>
-                )}
               </div>
-            </div>
+            )}
           </form>
 
           <Dialog

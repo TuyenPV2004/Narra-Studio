@@ -106,7 +106,11 @@ export function useAgentConversationLibrary(welcomeMessage: AgentMessage) {
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const schedulePersist = useCallback(
-    (libraryList: AgentConversation[], currentMessages: AgentMessage[], immediate = false) => {
+    (
+      libraryList: AgentConversation[],
+      currentMessages: AgentMessage[],
+      immediate = false,
+    ) => {
       if (debounceTimerRef.current) {
         clearTimeout(debounceTimerRef.current);
         debounceTimerRef.current = null;

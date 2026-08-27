@@ -529,9 +529,20 @@ ipcMain.handle('show-in-folder', async (_, filePath) => {
   shell.showItemInFolder(resolved);
 });
 
-// ── Open URL in default browser ───────────────────────────────────────
 ipcMain.handle('open-external-url', async (_, url) => {
-  await shell.openExternal(url);
+  if (typeof url !== 'string' || !url.trim()) return false;
+  let parsed;
+  try {
+    parsed = new URL(url.trim());
+  } catch {
+    throw new Error('Invalid URL format');
+  }
+  const allowedProtocols = new Set(['https:', 'http:', 'mailto:']);
+  if (!allowedProtocols.has(parsed.protocol)) {
+    throw new Error(`Forbidden protocol: ${parsed.protocol}`);
+  }
+  await shell.openExternal(parsed.href);
+  return true;
 });
 
 };

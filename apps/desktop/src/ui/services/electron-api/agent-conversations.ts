@@ -85,9 +85,13 @@ export const parseConversationPackage = (text: string): AgentConversation => {
   for (const item of rawMessages) {
     if (messages.length >= MAX_IMPORT_MESSAGES) break;
     if (isMessage(item)) {
+      const msgObj = item as Record<string, unknown>;
       messages.push({
         role: item.role,
         content: String(item.content).slice(0, MAX_MESSAGE_LENGTH),
+        ...(typeof msgObj.createdAt === "number"
+          ? { createdAt: msgObj.createdAt }
+          : {}),
       });
     }
   }
@@ -95,28 +99,40 @@ export const parseConversationPackage = (text: string): AgentConversation => {
     throw new Error("File JSON không chứa tin nhắn (messages) hợp lệ.");
   }
   const now = Date.now();
+  const rawTitle =
+    typeof root.title === "string" && root.title.trim()
+      ? root.title.trim().slice(0, 100)
+      : typeof conversation.title === "string" && conversation.title.trim()
+        ? conversation.title.trim().slice(0, 100)
+        : "Conversation import";
+
   return {
-    ...conversation,
     id: crypto.randomUUID(),
-    title:
-      typeof root.title === "string" && root.title.trim()
-        ? root.title.trim().slice(0, 100)
-        : "Conversation import",
+    title: rawTitle,
     messages,
     savedAt: now,
     updatedAt: now,
     kind: kind(conversation.kind),
     aspect: aspect(conversation.aspect),
-    plan: workflow.plan ?? null,
+    plan: workflow.plan ?? conversation.plan ?? null,
     runItems: Array.isArray(workflow.runItems)
       ? workflow.runItems.slice(0, 100)
-      : [],
+      : Array.isArray(conversation.runItems)
+        ? conversation.runItems.slice(0, 100)
+        : [],
     assets: Array.isArray(workflow.assets)
       ? workflow.assets.slice(0, 100)
-      : [],
+      : Array.isArray(conversation.assets)
+        ? conversation.assets.slice(0, 100)
+        : [],
     canvasGroups: Array.isArray(workflow.canvasGroups)
       ? workflow.canvasGroups.slice(0, 50)
-      : [],
+      : Array.isArray(conversation.canvasGroups)
+        ? conversation.canvasGroups.slice(0, 50)
+        : [],
+    ...(typeof conversation.pinned === "boolean"
+      ? { pinned: conversation.pinned }
+      : {}),
   };
 };
 

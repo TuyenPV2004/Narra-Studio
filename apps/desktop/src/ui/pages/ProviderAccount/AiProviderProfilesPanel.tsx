@@ -14,7 +14,7 @@ import {
   SquarePen,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import {
   Dialog,
@@ -81,16 +81,71 @@ function cleanErrorMessage(error: unknown): string {
   );
 }
 
+const summarizeError = (msg: string): string => {
+  if (!msg) return "Lỗi kết nối";
+  const lower = msg.toLowerCase();
+  if (
+    lower.includes("api key has expired") ||
+    lower.includes("api_key_expired") ||
+    lower.includes("expired")
+  ) {
+    return "API key đã hết hạn";
+  }
+  if (
+    lower.includes("401") ||
+    lower.includes("unauthorized") ||
+    lower.includes("invalid api key")
+  ) {
+    return "API key không hợp lệ";
+  }
+  if (
+    lower.includes("402") ||
+    lower.includes("insufficient") ||
+    lower.includes("balance") ||
+    lower.includes("quota")
+  ) {
+    return "Hết số dư / quota";
+  }
+  if (lower.includes("429") || lower.includes("rate limit")) {
+    return "Bị giới hạn tốc độ (429)";
+  }
+  if (lower.includes("timeout") || lower.includes("quá hạn")) {
+    return "Quá hạn (Timeout 15s)";
+  }
+  if (lower.includes("err_name_not_resolved") || lower.includes("dns")) {
+    return "Lỗi DNS / Sai tên miền";
+  }
+  if (lower.includes("err_connection_refused")) {
+    return "Máy chủ từ chối kết nối";
+  }
+  if (lower.includes("err_internet_disconnected")) {
+    return "Mất mạng Internet";
+  }
+  if (lower.includes("403") || lower.includes("permission_error")) {
+    return "Lỗi 403 (Bị từ chối)";
+  }
+  if (lower.includes("404")) {
+    return "Lỗi 404 (Không tìm thấy endpoint)";
+  }
+  const clean = msg.replace(/^Provider phản hồi (HTTP \d+: )?/, "").trim();
+  return clean.length > 26 ? `${clean.slice(0, 24)}…` : clean;
+};
+
 interface AiProviderProfilesPanelProps {
   refreshSignal?: number;
   onLoadingChange?: (loading: boolean) => void;
   onDirtyChange?: (dirty: boolean) => void;
+  onProfilesChange?: (
+    profiles: AiProviderProfile[],
+    activeByCapability: Partial<Record<AiProviderCapability, string>>,
+  ) => void;
 }
 
 export function AiProviderProfilesPanel({
   refreshSignal = 0,
   onLoadingChange,
   onDirtyChange,
+  onProfilesChange,
 }: AiProviderProfilesPanelProps) {
   const [profiles, setProfiles] = useState<AiProviderProfile[]>([]);
   const [activeByCapability, setActiveByCapability] = useState<
@@ -101,6 +156,10 @@ export function AiProviderProfilesPanel({
   const [models, setModels] = useState<AiProviderModel[]>([]);
   const [busy, setBusy] = useState(false);
   const [checkingProfileId, setCheckingProfileId] = useState("");
+  const [checkingAll, setCheckingAll] = useState(false);
+  const [providerErrors, setProviderErrors] = useState<
+    Record<string, string | null>
+  >({});
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
   const [deletingProfile, setDeletingProfile] =
     useState<AiProviderProfile | null>(null);
@@ -111,24 +170,118 @@ export function AiProviderProfilesPanel({
     }));
   };
 
-  const load = useCallback(async () => {
-    setBusy(true);
-    onLoadingChange?.(true);
-    try {
-      const value = await aiProviderApi.list();
-      setProfiles(value.profiles);
-      setActiveByCapability(value.activeByCapability);
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : String(error);
-      toast.error("Tải danh sách provider thất bại", { description: msg });
-    } finally {
-      setBusy(false);
-      onLoadingChange?.(false);
-    }
-  }, [onLoadingChange]);
+  const sortedProfiles = useMemo(() => {
+    return [...profiles].sort((a, b) => {
+      const aInUse = activeByCapability.text === a.id;
+      const bInUse = activeByCapability.text === b.id;
+      if (aInUse && !bInUse) return -1;
+      if (!aInUse && bInUse) return 1;
+      return 0;
+    });
+  }, [profiles, activeByCapability.text]);
+
+  const checkAllProfiles = useCallback(
+    async (profileList: AiProviderProfile[], currentActiveId?: string) => {
+      // Sắp xếp theo đúng thứ tự card hiển thị (active lên đầu)
+      const ordered = [...profileList].sort((a, b) => {
+        const aInUse = currentActiveId === a.id;
+        const bInUse = currentActiveId === b.id;
+        if (aInUse && !bInUse) return -1;
+        if (!aInUse && bInUse) return 1;
+        return 0;
+      });
+
+      const checkable = ordered.filter(
+        (p) => p.protocol === "openai-compatible",
+      );
+      if (!checkable.length) return;
+
+      setCheckingAll(true);
+      const results = await Promise.allSettled(
+        checkable.map(async (profile) => {
+          try {
+            const res = await aiProviderApi.test({ id: profile.id });
+            return {
+              id: profile.id,
+              name: profile.name,
+              success: true,
+              model: res.verifiedModel,
+            };
+          } catch (err) {
+            const msg = cleanErrorMessage(err);
+            return {
+              id: profile.id,
+              name: profile.name,
+              success: false,
+              error: msg,
+            };
+          }
+        }),
+      );
+
+      const nextErrors: Record<string, string | null> = {};
+      let hasError = false;
+
+      // Hiển thị toast lỗi riêng lẻ theo đúng thứ tự card từ trên xuống dưới
+      results.forEach((res, idx) => {
+        const profile = checkable[idx]!;
+        if (res.status === "fulfilled") {
+          if (res.value.success) {
+            nextErrors[profile.id] = null;
+          } else {
+            const errMsg = res.value.error || "Lỗi kết nối";
+            nextErrors[profile.id] = errMsg;
+            hasError = true;
+            toast.error(`${profile.name} không khả dụng`, {
+              description: errMsg,
+            });
+          }
+        } else {
+          const errMsg = cleanErrorMessage(res.reason);
+          nextErrors[profile.id] = errMsg;
+          hasError = true;
+          toast.error(`${profile.name} không khả dụng`, {
+            description: errMsg,
+          });
+        }
+      });
+
+      setProviderErrors((prev) => ({ ...prev, ...nextErrors }));
+      setCheckingAll(false);
+
+      if (!hasError) {
+        toast.success("Tất cả provider đều hoạt động tốt.");
+      }
+    },
+    [],
+  );
+
+  const load = useCallback(
+    async (shouldCheckAll = false) => {
+      setBusy(true);
+      onLoadingChange?.(true);
+      try {
+        const value = await aiProviderApi.list();
+        setProfiles(value.profiles);
+        setActiveByCapability(value.activeByCapability);
+        onProfilesChange?.(value.profiles, value.activeByCapability);
+        if (shouldCheckAll && value.profiles.length > 0) {
+          await checkAllProfiles(value.profiles, value.activeByCapability.text);
+        }
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        toast.error("Tải danh sách provider thất bại", { description: msg });
+      } finally {
+        setBusy(false);
+        onLoadingChange?.(false);
+      }
+    },
+    [onLoadingChange, onProfilesChange, checkAllProfiles],
+  );
 
   useEffect(() => {
-    void load();
+    const isInitial = refreshSignal === 0;
+    void load(!isInitial);
   }, [load, refreshSignal]);
 
   useEffect(() => {
@@ -245,11 +398,13 @@ export function AiProviderProfilesPanel({
     setCheckingProfileId(profile.id);
     try {
       const result = await aiProviderApi.test({ id: profile.id });
+      setProviderErrors((prev) => ({ ...prev, [profile.id]: null }));
       toast.success(`${profile.name} còn hoạt động`, {
         description: `API key đã được xác thực với model ${result.verifiedModel}.`,
       });
     } catch (error) {
       const msg = cleanErrorMessage(error);
+      setProviderErrors((prev) => ({ ...prev, [profile.id]: msg }));
       toast.error(`${profile.name} không khả dụng`, { description: msg });
     } finally {
       setCheckingProfileId("");
@@ -330,9 +485,10 @@ export function AiProviderProfilesPanel({
               <p>Chưa có AI provider được cấu hình</p>
             </div>
           )}
-          {profiles.map((profile) => {
+          {sortedProfiles.map((profile) => {
             const isExpanded = expandedIds[profile.id] ?? true;
             const isEditing = draft.id === profile.id;
+            const isInUse = activeByCapability.text === profile.id;
             return (
               <article
                 key={profile.id}
@@ -361,6 +517,20 @@ export function AiProviderProfilesPanel({
                         {protocolLabels[profile.protocol]}
                       </span>
                       <div className="source-provider-card__capabilities">
+                        {isInUse && (
+                          <span className="source-provider-card__cap-pill source-provider-card__cap-pill--in-use">
+                            Đang sử dụng
+                          </span>
+                        )}
+                        {providerErrors[profile.id] && (
+                          <span
+                            className="source-provider-card__cap-pill source-provider-card__cap-pill--error"
+                            title={`Chi tiết lỗi: ${providerErrors[profile.id]}`}
+                          >
+                            <AlertTriangle size={11} aria-hidden="true" />
+                            {summarizeError(providerErrors[profile.id]!)}
+                          </span>
+                        )}
                         {profile.capabilities.map((capability) => (
                           <span
                             key={capability}
@@ -398,33 +568,41 @@ export function AiProviderProfilesPanel({
                         <SquarePen size={13} /> Chỉnh sửa
                       </Button>
                     )}
-                    <Button
-                      variant="ghost"
-                      className="source-provider-card__btn-check"
-                      disabled={
-                        busy || profile.protocol !== "openai-compatible"
-                      }
-                      title={
-                        profile.protocol === "openai-compatible"
-                          ? `Kiểm tra ${profile.name}`
-                          : "Check hiện chỉ hỗ trợ provider OpenAI-compatible"
-                      }
-                      aria-label={`Kiểm tra ${profile.name}`}
-                      onClick={() => void checkProfile(profile)}
-                    >
-                      {checkingProfileId === profile.id ? (
-                        <LoaderCircle
-                          size={13}
-                          className="is-spinning"
-                          aria-hidden="true"
-                        />
-                      ) : (
-                        <GlobeLock size={13} aria-hidden="true" />
-                      )}
-                      {checkingProfileId === profile.id
-                        ? "Đang check…"
-                        : "Check"}
-                    </Button>
+                    {(() => {
+                      const isCheckingThis =
+                        checkingProfileId === profile.id ||
+                        (checkingAll &&
+                          profile.protocol === "openai-compatible");
+                      return (
+                        <Button
+                          variant="ghost"
+                          className="source-provider-card__btn-check"
+                          disabled={
+                            busy ||
+                            isCheckingThis ||
+                            profile.protocol !== "openai-compatible"
+                          }
+                          title={
+                            profile.protocol === "openai-compatible"
+                              ? `Kiểm tra ${profile.name}`
+                              : "Check hiện chỉ hỗ trợ provider OpenAI-compatible"
+                          }
+                          aria-label={`Kiểm tra ${profile.name}`}
+                          onClick={() => void checkProfile(profile)}
+                        >
+                          {isCheckingThis ? (
+                            <LoaderCircle
+                              size={13}
+                              className="is-spinning"
+                              aria-hidden="true"
+                            />
+                          ) : (
+                            <GlobeLock size={13} aria-hidden="true" />
+                          )}
+                          {isCheckingThis ? "Đang check…" : "Check"}
+                        </Button>
+                      );
+                    })()}
                     <Button
                       variant="ghost"
                       className="source-provider-card__btn-delete"
