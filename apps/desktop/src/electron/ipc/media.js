@@ -9,16 +9,6 @@ const registerDepthAnythingIpc = require('./media/depth-anything');
 const registerMediaDemuxIpc = require('./media/demux');
 const registerAudioSeparationIpc = require('./media/audio-separation');
 
-/**
- * Local media processing IPC (FFmpeg, ffprobe, file dialogs).
- *
- * Handler groups live in `electron/ipc/media/`:
- *   ffmpeg-edit.js  concat / trim / duration
- *   projects.js     video project files, media pickers, delete
- *   voice-cache.js  voice-changer IR asset cache
- *   filters.js      apply-video-filters (the CapCut export pipeline)
- *   probe.js        extract / ffprobe info / OS dialogs
- */
 module.exports = function registerMediaIpc(dependencies) {
   registerMediaFfmpegEditIpc(dependencies);
   registerMediaProjectsIpc(dependencies);

@@ -147,8 +147,6 @@ contextBridge.exposeInMainWorld("api", {
   loadHistory: (key) => ipcRenderer.invoke("load-history", key),
   saveHistory: (key, items) => ipcRenderer.invoke("save-history", key, items),
 
-  // Local workspace compatibility API. Names stay stable for the recovered renderer;
-  // implementations persist only under Electron userData and never call a team server.
   teamWorkspaceList: () => ipcRenderer.invoke("team-workspace-list"),
   teamWorkspaceCreate: (p) => ipcRenderer.invoke("team-workspace-create", p),
   teamWorkspaceGet: (p) => ipcRenderer.invoke("team-workspace-get", p),
@@ -209,7 +207,7 @@ contextBridge.exposeInMainWorld("api", {
   teamWorkspaceToolboxDelete: (p) =>
     ipcRenderer.invoke("team-workspace-toolbox-delete", p),
   teamMediaUpload: (p) => ipcRenderer.invoke("team-media-upload", p),
-  // ── User-defined preset library (CapCut transitions + effects) ──
+
   loadUserPresets: () => ipcRenderer.invoke("load-user-presets"),
   saveUserPresets: (payload) =>
     ipcRenderer.invoke("save-user-presets", payload),
@@ -235,7 +233,7 @@ contextBridge.exposeInMainWorld("api", {
   concatVideos: (p) => ipcRenderer.invoke("concat-videos", p),
   concatVideosWithTransitions: (p) =>
     ipcRenderer.invoke("concat-videos-with-transitions", p),
-  // Project management
+
   projectsList: () => ipcRenderer.invoke("projects:list"),
   projectsGet: (id) => ipcRenderer.invoke("projects:get", { id }),
   projectsSave: (project) => ipcRenderer.invoke("projects:save", project),
@@ -320,10 +318,6 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeListener("auto-entered-project", handler);
   },
 
-  // ── Voice Changer Asset Cache ──
-  // Real downloadable IR (impulse-response) WAV files used by the voice
-  // changer's reverb-based presets. See electron/main.js download-voice-asset
-  // handler + src/components/capcut/voiceAssets.ts registry.
   downloadVoiceAsset: (assetId) =>
     ipcRenderer.invoke("download-voice-asset", { assetId }),
   listVoiceAssetsCached: () => ipcRenderer.invoke("list-voice-assets-cached"),
@@ -333,7 +327,6 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeListener("voice-asset-progress", handler);
   },
 
-  // ── Video Download Events ──
   onVideoDownloaded: (cb) => {
     const handler = (_, d) => cb(d);
     ipcRenderer.on("video-downloaded", handler);
@@ -345,10 +338,9 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeListener("video-download-failed", handler);
   },
 
-  // ── Auto-Update ──
   getAppVersion: () => ipcRenderer.invoke("get-app-version"),
   getAppArch: () => ipcRenderer.invoke("get-app-arch"),
-  // Ngôn ngữ giao diện — lưu trong flow-settings.json, renderer cache lại ở localStorage
+
   getUiLanguage: () => ipcRenderer.invoke("get-ui-language"),
   setUiLanguage: (language) => ipcRenderer.invoke("set-ui-language", language),
   syncSession: () => ipcRenderer.invoke("sync-session"),
@@ -377,7 +369,6 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeAllListeners("slot-logged-out");
   },
 
-  // ── Text-to-Speech ──
   textToSpeech: (p) => ipcRenderer.invoke("text-to-speech", p),
   textToSpeechCancel: (p) => ipcRenderer.invoke("text-to-speech-cancel", p),
   getLipSyncSettings: () => ipcRenderer.invoke("get-lip-sync-settings"),
@@ -412,6 +403,11 @@ contextBridge.exposeInMainWorld("api", {
     };
   },
   aiAgentChatCancel: (p) => ipcRenderer.invoke("ai-agent-chat-cancel", p),
+  aiAgentWebSearch: (p) => ipcRenderer.invoke("ai-agent-web-search", p),
+  aiAgentWebFetch: (p) => ipcRenderer.invoke("ai-agent-web-fetch", p),
+  aiAgentResearch: (p) => ipcRenderer.invoke("ai-agent-research", p),
+  aiAgentResearchQuery: (p) =>
+    ipcRenderer.invoke("ai-agent-research-query", p),
   aiAgentIntent: (p) => ipcRenderer.invoke("ai-agent-intent", p),
   aiAgentWorkflow: (p) => ipcRenderer.invoke("ai-agent-workflow", p),
   aiAgentPolishWorkflow: (p) =>

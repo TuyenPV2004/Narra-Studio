@@ -23,10 +23,9 @@ const {
   )
 );
 
-// ── 1. Test Image Magic Byte Detection Logic ─────────────────────────
 const isValidImageBuffer = (buffer) => {
   if (!Buffer.isBuffer(buffer) || buffer.length < 12) return false;
-  // PNG: 89 50 4E 47 0D 0A 1A 0A
+
   if (
     buffer[0] === 0x89 &&
     buffer[1] === 0x50 &&
@@ -35,11 +34,11 @@ const isValidImageBuffer = (buffer) => {
   ) {
     return true;
   }
-  // JPEG: FF D8 FF
+
   if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) {
     return true;
   }
-  // GIF: GIF87a or GIF89a
+
   if (
     buffer[0] === 0x47 &&
     buffer[1] === 0x49 &&
@@ -48,7 +47,7 @@ const isValidImageBuffer = (buffer) => {
   ) {
     return true;
   }
-  // WebP: RIFF .... WEBP
+
   if (
     buffer[0] === 0x52 &&
     buffer[1] === 0x49 &&
@@ -64,7 +63,6 @@ const isValidImageBuffer = (buffer) => {
   return false;
 };
 
-// Valid Magic Bytes Tests
 const pngBuffer = Buffer.from([
   0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d,
 ]);
@@ -83,7 +81,6 @@ assert.equal(isValidImageBuffer(jpegBuffer), true, "JPEG buffer must be valid");
 assert.equal(isValidImageBuffer(gifBuffer), true, "GIF buffer must be valid");
 assert.equal(isValidImageBuffer(webpBuffer), true, "WebP buffer must be valid");
 
-// Invalid Payloads Tests (EXE, Script, HTML, Truncated, Null)
 const exeBuffer = Buffer.from([
   0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00, 0x04, 0x00, 0x00, 0x00,
 ]);
@@ -114,7 +111,6 @@ assert.equal(
   "Undefined buffer must be rejected",
 );
 
-// ── 2. Test SSRF Allowlist Function ──────────────────────────────────
 const isAllowedHost = (hostname) => {
   if (!hostname || typeof hostname !== "string") return false;
   const lower = hostname.toLowerCase();
@@ -131,7 +127,6 @@ const isAllowedHost = (hostname) => {
   );
 };
 
-// Allowed Google domains
 assert.equal(isAllowedHost("labs.google"), true);
 assert.equal(isAllowedHost("flow-content.google"), true);
 assert.equal(isAllowedHost("fx.labs.google"), true);
@@ -140,7 +135,6 @@ assert.equal(isAllowedHost("storage.googleapis.com"), true);
 assert.equal(isAllowedHost("lh3.googleusercontent.com"), true);
 assert.equal(isAllowedHost("yt3.ggpht.com"), true);
 
-// Disallowed SSRF targets (localhost, private IP, external domains)
 assert.equal(isAllowedHost("localhost"), false);
 assert.equal(isAllowedHost("127.0.0.1"), false);
 assert.equal(isAllowedHost("0.0.0.0"), false);
@@ -180,7 +174,6 @@ try {
   fs.rmSync(capabilityTestDir, { recursive: true, force: true });
 }
 
-// ── 3. Test Protocol Validation (HTTPS only) ──────────────────────────
 const isSafeUrl = (urlStr) => {
   if (typeof urlStr !== "string" || !urlStr.trim()) return false;
   try {
@@ -223,7 +216,6 @@ assert.equal(
   "javascript: must be rejected",
 );
 
-// ── 4. Verify generation.js Backend Contract & Security Boundaries ───
 const genJsPath = path.resolve(
   __dirname,
   "../apps/desktop/src/electron/ipc/generation.js",
@@ -292,7 +284,6 @@ assert.equal(
   "generation.js must contain normalizeImageAspect",
 );
 
-// ── 5. Test Aspect Ratio Normalization Logic ─────────────────────────
 const normalizeImageAspect = (aspect) => {
   if (!aspect) return "IMAGE_ASPECT_RATIO_LANDSCAPE";
   const map = {
@@ -345,7 +336,6 @@ assert.equal(
   "IMAGE_ASPECT_RATIO_PORTRAIT_THREE_FOUR",
 );
 
-// ── 6. Verify storage.js Slot-Scoped Partitioning ─────────────────────
 const storageJsPath = path.resolve(
   __dirname,
   "../apps/desktop/src/electron/ipc/storage.js",
@@ -357,7 +347,6 @@ assert.equal(
   "storage.js must use slotId for save-image-locally session partition",
 );
 
-// ── 7. Verify Strict Slot Isolation (No DEFAULTS.projectId Fallbacks) ─
 assert.equal(
   genJsContent.includes("DEFAULTS.projectId"),
   false,
@@ -369,7 +358,6 @@ assert.equal(
   "generation.js must not fallback to capturedAuth.bearerToken",
 );
 
-// ── 8. Verify Video Post-Processing Slot Propagation ─────────────────
 const videoTsPath = path.resolve(
   __dirname,
   "../apps/desktop/src/ui/services/electron-api/video.ts",
@@ -469,7 +457,6 @@ assert.equal(
   "VideoGeneratorPage must connect localPath to showInFolder",
 );
 
-// ── 9. Verify Multi-Reference Limits & Validation ─────────────────────
 assert.equal(
   genJsContent.includes("MAX_REFERENCE_IMAGES = 5"),
   true,
@@ -481,7 +468,6 @@ assert.equal(
   "generation.js must check max reference image count",
 );
 
-// ── 10. Verify Image Queue & UI Invariants ─────────────────────────────
 const imageTsPath = path.resolve(
   __dirname,
   "../apps/desktop/src/ui/services/electron-api/image.ts",
@@ -595,7 +581,6 @@ assert.equal(
   "Image adapter must honor explicit slots and discover account-scoped model policy",
 );
 
-// ── 11. Behavioral Runtime Mock Tests for Slot Isolation & Mismatch ───
 const sessionJsPath = path.resolve(
   __dirname,
   "../apps/desktop/src/electron/ipc/flow/session.js",
@@ -657,7 +642,6 @@ const mockGetSlot = (slotId = 0) => {
   return s;
 };
 
-// Register Session IPC
 const registerFlowSessionIpc = require(sessionJsPath);
 registerFlowSessionIpc({
   app: {},
@@ -808,7 +792,6 @@ registerGenerationIpc({
 });
 
 (async () => {
-  // 1. Verify get-auth-info slot scoping
   const slot1Auth = await registeredHandlers["get-auth-info"](
     {},
     { slotId: 1 },
@@ -824,7 +807,6 @@ registerGenerationIpc({
   assert.equal(slot3Auth.hasBearerToken, false);
   assert.equal(slot3Auth.projectId, null);
 
-  // 2. Verify set-manual-auth updates only target slot
   await registeredHandlers["set-manual-auth"](
     {},
     { slotId: 2, bearerToken: "new-token-2", projectId: "proj-manual-2" },
@@ -834,14 +816,12 @@ registerGenerationIpc({
   assert.equal(mockSlots[0].projectId, "project-0");
   assert.equal(mockSlots[1].projectId, "project-1");
 
-  // 3. Verify extract-auth-from-webview
   const slot2Extract = await registeredHandlers["extract-auth-from-webview"](
     {},
     { slotId: 2 },
   );
   assert.equal(slot2Extract.projectId, "proj-manual-2");
 
-  // 4. Slot 1 with Project ID of Slot 0 must throw mismatch error
   await assert.rejects(
     async () => {
       await registeredHandlers["generate-image"](
@@ -857,7 +837,6 @@ registerGenerationIpc({
     "Sending Slot 0 project ID to Slot 1 must be rejected",
   );
 
-  // 5. Slot 3 (missing bearer token) throws token error
   await assert.rejects(
     async () => {
       await registeredHandlers["generate-image"](
@@ -872,7 +851,6 @@ registerGenerationIpc({
     "Slot without bearer token must throw",
   );
 
-  // 6. Over 5 reference images must be rejected
   await assert.rejects(
     async () => {
       await registeredHandlers["generate-image"](
@@ -888,7 +866,6 @@ registerGenerationIpc({
     "Over 5 reference images must be rejected",
   );
 
-  // 7. generate-video with project ID mismatch
   await assert.rejects(
     async () => {
       await registeredHandlers["generate-video"](
@@ -904,7 +881,6 @@ registerGenerationIpc({
     "generate-video mismatch project ID must be rejected",
   );
 
-  // 8. poll-video-status with project ID mismatch
   await assert.rejects(
     async () => {
       await registeredHandlers["poll-video-status"](
@@ -920,7 +896,6 @@ registerGenerationIpc({
     "poll-video-status mismatch project ID must be rejected",
   );
 
-  // 9. Slot with null projectId must reject foreign pid and not bypass isolation
   mockSlots[3].bearerToken = "Bearer slot-3-token";
   mockSlots[3].projectId = null;
   await assert.rejects(
@@ -954,7 +929,6 @@ registerGenerationIpc({
     "Slot with null projectId without pid must be rejected",
   );
 
-  // 10. Verify sync-session propagates slot.id to refreshCapturedCookies
   let refreshedSlotId = null;
   const mockSyncIpc = {};
   const mockSyncIpcMain = {
@@ -1002,7 +976,6 @@ registerGenerationIpc({
     "sync-session must pass slot.id (2) to refreshCapturedCookies",
   );
 
-  // 11. Electron renderer must not enable or depend on the legacy <webview> UI.
   const appCoreJsPath = path.resolve(
     __dirname,
     "../apps/desktop/src/electron/runtime/app-core.js",
@@ -1019,7 +992,6 @@ registerGenerationIpc({
     "The obsolete WebView diagnostic timer must not run",
   );
 
-  // 12. Video Model Key Resolution Contract & Mode Mapping Tests
   const { resolveVideoModelKey } = registerGenerationIpc;
   assert.equal(
     typeof resolveVideoModelKey,
@@ -1027,7 +999,6 @@ registerGenerationIpc({
     "resolveVideoModelKey must be exported",
   );
 
-  // A. Omni / Abra model mapping across modes
   assert.equal(
     resolveVideoModelKey({
       mode: "text",
@@ -1097,7 +1068,6 @@ registerGenerationIpc({
     "EditVideo should resolve to abra_edit",
   );
 
-  // B. VEO 3.1 Model resolution according to tier and aspect
   assert.equal(
     resolveVideoModelKey({
       mode: "image",
@@ -1185,7 +1155,6 @@ registerGenerationIpc({
     "Unverified Tier Two Fast mapping must fail closed instead of spending credits with a guessed key",
   );
 
-  // C. IPC Handler execution checks
   await registeredHandlers["generate-video-start-image"](
     {},
     {
@@ -1281,7 +1250,6 @@ registerGenerationIpc({
     "A VEO request must fail before calling Google Flow when the selected slot tier is unknown",
   );
 
-  // 13. Video Upload Security, Magic Bytes & Path Boundary Tests
   const { isValidVideoBuffer, ALLOWED_VIDEO_EXTS, MAX_VIDEO_FILE_SIZE_BYTES } =
     registerGenerationIpc;
   assert.equal(
@@ -1297,16 +1265,15 @@ registerGenerationIpc({
     "Max video size must be 200MB",
   );
 
-  // A. Magic Bytes checks
   const mp4Header = Buffer.from([
     0, 0, 0, 24, 0x66, 0x74, 0x79, 0x70, 0x69, 0x73, 0x6f, 0x6d,
-  ]); // 'ftypisom'
+  ]);
   const webmHeader = Buffer.from([
     0x1a, 0x45, 0xdf, 0xa3, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   ]);
   const aviHeader = Buffer.from([
     0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x41, 0x56, 0x49, 0x20,
-  ]); // 'RIFF....AVI '
+  ]);
   const fakeFile = Buffer.from("THIS_IS_A_PLAIN_TEXT_FILE_AND_NOT_A_VIDEO");
 
   assert.equal(
@@ -1331,7 +1298,6 @@ registerGenerationIpc({
     "Buffer < 12 bytes must be rejected",
   );
 
-  // B. Handler path and extension rejection tests
   const os = require("os");
   const tempDir = os.tmpdir();
   const fakeTxtPath = path.join(tempDir, `fake-video-${Date.now()}.txt`);
@@ -1416,7 +1382,6 @@ registerGenerationIpc({
     if (fs.existsSync(fakeTxtPath)) fs.unlinkSync(fakeTxtPath);
   }
 
-  // 14. Video Architecture, Model Catalog, Queue Capacity & Retry Invariants
   assert.equal(
     videoTsContent.includes("export const DEFAULT_VIDEO_MODELS: VideoModel[]"),
     true,
@@ -1438,7 +1403,6 @@ registerGenerationIpc({
     "VideoGeneratorPage must not hardcode flowModels catalog",
   );
 
-  // A. Resolver thorough coverage
   const testCases = [
     {
       input: { mode: "text", videoModelKey: "abra_t2v", duration: 4 },
@@ -1543,7 +1507,6 @@ registerGenerationIpc({
     );
   }
 
-  // Tier violation assertions
   assert.throws(
     () =>
       resolveVideoModelKey({
@@ -1563,7 +1526,6 @@ registerGenerationIpc({
     /yêu cầu tài khoản Tier One/,
   );
 
-  // B. Queue Capacity & Enqueue Invariant simulation
   function simulateEnqueue(
     existingActiveCount,
     requestsCount,
@@ -1591,7 +1553,6 @@ registerGenerationIpc({
     "Enqueue when empty should accept all 3",
   );
 
-  // C. Retry snapshot isolation simulation
   function simulateRetryTask(task, currentFormState) {
     if (task.request) return { reusedRequest: task.request, action: "enqueue" };
     if (task.mode === "text") {
@@ -1669,7 +1630,6 @@ registerGenerationIpc({
   );
   assert.equal(imageRetryResult.loadedForm.mode, "image");
 
-  // D. Upscale must use the immutable task snapshot, not the current form aspect.
   assert.equal(
     videoPageContent.includes('task.aspect ?? "landscape"'),
     true,
@@ -1683,7 +1643,6 @@ registerGenerationIpc({
     "Video upscale must not use the mutable current form aspect",
   );
 
-  // E. Upload file I/O on Electron Main must remain asynchronous and fail closed.
   assert.equal(
     genJsContent.includes("await fs.promises.realpath(normalizedPath)"),
     true,

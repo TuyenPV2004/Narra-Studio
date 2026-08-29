@@ -5,11 +5,11 @@ const nativeFs = require('node:fs');
 const { fileURLToPath: nativeFileURLToPath } = require('node:url');
 
 const ALLOWED_MEDIA_EXTENSIONS = new Set([
-  // Images
+
   '.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.svg', '.heic', '.avif',
-  // Videos
+
   '.mp4', '.webm', '.mov', '.avi', '.mkv', '.m4v', '.flv', '.wmv', '.3gp',
-  // Audios
+
   '.mp3', '.wav', '.m4a', '.aac', '.ogg', '.flac', '.opus',
 ]);
 

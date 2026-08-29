@@ -75,7 +75,7 @@ function remoteMediaExtension(source, inputKind, path) {
       ? new Set(['.jpg', '.jpeg', '.png', '.webp', '.avif'])
       : new Set(['.mp4', '.mov', '.m4v', '.webm', '.mkv']);
     if (allowed.has(extension)) return extension;
-  } catch { /* use a safe media fallback */ }
+  } catch {  }
   return inputKind === 'image' ? '.jpg' : '.mp4';
 }
 
@@ -95,7 +95,7 @@ async function downloadRemoteMedia({ source, tempDir, inputKind, path, fs, fetch
     return localPath;
   } catch (error) {
     if (state.cancelled || error?.name === 'AbortError') throw new Error('DEPTH_CANCELLED');
-    // Never expose a signed R2 URL or its query parameters in renderer errors.
+
     throw new Error(
       `Không thể tải ${inputKind === 'image' ? 'hình ảnh' : 'video'} đầu vào từ kho lưu trữ. `
       + 'Hãy tải lại Canvas hoặc tạo lại liên kết nguồn rồi thử lại.',
@@ -197,7 +197,7 @@ module.exports = function registerDepthAnythingIpc(dependencies) {
       fs.mkdirSync(outputDir, { recursive: true });
       let lastProgressEmitAt = 0;
       const emit = progress => {
-        try { event.sender.send('depth-anything-progress', { jobId, ...progress }); } catch { /* renderer closed */ }
+        try { event.sender.send('depth-anything-progress', { jobId, ...progress }); } catch {  }
       };
       const emitThrottled = (progress, force = false) => {
         const now = Date.now();
@@ -272,8 +272,7 @@ module.exports = function registerDepthAnythingIpc(dependencies) {
               ELECTRON_RUN_AS_NODE: '1',
               GENYU_DEPTH_THREADS: String(coreMlEnabled ? depthThreadCount : 1),
               GENYU_DEPTH_COREML: coreMlEnabled ? '1' : '0',
-              // Apple Silicon: prefer Neural Engine + static MLProgram. CPU/GPU
-              // CoreML mode retained >5 GB in testing and can stall the Canvas.
+
               GENYU_DEPTH_COREML_FLAGS: String(0x004 | 0x008 | 0x010),
             },
             stdio: ['ignore', 'ignore', 'pipe', 'ipc'],
@@ -282,7 +281,7 @@ module.exports = function registerDepthAnythingIpc(dependencies) {
           worker.stderr?.on('data', chunk => {
             workerStderr = `${workerStderr}${String(chunk)}`.slice(-2400);
           });
-          try { os.setPriority(worker.pid, 10); } catch { /* unsupported platform */ }
+          try { os.setPriority(worker.pid, 10); } catch {  }
           state.worker = worker;
           try {
             await new Promise((resolve, reject) => {
@@ -339,7 +338,7 @@ module.exports = function registerDepthAnythingIpc(dependencies) {
         } catch (error) {
           if (state.cancelled || !isDepthWorkerMemoryExit(error)) throw error;
           outputFrames.forEach(framePath => {
-            try { fs.rmSync(framePath, { force: true }); } catch { /* best effort */ }
+            try { fs.rmSync(framePath, { force: true }); } catch {  }
           });
           emit({
             stage: 'loading-model',
@@ -417,10 +416,10 @@ module.exports = function registerDepthAnythingIpc(dependencies) {
         if (state.worker) {
           try {
             if (!state.worker.killed) state.worker.kill();
-          } catch { /* already stopped */ }
+          } catch {  }
         }
         activeJobs.delete(jobId);
-        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch { /* best effort */ }
+        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch {  }
       }
     };
 

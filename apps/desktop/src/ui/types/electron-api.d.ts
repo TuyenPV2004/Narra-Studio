@@ -256,6 +256,64 @@ export interface NarraElectronApi {
   aiAgentChatCancel: (payload: {
     requestId: string;
   }) => Promise<{ cancelled: boolean; requestId?: string }>;
+  aiAgentWebSearch: (payload: { query: string }) => Promise<{
+    success: boolean;
+    results: Array<{ title: string; url: string; snippet: string }>;
+    error?: string;
+  }>;
+  aiAgentWebFetch: (payload: { url: string }) => Promise<{
+    success: boolean;
+    data?: {
+      url: string;
+      finalUrl?: string;
+      domain: string;
+      title: string;
+      siteName?: string;
+      statusCode?: number;
+      contentType?: string;
+      wordCount?: number;
+      fetchedAt?: string;
+      text: string;
+    };
+    error?: string;
+  }>;
+  aiAgentResearch: (payload: {
+    query: string;
+    maxSources?: number;
+  }) => Promise<{
+    success: boolean;
+    query: string;
+    sources: Array<{
+      rank: number;
+      url: string;
+      domain: string;
+      title: string;
+      siteName: string;
+      success: boolean;
+      wordCount?: number;
+      fetchedAt?: string;
+      keyExcerpts: string[];
+    }>;
+
+    nonce: string;
+    synthesizedEvidenceText: string;
+    evidenceAvailable: boolean;
+    failureReason?: string;
+    fullTextSourceCount?: number;
+    searchError?: string | null;
+    error?: string;
+  }>;
+  aiAgentResearchQuery: (payload: {
+    message: string;
+    history: unknown[];
+    title?: string;
+  }) => Promise<{
+    success: boolean;
+    query: string;
+    derived?: boolean;
+    warning?: string;
+    error?: string;
+  }>;
   aiAgentIntent: (payload: Record<string, unknown>) => Promise<unknown>;
   aiAgentWorkflow: (payload: Record<string, unknown>) => Promise<unknown>;
   aiAgentPolishWorkflow: (payload: Record<string, unknown>) => Promise<unknown>;

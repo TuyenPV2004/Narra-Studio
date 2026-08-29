@@ -38,10 +38,6 @@ module.exports = function createAppCore(dependencies) {
     getNextFilename,
   } = dependencies;
 
-// ── Default values from real cURL ──────────────────────────────────────
-// Build a clean Chrome UA matching the actual OS, with no Electron / app-name
-// substring. reCAPTCHA Enterprise reads navigator.userAgent and any mention
-// of "Electron" or app-name → low score / UNUSUAL_ACTIVITY.
 function buildCleanUserAgent() {
   const chromeMajor = (process.versions.chrome || '147.0.0.0').split('.')[0];
   const ver = `${chromeMajor}.0.0.0`;
@@ -64,10 +60,6 @@ const DEFAULTS = {
   userAgent: buildCleanUserAgent(),
 };
 
-// ── Captured auth data ─────────────────────────────────────────────────
-// ── Multi-Account Slot System ─────────────────────────────────────────
-// Mỗi slot = 1 Google account với session partition riêng biệt.
-// Slot 0 = account chính (backward compat với SESSION_PARTITION cũ).
 function makeEmptySlot(id) {
   return {
     id,
@@ -91,12 +83,8 @@ function makeEmptySlot(id) {
 
 const accountSlots = Array.from({ length: MAX_SLOTS }, (_, i) => makeEmptySlot(i));
 
-// Backward compat alias — các code cũ dùng capturedAuth vẫn hoạt động qua slot 0
 const capturedAuth = accountSlots[0];
 
-// Handles cho các timer nền của webview (poll projectId, re-inject upload-spy,
-// auto-enter). Lưu lại để clear khi cửa sổ đóng / setup chạy lại → tránh timer
-// chồng chất chạy mãi làm tăng CPU nền.
 let webviewBackgroundTimers = [];
 function clearWebviewBackgroundTimers() {
   for (const t of webviewBackgroundTimers) {
@@ -110,10 +98,7 @@ function getSlot(slotId) {
   return accountSlots[id] || accountSlots[0];
 }
 
-// ── Busy slot tracking (in-flight API calls) ─────────────────────────
-// Track số lượng concurrent requests mỗi slot đang xử lý
-// để pickRandomSlot ưu tiên slot ít bận nhất.
-const slotRequestCounts = {}; // { slotId: count }
+const slotRequestCounts = {};
 function markSlotBusy(slotId) {
   slotRequestCounts[slotId] = (slotRequestCounts[slotId] || 0) + 1;
 }
@@ -124,16 +109,15 @@ function markSlotFree(slotId) {
 function pickRandomSlot() {
   const available = accountSlots.filter(s => s.status === 'connected' && s.bearerToken);
   if (!available.length) {
-    // Fallback về slot 0 nếu không có slot nào connected
     if (accountSlots[0].bearerToken) return accountSlots[0];
     throw new Error('Không có account nào sẵn sàng. Vui lòng đăng nhập.');
   }
-  // Ưu tiên slot có 0 requests đang chạy (idle slots first)
+
   const idle = available.filter(s => !slotRequestCounts[s.id] || slotRequestCounts[s.id] === 0);
   if (idle.length > 0) {
     return idle[Math.floor(Math.random() * idle.length)];
   }
-  // Fallback: chọn slot ít bận nhất (least concurrent requests)
+
   available.sort((a, b) => (slotRequestCounts[a.id] || 0) - (slotRequestCounts[b.id] || 0));
   return available[0];
 }
@@ -161,12 +145,10 @@ async function refreshCapturedCookies(slotId = 0) {
   }
 }
 
-// Fetch session info with structured classification (authenticated, unauthenticated, transient-error, server-error, network-error)
 async function fetchSlotSession(slotId) {
   const slot = getSlot(slotId);
   if (!slot) return { ok: false, kind: 'unauthenticated' };
 
-  // 1. Google OAuth UserInfo API via Bearer token (fastest & most reliable if token active)
   if (slot.bearerToken) {
     try {
       const token = slot.bearerToken.replace(/^(Bearer\s+)+/i, 'Bearer ');
@@ -194,7 +176,6 @@ async function fetchSlotSession(slotId) {
           return { ok: true, kind: 'authenticated', user, status: 200 };
         }
       } else if (userinfoResp.status === 401 || userinfoResp.status === 403) {
-        // Bearer token expired in RAM — invalidate it but DO NOT exit early; fall through to test persistent cookie session!
         console.warn(`[SLOT-${slotId}][PROFILE] Stale Bearer token returned ${userinfoResp.status}, resetting token in memory and falling back to persistent cookie session check...`);
         slot.bearerToken = null;
       }
@@ -203,7 +184,6 @@ async function fetchSlotSession(slotId) {
     }
   }
 
-  // 2. Direct fetch using slot partition cookies (labs.google/fx/api/auth/session)
   try {
     const ses = session.fromPartition(slot.partition || `persist:slot-${slotId}`);
     const all = await ses.cookies.get({}).catch(() => []);
@@ -291,12 +271,8 @@ async function clearSlotSessionData(slotId) {
   slot.userAgent = null;
   slot.lastCaptured = null;
   slot.status = 'empty';
-
 }
 
-// ── Silent Session Hydration & Restoration ───────────────────────────
-// Khôi phục trạng thái session từ persistent partition sau khi khởi động lại app.
-// Tuyệt đối không lưu token/cookie ra file JSON; dùng trực tiếp Chromium partition.
 async function restoreSlotSession(slotId) {
   const slot = getSlot(slotId);
   if (!slot) return { status: 'empty' };
@@ -304,7 +280,6 @@ async function restoreSlotSession(slotId) {
   try {
     const ses = session.fromPartition(slot.partition || `persist:slot-${slotId}`);
 
-    // 1. Kiểm tra cookie trong partition
     const [googleCookies, labsCookies] = await Promise.all([
       ses.cookies.get({ domain: '.google.com' }).catch(() => []),
       ses.cookies.get({ domain: 'labs.google' }).catch(() => []),
@@ -321,7 +296,6 @@ async function restoreSlotSession(slotId) {
     slot.status = 'restoring';
     const hasAuthCookies = hasAuthenticationCookie(allCookies);
 
-    // 2. Xác minh session hợp lệ qua endpoint với response phân loại
     const sessionRes = await fetchSlotSession(slotId);
 
     const calculatedStatus = evaluateSlotStatus({
@@ -384,13 +358,11 @@ async function restoreAllSlotSessions() {
   }
 }
 
-// Backward compat alias
 async function fetchSlotEmail(slotId) {
   const s = await fetchSlotSession(slotId);
   return s?.email || null;
 }
 
-// Backward compat — capturedCookieHeader getter/setter qua slot 0
 Object.defineProperty(global, 'capturedCookieHeader', {
   get: () => accountSlots[0].cookies,
   set: (v) => { accountSlots[0].cookies = v; },
@@ -411,7 +383,7 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       webSecurity: false,
-      // Performance tweaks
+
       backgroundThrottling: true,
       spellcheck: false,
       enableBlinkFeatures: 'CSSContainerQueries',
@@ -422,12 +394,7 @@ function createWindow() {
     runtime.mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     runtime.mainWindow.once('ready-to-show', () => runtime.mainWindow.show());
   } else {
-    // app-core.js lives in electron/runtime/, while Vite outputs to the
-    // project-level dist/ directory. Keep the packaged path rooted two levels
-    // above this module; otherwise Electron loads electron/dist/index.html and
-    // the window remains on its background color with no renderer content.
     runtime.mainWindow.loadFile(path.join(__dirname, '..', '..', 'dist', 'index.html'));
-    // ready-to-show handled in app.whenReady (với splash)
   }
 
   runtime.mainWindow.setMenuBarVisibility(false);
@@ -453,25 +420,18 @@ function createWindow() {
       console.warn('[RENDERER-CRASH] Could not persist diagnostics:', error.message);
     }
   });
-  // Dừng mọi timer nền của webview khi cửa sổ đóng — tránh chúng chạy tiếp và
-  // gọi findFlowWebview/executeJavaScript trên webContents đã destroy.
+
   runtime.mainWindow.on('closed', clearWebviewBackgroundTimers);
-  // Provider runtime restoration is renderer-driven after license and saved
-  // navigation validation. VEO3 interception stays lazy: opening the window or
-  // remaining on Provider Hub must not start Google browser/session runtimes.
 }
 
 function setupRequestInterception() {
-  // Clear timer cũ nếu setup chạy lại (vd cửa sổ được tạo lại) → không chồng timer.
   clearWebviewBackgroundTimers();
-  // Setup interceptor cho TẤT CẢ slot partitions
+
   for (let slotId = 0; slotId < MAX_SLOTS; slotId++) {
     const slot = accountSlots[slotId];
     const ses = session.fromPartition(slot.partition);
 
-    // Inject JS vào mọi page trong partition này TRƯỚC khi page script chạy
-    // → navigator.webdriver = false, chrome.runtime mock, plugin list realistic
-    ses.setPreloads = ses.setPreloads || (() => { }); // safety
+    ses.setPreloads = ses.setPreloads || (() => { });
     const antiDetectScript = path.join(__dirname, 'anti-detect.js');
     if (require('fs').existsSync(antiDetectScript)) {
       ses.setPreloads([antiDetectScript]);
@@ -482,31 +442,24 @@ function setupRequestInterception() {
         urls: [
           'https://aisandbox-pa.googleapis.com/*',
           'https://labs.google/*',
-          // PERF: chỉ intercept đúng 2 host cần thiết (API VEO3 + trang labs).
-          // Trước đây filter cả 'https://*.googleapis.com/*' khiến callback chạy
-          // trên MỌI request fonts/storage/analytics/gstatic → tốn CPU vô ích.
-          // Token/x-browser/projectId chỉ xuất hiện trên aisandbox-pa + labs.google.
-          // KHÔNG intercept accounts.google.com — UA override tạo mismatch với sec-ch-ua
-          // → Google block login. Chỉ intercept API calls cần thiết.
+
         ]
       },
       (details, callback) => {
         const h = details.requestHeaders;
 
-        // — Force override UA cho mọi request → xóa "Electron" hoàn toàn —
         const cleanUA = slot.userAgent || DEFAULTS.userAgent;
         h['User-Agent'] = cleanUA;
         h['user-agent'] = cleanUA;
 
         const authHeader = h['Authorization'] || h['authorization'];
         if (authHeader && authHeader.startsWith('Bearer ')) {
-          // Collapse any accidental "Bearer Bearer ..." into a single prefix.
           slot.bearerToken = authHeader.replace(/^(Bearer\s+)+/i, 'Bearer ');
           slot.lastCaptured = new Date().toISOString();
           slot.status = 'connected';
           refreshCapturedCookies(slotId);
           console.log(`[SLOT-${slotId}][AUTH] ✅ Bearer token captured from:`, new URL(details.url).hostname);
-          // Fetch full session (name, email, avatar) — fire-and-forget, retry if already has email
+
           setTimeout(() => {
             fetchSlotSession(slotId).then(session => {
               if (session) {
@@ -519,7 +472,7 @@ function setupRequestInterception() {
                 }
               }
             }).catch(() => { });
-          }, 2000); // wait 2s for page to settle after token capture
+          }, 2000);
         }
 
         if (details.url.includes('aisandbox-pa.googleapis.com')) {
@@ -540,7 +493,6 @@ function setupRequestInterception() {
           console.log(`[SLOT-${slotId}][AUTH] ✅ ProjectId:`, slot.projectId);
         }
 
-        // Notify UI khi BẤT KỲ slot nào capture được token (không chỉ slot 0)
         if (slot.bearerToken && runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
           runtime.mainWindow.webContents.send('auth-captured', {
             hasBearerToken: true,
@@ -554,11 +506,8 @@ function setupRequestInterception() {
     );
   }
 
-
   console.log('[AUTH] Request interception active - monitoring all slot partitions');
 
-  // ── Auto-inject upload-video spy into webview ──
-  // Automatically installs fetch interceptor to capture the browser's upload protocol
   async function autoInjectUploadSpy() {
     try {
       const wv = findFlowWebview();
@@ -613,8 +562,6 @@ function setupRequestInterception() {
               entry.resHeaders = resHeaders;
               entry.resBody = resBody.substring(0, 1000);
               window.__uploadSpyLogs.push(entry);
-              // PERF: bound log ở 50 entry gần nhất — trước đây mảng này tăng vô hạn
-              // trong bộ nhớ trang webview suốt phiên làm việc.
               if (window.__uploadSpyLogs.length > 50) window.__uploadSpyLogs.splice(0, window.__uploadSpyLogs.length - 50);
               console.log('[SPY] <<<', res.status, resBody.substring(0, 300));
               return res;
@@ -627,7 +574,7 @@ function setupRequestInterception() {
       console.log('[SPY-UPLOAD] ✅ Auto-injected into webview');
     } catch (e) { console.log('[SPY-UPLOAD] Auto-inject error:', e.message); }
   }
-  // Pipe webview console.log [SPY] messages to main terminal
+
   let spyConsoleAttached = false;
   function attachSpyConsoleListener() {
     if (spyConsoleAttached) return;
@@ -643,11 +590,7 @@ function setupRequestInterception() {
       console.log('[SPY-UPLOAD] ✅ Console listener attached to webview');
     } catch (e) { }
   }
-  // Inject after 12s (after diagnose), then re-inject periodically (in case page reloads).
-  // PERF: giãn re-inject 30s → 60s và lưu handle để cleanup. Guard __uploadSpyActive
-  // khiến lần re-inject thường là no-op nên 60s vẫn đủ bắt trường hợp page reload.
 
-  // Auto-enter a project after login (so user doesn't have to manually click)
   let autoEnterAttempted = false;
   async function tryAutoEnterProject() {
     if (autoEnterAttempted) return;
@@ -681,14 +624,13 @@ function setupRequestInterception() {
 
       console.log('[AUTO-ENTER] Page state:', JSON.stringify(pageState));
 
-      // Already inside a project (has textbox) — save URL & skip
       if (pageState.hasTextbox) {
         console.log('[AUTO-ENTER] Already in a project — saving URL');
         autoEnterAttempted = true;
         if (pageState.url && pageState.url.includes('/project/')) {
           saveSettings({ lastProjectUrl: pageState.url });
           console.log('[AUTO-ENTER] Saved project URL:', pageState.url);
-          // Extract và broadcast projectId nếu chưa có
+
           const m = pageState.url.match(/\/project\/([a-zA-Z0-9_-]+)/);
           if (m && m[1] && !capturedAuth.projectId) {
             capturedAuth.projectId = m[1];
@@ -701,12 +643,10 @@ function setupRequestInterception() {
         return;
       }
 
-      // On project list page
       if (pageState.hasNewProjectBtn) {
         autoEnterAttempted = true;
 
         if (pageState.projectCount > 0) {
-          // Click first existing project
           console.log('[AUTO-ENTER] Clicking first existing project...');
           const projectUrl = await wv.executeJavaScript(`
             (function() {
@@ -722,7 +662,7 @@ function setupRequestInterception() {
           if (projectUrl) {
             saveSettings({ lastProjectUrl: projectUrl });
             console.log('[AUTO-ENTER] Saved project URL:', projectUrl);
-            // Extract projectId từ URL
+
             const m = projectUrl.match(/\/project\/([a-zA-Z0-9_-]+)/);
             if (m && m[1]) {
               capturedAuth.projectId = m[1];
@@ -730,7 +670,6 @@ function setupRequestInterception() {
             }
           }
         } else {
-          // No projects — click "New project"
           console.log('[AUTO-ENTER] No projects found, clicking New project...');
           await wv.executeJavaScript(`
             (function() {
@@ -744,14 +683,14 @@ function setupRequestInterception() {
               return false;
             })()
           `);
-          // Save URL after new project is created (wait a bit)
+
           setTimeout(async () => {
             try {
               const url = await wv.executeJavaScript('window.location.href');
               if (url && url.includes('/project/')) {
                 saveSettings({ lastProjectUrl: url });
                 console.log('[AUTO-ENTER] Saved new project URL:', url);
-                // Extract projectId từ URL mới
+
                 const m = url.match(/\/project\/([a-zA-Z0-9_-]+)/);
                 if (m && m[1]) {
                   capturedAuth.projectId = m[1];
@@ -765,17 +704,12 @@ function setupRequestInterception() {
           }, 5000);
         }
 
-        // Notify renderer that we auto-entered
         if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
           runtime.mainWindow.webContents.send('auto-entered-project');
         }
       }
     } catch (e) { console.log('[AUTO-ENTER] Error:', e.message); }
   }
-
-  // Try auto-enter at 12s, 20s, 30s (user may still be logging in).
-  // Guard autoEnterAttempted khiến các lần sau là no-op; lưu handle để cleanup nếu
-  // cửa sổ đóng trước khi kịp chạy.
 }
 
 function teardownRequestInterception() {
@@ -835,11 +769,6 @@ function generateUUID() {
   });
 }
 
-// ── DRY-RUN AUDIT (payload capture, NO network) ───────────────────────
-// Gated entirely on a flag file in tmpdir so production builds never touch
-// this path. When the flag exists, makeApiRequest appends the exact payload
-// it WOULD have sent to a JSONL file and returns a benign 200 — no credits,
-// no real media, nothing leaves the machine.
 const DRYRUN_FLAG_FILE = path.join(os.tmpdir(), 'veo3-dryrun.on');
 const DRYRUN_CAPTURE_FILE = path.join(os.tmpdir(), 'veo3-dryrun.jsonl');
 function isDryRunActive() {
@@ -847,7 +776,6 @@ function isDryRunActive() {
 }
 
 function makeApiRequest(url, body, slotId = 0) {
-  // DRY-RUN: capture payload, skip network entirely.
   if (isDryRunActive()) {
     try {
       fs.appendFileSync(DRYRUN_CAPTURE_FILE, JSON.stringify({ ts: Date.now(), url, slotId, body }) + '\n');
@@ -857,7 +785,7 @@ function makeApiRequest(url, body, slotId = 0) {
     }
     return Promise.resolve({ status: 200, data: { __dryRun: true, media: [], workflows: [], requests: [] } });
   }
-  // Track slot busy để pickRandomSlot ưu tiên slot idle
+
   markSlotBusy(slotId);
   return new Promise((resolve, reject) => {
     const slot = getSlot(slotId);
@@ -897,10 +825,8 @@ function makeApiRequest(url, body, slotId = 0) {
   });
 }
 
-// ── WebView Proxy: CAPTCHA + API fetch inside browser context ──────────
 const RECAPTCHA_SITE_KEY = '6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV';
 
-// Track which slot's webview is currently active in WebViewPage
 let activeWebviewSlot = 0;
 function setActiveWebviewSlot(slotId) { activeWebviewSlot = slotId; }
 
@@ -910,17 +836,14 @@ function findFlowWebview(slotId = null) {
   const targetSlot = slotId !== null ? slotId : activeWebviewSlot;
   const targetPartition = `persist:slot-${targetSlot}`;
 
-  // Try to find by partition first (most reliable)
   const byPartition = all.find(wc => {
     try { return wc.getType() === 'webview' && wc.session?.storagePath?.includes(`slot-${targetSlot}`); }
     catch { return false; }
   });
   if (byPartition) return byPartition;
 
-  // If a specific slotId was requested, DO NOT fallback to other slots' webviews
   if (slotId !== null) return null;
 
-  // Fallback: find any webview on labs.google
   return all.find(wc => {
     try {
       const url = wc.getURL();
@@ -928,7 +851,6 @@ function findFlowWebview(slotId = null) {
     } catch { return false; }
   });
 }
-
 
   return {
     buildCleanUserAgent,

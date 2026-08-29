@@ -22,7 +22,6 @@ function findExtensionDirectory({fs, path, candidates, requiredVersion}) {
       if (!versionAtLeast(manifest.version, requiredVersion)) continue;
       return directory;
     } catch {
-      // Missing or malformed candidates are ignored in favor of the next path.
     }
   }
   return null;

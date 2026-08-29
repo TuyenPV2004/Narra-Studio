@@ -101,7 +101,7 @@ Expected: JS behavior assertions PASS; CSS redesign assertions vẫn FAIL.
 
 **Interfaces:**
 - Consumes: semantic tokens `--bg-*`, `--text*`, `--border*`, `--brand-primary*`, `--success-*`, `--danger-*`.
-- Produces: một section `/* CAPTCHA light redesign */` và một section toast/nav alignment có selector rõ ràng.
+- Produces: một section CAPTCHA light redesign và một section toast/nav alignment có selector rõ ràng.
 
 - [ ] **Step 1: Viết CAPTCHA light surfaces**
 

@@ -2,13 +2,6 @@
 
 const { normalizeGridSelection, resolveGridCropCells } = require('./grid-segmentation');
 
-/**
- * Read-only media inspection and OS dialogs: audio/thumbnail extraction,
- * ffprobe info, file pickers, reveal in Finder, open external URL.
- *
- * Registered by `electron/ipc/media.js`.
- */
-
 module.exports = function registerMediaProbeIpc(dependencies) {
   const {
     app,
@@ -28,7 +21,6 @@ module.exports = function registerMediaProbeIpc(dependencies) {
     getImageOutputDir,
   } = dependencies;
 
-// ── Extract Audio from Video ──────────────────────────────────────────
 ipcMain.handle('extract-audio', async (_, { filePath, format }) => {
   const { execFile } = require('child_process');
   const { fileURLToPath } = require('url');
@@ -83,7 +75,6 @@ ipcMain.handle('extract-audio', async (_, { filePath, format }) => {
   return pathToFileURL(outPath).toString();
 });
 
-// ── Extract Thumbnail (Frame Capture) ─────────────────────────────────
 ipcMain.handle('extract-thumbnail', async (_, { filePath, timeSeconds, asDataUrl }) => {
   const { execFile } = require('child_process');
   const { fileURLToPath } = require('url');
@@ -133,7 +124,6 @@ ipcMain.handle('extract-thumbnail', async (_, { filePath, timeSeconds, asDataUrl
     });
   });
 
-  // Return base64 data URL if requested (more reliable in renderer)
   if (asDataUrl) {
     const buf = fs.readFileSync(outPath);
     return `data:image/jpeg;base64,${buf.toString('base64')}`;
@@ -141,11 +131,6 @@ ipcMain.handle('extract-thumbnail', async (_, { filePath, timeSeconds, asDataUrl
   return pathToFileURL(outPath).toString();
 });
 
-// ── Image Thumbnail (nativeImage downscale, renderer-only LOD) ─────────
-// Trả về một dataURL JPEG nhỏ để card ảnh trên canvas không phải paint
-// texture full-res (1K–4K) hàng trăm lần. Resize ở main process qua
-// nativeImage nên không dính CORS của signed storage.googleapis.com URL.
-// Return null nếu ảnh gốc đã nhỏ hơn maxDim (renderer dùng thẳng src).
 ipcMain.handle('image-thumbnail', async (_, { src, maxDim, includeMetadata = false } = {}) => {
   if (!src || typeof src !== 'string') return null;
   const dim = Math.max(64, Math.min(1024, Number(maxDim) || 384));
@@ -157,7 +142,6 @@ ipcMain.handle('image-thumbnail', async (_, { src, maxDim, includeMetadata = fal
   const cachePath = path.join(thumbDir, `${key}.jpg`);
   const metadataPath = path.join(thumbDir, `${key}.json`);
 
-  // Disk cache: reload nhanh, không fetch lại.
   try {
     if (fs.existsSync(cachePath)) {
       const cached = fs.readFileSync(cachePath);
@@ -174,7 +158,6 @@ ipcMain.handle('image-thumbnail', async (_, { src, maxDim, includeMetadata = fal
     }
   } catch { }
 
-  // Load bytes: data:/file:/http(s).
   let buf = null;
   try {
     if (src.startsWith('data:')) {
@@ -213,7 +196,7 @@ ipcMain.handle('image-thumbnail', async (_, { src, maxDim, includeMetadata = fal
 
   const size = img.getSize();
   const longest = Math.max(size.width, size.height);
-  // Ảnh gốc đã nhỏ: renderer dùng thẳng src, khỏi tốn thêm 1 texture.
+
   if (longest <= dim) {
     return includeMetadata ? { src: null, width: size.width, height: size.height } : null;
   }
@@ -236,10 +219,6 @@ ipcMain.handle('image-thumbnail', async (_, { src, maxDim, includeMetadata = fal
     : thumbnailSrc;
 });
 
-// ── Image Grid Segmentation (nativeImage crop, no renderer CORS) ─────
-// Splits only the requested cells from the original image bytes. The renderer
-// immediately sends these bytes through the existing Cloudflare image ingest,
-// so no base64 payload is persisted in Canvas/Team realtime state.
 ipcMain.handle('image-grid-segment', async (_, {
   src,
   rows,
@@ -309,14 +288,12 @@ ipcMain.handle('image-grid-segment', async (_, {
   });
 });
 
-// ── Get Video Info (FFprobe) ──────────────────────────────────────────
 ipcMain.handle('get-video-info', async (_, { filePath }) => {
   const { execFile } = require('child_process');
   const { fileURLToPath } = require('url');
   const resolved = filePath.startsWith('file://') ? fileURLToPath(filePath) : filePath;
   if (!fs.existsSync(resolved)) throw new Error(`File không tồn tại: ${resolved}`);
 
-  // Try ffprobe first (system), fall back to bundled ffmpeg
   const probeBin = (() => {
     const ffprobeCandidates = [
       '/opt/homebrew/bin/ffprobe', '/usr/local/bin/ffprobe', '/usr/bin/ffprobe',
@@ -324,7 +301,7 @@ ipcMain.handle('get-video-info', async (_, { filePath }) => {
     for (const c of ffprobeCandidates) {
       try { if (fs.existsSync(c)) return c; } catch { }
     }
-    return getFfmpegBin(); // fallback to bundled ffmpeg
+    return getFfmpegBin();
   })();
 
   const isProbe = probeBin.includes('ffprobe');
@@ -351,7 +328,6 @@ ipcMain.handle('get-video-info', async (_, { filePath }) => {
           });
         } catch { resolve({ width: 0, height: 0, fps: 0, codec: 'unknown', bitrate: 0, duration: 0, fileSize }); }
       } else {
-        // Parse ffmpeg -i stderr output
         const all = (stderr || '') + (stdout || '');
         const resMatch = all.match(/(\d{2,5})x(\d{2,5})/);
         const fpsMatch = all.match(/([\d.]+)\s*fps/);
@@ -372,14 +348,12 @@ ipcMain.handle('get-video-info', async (_, { filePath }) => {
   });
 });
 
-// ── Get Audio Info (FFprobe) ──────────────────────────────────────────
 ipcMain.handle('get-audio-info', async (_, { filePath }) => {
   const { execFile } = require('child_process');
   const { fileURLToPath } = require('url');
   const resolved = filePath.startsWith('file://') ? fileURLToPath(filePath) : filePath;
   if (!fs.existsSync(resolved)) throw new Error(`File không tồn tại: ${resolved}`);
 
-  // Try ffprobe first (system), fall back to bundled ffmpeg
   const probeBin = (() => {
     const ffprobeCandidates = [
       '/opt/homebrew/bin/ffprobe', '/usr/local/bin/ffprobe', '/usr/bin/ffprobe',
@@ -387,7 +361,7 @@ ipcMain.handle('get-audio-info', async (_, { filePath }) => {
     for (const c of ffprobeCandidates) {
       try { if (fs.existsSync(c)) return c; } catch { }
     }
-    return getFfmpegBin(); // fallback to bundled ffmpeg
+    return getFfmpegBin();
   })();
 
   const isProbe = probeBin.includes('ffprobe');
@@ -415,7 +389,6 @@ ipcMain.handle('get-audio-info', async (_, { filePath }) => {
           });
         } catch { resolve({ codec: 'unknown', sampleRate: 0, channels: 0, bitrate: 0, duration: 0, fileSize }); }
       } else {
-        // Parse ffmpeg -i stderr output
         const all = (stderr || '') + (stdout || '');
         const codecMatch = all.match(/Audio:\s*(\w+)/);
         const rateMatch = all.match(/(\d+)\s*Hz/);
@@ -435,7 +408,6 @@ ipcMain.handle('get-audio-info', async (_, { filePath }) => {
   });
 });
 
-// ── Select SRT File ───────────────────────────────────────────────────
 ipcMain.handle('select-srt-file', async () => {
   const { dialog } = require('electron');
   const result = await dialog.showOpenDialog({
@@ -447,7 +419,6 @@ ipcMain.handle('select-srt-file', async () => {
   return pathToFileURL(result.filePaths[0]).toString();
 });
 
-// ── Select Audio File (for BGM) ───────────────────────────────────────
 ipcMain.handle('select-audio-file', async () => {
   const { dialog } = require('electron');
   const result = await dialog.showOpenDialog({
@@ -459,8 +430,6 @@ ipcMain.handle('select-audio-file', async () => {
   return pathToFileURL(result.filePaths[0]).toString();
 });
 
-// Audio Node upload: keep the existing path-only picker above for video tools,
-// while this dedicated picker returns bytes + metadata for the shared CDN.
 async function readAudioFilePayload(filePath) {
   const stats = await fs.promises.stat(filePath);
   const maxBytes = 8 * 1024 * 1024;
@@ -502,8 +471,6 @@ ipcMain.handle('select-audio-upload-file', async () => {
   return readAudioFilePayload(result.filePaths[0]);
 });
 
-// Reads a known local audio file (e.g. output of trim-audio) as bytes + metadata
-// for the shared CDN, without opening a picker dialog.
 ipcMain.handle('read-local-audio-file', async (_, { filePath }) => {
   const { fileURLToPath } = require('url');
   const resolved = filePath.startsWith('file://') ? fileURLToPath(filePath) : filePath;
@@ -511,7 +478,6 @@ ipcMain.handle('read-local-audio-file', async (_, { filePath }) => {
   return readAudioFilePayload(resolved);
 });
 
-// ── Select Output Folder ──────────────────────────────────────────────
 ipcMain.handle('select-output-folder', async () => {
   const result = await dialog.showOpenDialog({
     title: 'Chọn thư mục lưu',
@@ -521,7 +487,6 @@ ipcMain.handle('select-output-folder', async () => {
   return result.filePaths[0];
 });
 
-// ── Show file in Finder ───────────────────────────────────────────────
 ipcMain.handle('show-in-folder', async (_, filePath) => {
   const { shell } = require('electron');
   const { fileURLToPath } = require('url');
@@ -544,5 +509,4 @@ ipcMain.handle('open-external-url', async (_, url) => {
   await shell.openExternal(parsed.href);
   return true;
 });
-
 };

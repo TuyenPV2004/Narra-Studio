@@ -112,8 +112,6 @@ async function ensureAudioSeparationModel({
   }
   await removeIfExists(modelPath, fsImpl);
 
-  // One writer per model cache entry. Callers still get deterministic
-  // checksum verification instead of competing over partial files.
   const key = pathImpl.resolve(modelPath);
   let pending = pendingDownloads.get(key);
   if (!pending) {

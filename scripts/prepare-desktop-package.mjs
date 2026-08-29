@@ -1,4 +1,3 @@
-/* global console, process */
 import {cpSync, existsSync, mkdirSync, rmSync, writeFileSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import path from 'node:path';

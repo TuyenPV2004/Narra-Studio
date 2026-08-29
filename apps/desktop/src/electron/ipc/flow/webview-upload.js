@@ -1,11 +1,5 @@
 'use strict';
 
-/**
- * Uploading start/end frames and reference images into the Flow page UI.
- *
- * Registered by `electron/ipc/flow.js`.
- */
-
 module.exports = function registerFlowWebviewUploadIpc(dependencies) {
   const {
     ipcMain,
@@ -15,8 +9,6 @@ module.exports = function registerFlowWebviewUploadIpc(dependencies) {
     findFlowWebview,
   } = dependencies;
 
-// ── Upload Start Image for Video on WebView ──────────────────────────
-// Clicks "Bắt đầu"/"Kết thúc" → opens picker → uploads image → selects it
 ipcMain.handle('upload-start-image-on-webview', async (_, { imagePath, slot }) => {
   const wv = findFlowWebview();
   if (!wv) throw new Error('WebView not found');
@@ -33,14 +25,12 @@ ipcMain.handle('upload-start-image-on-webview', async (_, { imagePath, slot }) =
   const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
   console.log('[START-IMG] Starting upload for slot:', slotLabel, 'file:', fileName);
 
-  // 1: Click "Bắt đầu" or "Kết thúc" div to open media picker dialog
   const slotClicked = await wv.executeJavaScript(`
     (function() {
       var label = '${slotLabel}';
       var isStart = label.indexOf('\u1EAFt') !== -1;
       var stateKey = isStart ? 'START' : 'END';
 
-      // ── NEW UI: detect swap_horiz button ──
       var swapBtn = null;
       var allPageBtns = Array.from(document.querySelectorAll('button'));
       for (var s = 0; s < allPageBtns.length; s++) {
@@ -57,7 +47,6 @@ ipcMain.handle('upload-start-image-on-webview', async (_, { imagePath, slot }) =
           el.focus(); el.click();
           return { found: true, text: 'new-ui-card-' + slotIdx, stateKey: stateKey, newUI: true };
         }
-        // Fallback: div[aria-haspopup="dialog"] — tìm theo text label trước, rồi theo index
         var slotDivs = Array.from(document.querySelectorAll('[aria-haspopup="dialog"]')).filter(function(b) {
           var r = b.getBoundingClientRect();
           if (r.width <= 0 || r.height <= 0) return false;
@@ -76,14 +65,10 @@ ipcMain.handle('upload-start-image-on-webview', async (_, { imagePath, slot }) =
         return { found: false, reason: 'new-ui-no-card-at-idx-' + slotIdx };
       }
 
-      // ── OLD UI ──
-      // Primary: data-scroll-state
       var el = document.querySelector('[data-scroll-state="' + stateKey + '"][aria-haspopup="dialog"]');
-      // Secondary: jekiem class — find the one whose own text matches exactly
       if (!el) {
         var candidates = Array.from(document.querySelectorAll('.jekiem[aria-haspopup="dialog"], div[aria-haspopup="dialog"], button[aria-haspopup="dialog"]'));
         for (var i = 0; i < candidates.length; i++) {
-          // Use only direct text nodes to avoid matching wrapper/swap button text
           var ownText = Array.from(candidates[i].childNodes)
             .filter(function(n){ return n.nodeType === 3; })
             .map(function(n){ return n.textContent.trim(); })
@@ -104,16 +89,13 @@ ipcMain.handle('upload-start-image-on-webview', async (_, { imagePath, slot }) =
   if (!slotClicked.found) throw new Error('"' + slotLabel + '" button not found');
   await new Promise(r => setTimeout(r, 1000));
 
-  // 2: Click upload area inside the open picker dialog
   const uploadIconClicked = await wv.executeJavaScript(`
     (function() {
-      // Primary: class sc-f4c85962-10 (upload row in picker — "Tải hình ảnh lên")
       var byClass = document.querySelector('.sc-f4c85962-10');
       if (byClass) {
         var r = byClass.getBoundingClientRect();
         if (r.width > 0) { byClass.click(); return { found: true, method: 'class', text: (byClass.textContent||'').trim().substring(0,40) }; }
       }
-      // Secondary: any visible element containing "Tải hình ảnh lên" or "Upload image"
       var all = Array.from(document.querySelectorAll('div, button, span'));
       for (var i = 0; i < all.length; i++) {
         var t = (all[i].textContent || '').trim();
@@ -123,7 +105,6 @@ ipcMain.handle('upload-start-image-on-webview', async (_, { imagePath, slot }) =
           all[i].click(); return { found: true, method: 'text', text: t.substring(0,40) };
         }
       }
-      // Tertiary: open dialog → click parent of "upload" icon
       var dialogs = Array.from(document.querySelectorAll('[role="dialog"], [data-radix-popper-content-wrapper]'));
       var root = dialogs.length > 0 ? dialogs[dialogs.length - 1] : null;
       if (root) {
@@ -141,7 +122,6 @@ ipcMain.handle('upload-start-image-on-webview', async (_, { imagePath, slot }) =
   console.log('[START-IMG] Upload icon:', JSON.stringify(uploadIconClicked));
   await new Promise(r => setTimeout(r, 500));
 
-  // 3: Inject file into file input (same approach as reference upload)
   const injected = await wv.executeJavaScript(`
     (async function() {
       var base64 = '${base64}';
@@ -165,15 +145,13 @@ ipcMain.handle('upload-start-image-on-webview', async (_, { imagePath, slot }) =
   console.log('[START-IMG] File inject:', JSON.stringify(injected));
   if (!injected?.success) throw new Error(injected?.error || 'File inject failed');
 
-  // 4: Wait for upload to complete
   console.log('[START-IMG] Waiting for upload...');
   await new Promise(r => setTimeout(r, 6000));
 
-  // 5: Click the recently uploaded image in picker (first item or match by filename)
   const selectResult = await wv.executeJavaScript(`
     (function() {
       var target = '${fileName.replace(/'/g, "\\'")}';
-      // Find items in the picker dialog
+
       var dialogs = Array.from(document.querySelectorAll('[role="dialog"], [data-radix-popper-content-wrapper]'));
       var root = dialogs.length > 0 ? dialogs[dialogs.length - 1] : document;
       var items = Array.from(root.querySelectorAll('div, button, li'));
@@ -188,7 +166,7 @@ ipcMain.handle('upload-start-image-on-webview', async (_, { imagePath, slot }) =
           return { success: true, text: txt.substring(0, 50) };
         }
       }
-      // Fallback: click the first image item with a thumbnail
+
       var imgs = Array.from(root.querySelectorAll('img'));
       for (var j = 0; j < imgs.length; j++) {
         var ir = imgs[j].getBoundingClientRect();
@@ -206,7 +184,6 @@ ipcMain.handle('upload-start-image-on-webview', async (_, { imagePath, slot }) =
   return { success: selectResult?.success || false, fileName };
 });
 
-// ── Upload Reference Image on WebView ────────────────────────────────
 ipcMain.handle('upload-reference-on-webview', async (_, { imagePath }) => {
   const wv = findFlowWebview();
   if (!wv) return { success: false, error: 'WebView not found' };
@@ -227,7 +204,6 @@ ipcMain.handle('upload-reference-on-webview', async (_, { imagePath }) => {
   const mimeType = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
   console.log('[REF-UPLOAD] Starting:', fileName);
 
-  // 1: Click "+" to open media picker
   const addClicked = await wv.executeJavaScript(`
     (function() {
       var btns = Array.from(document.querySelectorAll('button'));
@@ -245,7 +221,6 @@ ipcMain.handle('upload-reference-on-webview', async (_, { imagePath }) => {
   if (!addClicked) return { success: false, error: 'Add (+) button not found' };
   await new Promise(r => setTimeout(r, 1000));
 
-  // 2: Click "Upload image" button
   const uploadBtnClicked = await wv.executeJavaScript(`
     (function() {
       var btns = Array.from(document.querySelectorAll('button'));
@@ -267,7 +242,6 @@ ipcMain.handle('upload-reference-on-webview', async (_, { imagePath }) => {
   console.log('[REF-UPLOAD] Upload button:', uploadBtnClicked);
   await new Promise(r => setTimeout(r, 500));
 
-  // 3: Inject file into file input
   const _b64_ref = base64;
   const _fn_ref = fileName.replace(/'/g, "\\'");
   const _mt_ref = mimeType;
@@ -294,11 +268,9 @@ ipcMain.handle('upload-reference-on-webview', async (_, { imagePath }) => {
   console.log('[REF-UPLOAD] File inject:', JSON.stringify(injected));
   if (!injected?.success) return { success: false, error: injected?.error || 'Inject failed' };
 
-  // 4: Wait for upload
   console.log('[REF-UPLOAD] Waiting for upload...');
   await new Promise(r => setTimeout(r, 6000));
 
-  // 5: Click uploaded image in picker
   const escapedName = fileName.replace(/'/g, "\\'");
   const selectResult = await wv.executeJavaScript(`
     (function() {
@@ -348,5 +320,4 @@ ipcMain.handle('upload-reference-on-webview', async (_, { imagePath }) => {
 
   return { success: true, fileName };
 });
-
 };

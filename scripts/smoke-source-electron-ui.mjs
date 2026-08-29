@@ -275,7 +275,7 @@ let client;
 let runtime;
 try {
   const target = await waitForTarget(endpoint);
-  // Avoid attaching CDP while Electron is still initializing preload startup data.
+
   await new Promise((resolve) => setTimeout(resolve, 500));
   client = new CdpClient(target.webSocketDebuggerUrl);
   await client.connect();

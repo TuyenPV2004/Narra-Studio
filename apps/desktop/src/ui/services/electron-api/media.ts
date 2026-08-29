@@ -16,7 +16,7 @@ const record = (value: unknown): Record<string, unknown> =>
 
 export function cleanMediaDisplayName(rawName: string): string {
   if (!rawName) return "";
-  // Remove 10-14 digit unix timestamp suffixes like "-1787593310597" or "_1787593310597" before file extension
+
   return rawName.replace(/[-_]\d{10,14}(?=\.[^.]+$|$)/, "");
 }
 

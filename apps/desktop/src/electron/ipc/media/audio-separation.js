@@ -1,13 +1,5 @@
 'use strict';
 
-/**
- * AI two-stem audio separation for completed Video nodes.
- *
- * The IPC materializes local/file/HTTPS input, decodes its first audio stream
- * to stereo float32 PCM at the model sample rate, submits that PCM once to the
- * shared separation engine, then encodes both returned stems.
- */
-
 const { spawn } = require('node:child_process');
 const {
   parseProgressSeconds,
@@ -56,7 +48,6 @@ function createProgressEmitter(event, operationId) {
     try {
       event.sender.send(PROGRESS_CHANNEL, payload);
     } catch {
-      // Renderer may close while cleanup or worker shutdown is settling.
     }
   };
 

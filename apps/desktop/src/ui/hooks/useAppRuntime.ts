@@ -189,9 +189,7 @@ export function useAppRuntime() {
           setSessionConfirmed(true);
           setRuntimeActive(true);
         }
-      } catch {
-        // silent sync
-      }
+      } catch {}
     };
     const interval = window.setInterval(syncStatus, 3000);
     const handleVisibility = () => {

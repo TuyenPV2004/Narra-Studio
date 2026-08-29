@@ -16,10 +16,6 @@ function send(message) {
 }
 
 async function separate(message) {
-  // Electron's executable installs Chromium's allocator even with
-  // ELECTRON_RUN_AS_NODE. Large Demucs Conv allocations in onnxruntime-node
-  // can therefore terminate the child with SIGTRAP on macOS. The WASM runtime
-  // is process-isolated, cross-platform and is the runtime demucs-web targets.
   const ort = require('onnxruntime-web');
   const { DemucsProcessor } = await import('demucs-web');
   const pcm = deinterleaveStereo(await fs.promises.readFile(message.inputPcmPath));
@@ -48,8 +44,7 @@ async function separate(message) {
   });
   try {
     send({ type: 'stage', operationId: message.operationId, stage: 'loading-model' });
-    // demucs-web's public loadModel fetches the entire model into a JS buffer.
-    // onnxruntime-node accepts a local path directly and avoids that 180 MB copy.
+
     const modelSource = new Uint8Array(await fs.promises.readFile(message.modelPath));
     processor.session = await ort.InferenceSession.create(modelSource, sessionOptions);
     send({ type: 'stage', operationId: message.operationId, stage: 'separating' });

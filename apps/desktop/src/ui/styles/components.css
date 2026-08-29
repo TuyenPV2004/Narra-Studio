@@ -1198,6 +1198,165 @@
   flex-shrink: 0;
 }
 
+.source-agent-stage-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 4px 2px 8px 2px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.source-agent-stage-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.source-agent-stage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--surface-muted) 80%, var(--surface));
+  border: 1px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: 0.78rem;
+  font-weight: 550;
+  white-space: nowrap;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+
+.source-agent-stage-chip:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+  border-color: color-mix(in srgb, var(--primary) 35%, transparent);
+  color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.source-agent-stage-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.source-agent-stage-chip[data-armed="true"] {
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.source-agent-stage-chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.source-agent-research-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.8rem;
+  color: var(--muted-foreground);
+}
+
+.source-agent-research-status svg {
+  flex: none;
+  color: var(--primary);
+  animation: source-agent-research-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes source-agent-research-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.source-agent-citations {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--border);
+}
+
+.source-agent-citations__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.source-agent-citations__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.source-agent-citation-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 9px;
+  border-radius: 9999px;
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  color: var(--foreground);
+  font-size: 0.74rem;
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background-color 0.15s ease,
+    border-color 0.15s ease;
+}
+
+.source-agent-citation-chip:hover {
+  border-color: color-mix(in srgb, var(--primary) 40%, transparent);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+  color: var(--primary);
+}
+
+.source-agent-citation-chip:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+.source-agent-citation-chip__rank {
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.source-agent-citation-chip__partial {
+  font-size: 0.68rem;
+  color: var(--warning);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .source-agent-research-status svg {
+    animation: none;
+    opacity: 1;
+  }
+
+  .source-agent-stage-chip,
+  .source-agent-citation-chip {
+    transition: none;
+  }
+}
+
 .source-agent-chat-form__input-wrap {
   position: relative;
   width: 100%;
@@ -4288,7 +4447,6 @@
   outline-offset: 2px;
 }
 
-/* Timeline: Time Left -> Scrubber -> Time Right */
 .source-voice-music-card__timeline {
   display: flex;
   align-items: center;
@@ -4993,7 +5151,6 @@
   font-weight: 500;
 }
 
-/* ── Pure Media Lightbox (Distraction-Free) ──────────────────────── */
 .narra-dialog__content.source-media-lightbox {
   position: fixed !important;
   top: 50% !important;
@@ -5651,7 +5808,7 @@
   color: var(--muted-foreground);
   font-weight: 500;
 }
-/* ── AI Provider Profile Cards ───────────────────────────────────── */
+
 .source-provider-card {
   display: flex;
   flex-direction: column;
@@ -6073,7 +6230,6 @@
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
-/* Card Top: Slot tag on left, Project ID & Logout on right */
 .source-flow-slot-card__top {
   display: flex;
   align-items: center;
@@ -6187,7 +6343,6 @@
   transform: scale(1.1);
 }
 
-/* User Info Section with Round Avatar + Status Dot */
 .source-flow-slot-user {
   display: flex;
   align-items: center;
@@ -6301,7 +6456,6 @@
   white-space: nowrap;
 }
 
-/* Button actions */
 .source-flow-slot-actions {
   display: flex;
   align-items: center;
@@ -6908,7 +7062,6 @@
   }
 }
 
-/* Radix Dialog */
 @keyframes narra-dialog-overlay-show {
   from {
     opacity: 0;
@@ -7002,7 +7155,6 @@
   margin-top: var(--space-6);
 }
 
-/* Radix DropdownMenu */
 .narra-dropdown__content {
   min-width: 180px;
   padding: var(--space-1);
@@ -7069,7 +7221,6 @@
   color: var(--muted-foreground);
 }
 
-/* Radix Tooltip */
 .narra-tooltip__content {
   padding: var(--space-1) var(--space-2);
   font-size: 0.75rem;
@@ -7082,7 +7233,6 @@
   user-select: none;
 }
 
-/* Radix Switch */
 .narra-switch {
   position: relative;
   width: 40px;
@@ -7114,7 +7264,6 @@
   transform: translateX(18px);
 }
 
-/* Radix Select */
 .narra-select__trigger {
   display: flex;
   width: 100%;
@@ -7207,7 +7356,6 @@
   background: var(--border);
 }
 
-/* ── Centered Toast Notification System ──────────────────────────── */
 .narra-toast-container {
   position: fixed;
   top: 28px;
@@ -7270,7 +7418,6 @@
   }
 }
 
-/* Solid colored icon badge with white symbol */
 .narra-toast-icon-wrap {
   display: inline-flex;
   align-items: center;
@@ -7304,7 +7451,6 @@
   background: var(--primary);
 }
 
-/* Content block on the right */
 .narra-toast-content {
   display: flex;
   flex-direction: column;
@@ -7328,7 +7474,6 @@
   word-break: break-word;
 }
 
-/* Bottom Progress Countdown Bar */
 .narra-toast-progress-track {
   position: absolute;
   bottom: 0;

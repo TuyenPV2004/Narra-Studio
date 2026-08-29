@@ -1,12 +1,5 @@
 'use strict';
 
-/**
- * Account slots and auth: captured bearer tokens, session sync, slot switching,
- * incognito/login windows, and project auto-entry.
- *
- * Registered by `electron/ipc/flow.js`.
- */
-
 module.exports = function registerFlowSessionIpc(dependencies) {
   const {
     app,
@@ -33,8 +26,6 @@ module.exports = function registerFlowSessionIpc(dependencies) {
     findFlowWebview,
   } = dependencies;
 
-  // __dirname was electron/ipc before this group moved into flow/;
-  // resolve against that directory so packaged paths stay identical.
   const IPC_DIR = path.join(__dirname, '..');
 
 ipcMain.handle('copy-to-clipboard', (_, text) => { clipboard.writeText(text); return true; });
@@ -59,7 +50,6 @@ ipcMain.handle('get-auth-info', (_, { slotId } = {}) => {
   };
 });
 
-// ── IPC: Get all slots status with silent hydration & hasSession ──────
 ipcMain.handle('get-all-slots', async () => {
   for (const slot of accountSlots) {
     if (slot.status === 'empty' && typeof restoreSlotSession === 'function') {
@@ -190,9 +180,6 @@ ipcMain.handle('create-flow-project', async (_, { slotId = 0 } = {}) => {
   }
 });
 
-// Read the current Flow project's preset/custom Voice references through the
-// authenticated slot session. Cookies and bearer tokens never cross into
-// the renderer; only the normalized public catalog is returned.
 ipcMain.handle('get-flow-project-initial-data', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
   const projectCandidates = [slot.projectId]
@@ -202,8 +189,6 @@ ipcMain.handle('get-flow-project-initial-data', async (_, { slotId = 0 } = {}) =
   let data = null;
   let projectId = projectCandidates[0];
 
-  // session.fetch uses the authenticated persist:slot partition, so
-  // pricing/voices do not depend on an open browser window.
   const slotSession = session.fromPartition(slot.partition);
   for (const candidate of projectCandidates) {
     try {
@@ -324,11 +309,9 @@ ipcMain.handle('set-manual-auth', (_, { bearerToken, projectId, slotId = 0 }) =>
   return true;
 });
 
-// ── IPC: Force sync cookies from the isolated slot session ────────────
 ipcMain.handle('sync-session', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
   try {
-    // 1. Refresh cookies từ Electron session
     await refreshCapturedCookies(slot.id);
 
     const cookieCount = String(slot.cookies || '').split(';').filter(Boolean).length;
@@ -346,30 +329,23 @@ ipcMain.handle('sync-session', async (_, { slotId = 0 } = {}) => {
   }
 });
 
-
-
-// ── IPC: Logout a specific slot ───────────────────────────────────────
-// Xóa toàn bộ cookies + storage của partition → lần sau reload sẽ không auto-login
 ipcMain.handle('logout-slot', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
   try {
     const ses = session.fromPartition(slot.partition);
 
-    // Xóa toàn bộ cookies (google.com + labs.google + tất cả domain)
     const allCookies = await ses.cookies.get({});
     await Promise.all(allCookies.map(c => {
       const url = `${c.secure ? 'https' : 'http'}://${c.domain.replace(/^\./, '')}${c.path || '/'}`;
       return ses.cookies.remove(url, c.name).catch(() => {});
     }));
 
-    // Xóa storage data (localStorage, sessionStorage, IndexedDB, cache...)
     await ses.clearStorageData({
       storages: ['cookies', 'localstorage', 'sessionstorage', 'indexdb', 'cachestorage', 'serviceworkers'],
     }).catch(() => {});
 
     await ses.clearCache().catch(() => {});
 
-    // Reset in-memory slot state
     slot.bearerToken = null;
     slot.projectId = null;
     slot.cookies = '';
@@ -385,7 +361,6 @@ ipcMain.handle('logout-slot', async (_, { slotId = 0 } = {}) => {
     slot.lastCaptured = null;
     slot.status = 'empty';
 
-    // Notify renderer để cập nhật UI ngay
     if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
       runtime.mainWindow.webContents.send('slot-logged-out', { slotId });
     }
@@ -398,7 +373,6 @@ ipcMain.handle('logout-slot', async (_, { slotId = 0 } = {}) => {
   }
 });
 
-// ── IPC: Open the selected slot's isolated Google Flow session ─────────
 ipcMain.handle('open-flow-session', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
   const flowWindow = new BrowserWindow({
@@ -422,18 +396,13 @@ ipcMain.handle('open-flow-session', async (_, { slotId = 0 } = {}) => {
   return { success: true, slotId, partition: slot.partition };
 });
 
-// ── IPC: Open isolated Google login window for slot ─────────────────
-// Sử dụng trực tiếp persistent partition của slot (persist:slot-${slotId})
-// Chromium tự lưu toàn bộ Cookies, NextAuth token, LocalStorage và IndexedDB xuống đĩa.
 ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
   const ses = session.fromPartition(slot.partition);
 
-  // Clean UA — remove Electron/app name
   const chromeVersion = process.versions.chrome || '130.0.0.0';
   const cleanUA = `Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
 
-  // Override sec-ch-ua headers tại session level → Google thấy Chrome thật
   ses.webRequest.onBeforeSendHeaders(
     { urls: ['https://accounts.google.com/*', 'https://*.google.com/*', 'https://labs.google/*'] },
     (details, callback) => {
@@ -447,7 +416,6 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
     }
   );
 
-  // Inject anti-detect script
   const antiDetectScript = path.join(IPC_DIR, 'anti-detect.js');
   if (require('fs').existsSync(antiDetectScript)) {
     ses.setPreloads([antiDetectScript]);
@@ -470,7 +438,6 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
 
   loginWin.setMenuBarVisibility(false);
 
-  // Intercept auth token từ cửa sổ login
   ses.webRequest.onBeforeSendHeaders(
     { urls: ['https://aisandbox-pa.googleapis.com/*', 'https://*.googleapis.com/*'] },
     (details, callback) => {
@@ -480,7 +447,6 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
 
       const authHeader = h['Authorization'] || h['authorization'];
       if (authHeader && authHeader.startsWith('Bearer ')) {
-        // Collapse any accidental "Bearer Bearer ..." into a single prefix.
         slot.bearerToken = authHeader.replace(/^(Bearer\s+)+/i, 'Bearer ');
         slot.lastCaptured = new Date().toISOString();
         slot.status = 'connected';
@@ -489,7 +455,6 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
 
         refreshCapturedCookies(slotId);
 
-        // Fetch session info (email, avatar)
         setTimeout(() => {
           fetchSlotSession(slotId).then(s => {
             if (s && s.user) {
@@ -503,7 +468,6 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
           }).catch(() => {});
         }, 1000);
 
-        // Notify UI
         if (runtime.mainWindow && !runtime.mainWindow.isDestroyed()) {
           runtime.mainWindow.webContents.send('auth-captured', {
             hasBearerToken: true,
@@ -537,7 +501,6 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
 
   loginWin.loadURL('https://labs.google/fx/tools/flow');
 
-  // Auto-close khi user đã vào project (có token + projectId)
   const checkInterval = setInterval(() => {
     if (slot.bearerToken && slot.projectId) {
       clearInterval(checkInterval);
@@ -559,7 +522,6 @@ ipcMain.handle('open-incognito-login', async (_, { slotId = 0 } = {}) => {
   return { success: true, slotId };
 });
 
-// ── IPC: Pick random available slot ──────────────────────────────────
 ipcMain.handle('pick-random-slot', () => {
   try {
     const slot = pickRandomSlot();
@@ -569,7 +531,6 @@ ipcMain.handle('pick-random-slot', () => {
   }
 });
 
-// ── IPC: Sync session for a specific slot ────────────────────────────
 ipcMain.handle('sync-slot-session', async (_, { slotId = 0 } = {}) => {
   try {
     const slot = getSlot(slotId);
@@ -601,9 +562,6 @@ ipcMain.handle('sync-slot-session', async (_, { slotId = 0 } = {}) => {
   }
 });
 
-// ── IPC: Mở cửa sổ đăng nhập tự động (popup BrowserWindow) ──────────────
-// Dùng BrowserWindow thật thay vì webview tag → Google không chặn
-// Sau khi login xong, cửa sổ tự đóng và cookies được sync về slot
 ipcMain.handle('open-login-window', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
 
@@ -612,21 +570,17 @@ ipcMain.handle('open-login-window', async (_, { slotId = 0 } = {}) => {
     height: 700,
     title: `Đăng nhập Google — Slot ${slotId + 1}`,
     webPreferences: {
-      partition: slot.partition,  // dùng đúng session của slot
+      partition: slot.partition,
       nodeIntegration: false,
       contextIsolation: true,
-      // KHÔNG inject anti-detect.js vào login window — gây Google block
     },
     autoHideMenuBar: true,
     resizable: true,
   });
 
-  // Override User-Agent: xóa chuỗi "Electron/xx" khỏi UA trước khi load bất kỳ trang nào
-  // → Google dùng UA để detect embedded WebView và block login nếu thấy "Electron"
   const cleanLoginUA = DEFAULTS.userAgent;
   loginWin.webContents.setUserAgent(cleanLoginUA);
 
-  // XÓA preload khỏi session trước khi mở trang Google login + set clean UA
   const ses = session.fromPartition(slot.partition);
   ses.setUserAgent(cleanLoginUA);
   const antiDetectScript = path.join(IPC_DIR, 'anti-detect.js');
@@ -641,19 +595,16 @@ ipcMain.handle('open-login-window', async (_, { slotId = 0 } = {}) => {
 
   loginWin.loadURL('https://labs.google/fx/tools/flow');
 
-  // Monitor: khi user login xong và navigate về labs.google → capture & đóng cửa sổ
-  let hasNavigatedToAuth = false; // phải đi qua accounts.google trước
+  let hasNavigatedToAuth = false;
 
   loginWin.webContents.on('did-navigate', async (event, url) => {
     console.log(`[SLOT-${slotId}][LOGIN-WIN] Navigated:`, url);
 
-    // Ghi nhận khi redirect sang trang login Google
     if (url.includes('accounts.google.com') || url.includes('myaccount.google.com')) {
       hasNavigatedToAuth = true;
       console.log(`[SLOT-${slotId}][LOGIN-WIN] → Google login page detected`);
     }
 
-    // Chỉ capture khi ĐÃ qua accounts.google (login thật) rồi mới về labs.google
     if (url.startsWith('https://labs.google') && hasNavigatedToAuth) {
       console.log(`[SLOT-${slotId}][LOGIN-WIN] ✅ Login confirmed! Syncing cookies...`);
 
@@ -677,7 +628,6 @@ ipcMain.handle('open-login-window', async (_, { slotId = 0 } = {}) => {
   return { success: true, slotId };
 });
 
-// ── IPC: Trigger auto-enter project on demand (e.g. after account switch) ──
 ipcMain.handle('auto-enter-project', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
   try {
@@ -702,7 +652,7 @@ ipcMain.handle('auto-enter-project', async (_, { slotId = 0 } = {}) => {
     if (pageState.hasTextbox) {
       if (pageState.url && pageState.url.includes('/project/')) {
         saveSettings({ lastProjectUrl: pageState.url });
-        // Extract và set projectId nếu chưa có
+
         const m = pageState.url.match(/\/project\/([a-zA-Z0-9_-]+)/);
         if (m && m[1] && !slot.projectId) {
           slot.projectId = m[1];
@@ -717,7 +667,6 @@ ipcMain.handle('auto-enter-project', async (_, { slotId = 0 } = {}) => {
 
     if (pageState.hasNewProjectBtn) {
       if (pageState.projectCount > 0) {
-        // Click first existing project
         const projectUrl = await wv.executeJavaScript(`
           (function() {
             var links = document.querySelectorAll('a[href*="/project/"]');
@@ -738,7 +687,6 @@ ipcMain.handle('auto-enter-project', async (_, { slotId = 0 } = {}) => {
         }
         return { success: true, action: 'entered-existing', projectId: slot.projectId };
       } else {
-        // Click "New project"
         await wv.executeJavaScript(`
           (function() {
             var buttons = Array.from(document.querySelectorAll('button'));
@@ -778,7 +726,6 @@ ipcMain.handle('auto-enter-project', async (_, { slotId = 0 } = {}) => {
   }
 });
 
-
 ipcMain.handle('extract-auth-from-webview', async (_, { slotId = 0 } = {}) => {
   const slot = getSlot(slotId);
   return {
@@ -786,5 +733,4 @@ ipcMain.handle('extract-auth-from-webview', async (_, { slotId = 0 } = {}) => {
     projectId: slot.projectId || null,
   };
 });
-
 };

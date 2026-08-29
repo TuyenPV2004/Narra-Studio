@@ -15,24 +15,20 @@ coverage/
 release/
 release-*/
 
-# Local credentials and machine-specific configuration
 .env
 .env.*
 !.env.example
 
-# Local Narra projects and generated media
 projects/
 /database/
 renders/
 *.log
 
-# Reproducible fixture media and render outputs
 fixtures/**/assets/videos/*.mp4
 fixtures/**/audio/**/*.wav
 fixtures/**/renders/**
 .codex-config-cleanup.tmp.toml
 
-# OS/editor files
 .DS_Store
 Thumbs.db
 .idea/

@@ -2,13 +2,6 @@
 
 const { grantLocalFileCapability } = require('../../runtime/localFileCapabilities');
 
-/**
- * Video project files on disk (list/save/load/delete), media file pickers,
- * and file deletion.
- *
- * Registered by `electron/ipc/media.js`.
- */
-
 module.exports = function registerMediaProjectsIpc(dependencies) {
   const {
     app,
@@ -25,8 +18,6 @@ module.exports = function registerMediaProjectsIpc(dependencies) {
     loadSettings,
   } = dependencies;
 
-// ── Select video files dialog ─────────────────────────────────────────
-// ── Video Project Management ──────────────────────────────────────────
 const PROJECTS_DIR = path.join(app.getPath('userData'), 'video-projects');
 if (!fs.existsSync(PROJECTS_DIR)) fs.mkdirSync(PROJECTS_DIR, { recursive: true });
 
@@ -106,9 +97,7 @@ ipcMain.handle('select-video-files', async () => {
   const result = await dialog.showOpenDialog(runtime.mainWindow, {
     title: 'Chọn video để chỉnh sửa',
     properties: ['openFile', 'multiSelections'],
-    // First filter is selected by default. We add an All Files fallback
-    // so users can override if macOS UTI matching hides legit video
-    // files (rare but reported with some .mov / .mkv variants).
+
     filters: [
       { name: 'Video', extensions: ['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv', 'flv', 'wmv', '3gp', 'mts', 'm2ts'] },
       { name: 'All Files', extensions: ['*'] },
@@ -119,25 +108,21 @@ ipcMain.handle('select-video-files', async () => {
     .map(grantLocalFileCapability)
     .filter(Boolean)
     .map(p => pathToFileURL(p).toString());
-  // Return array if multi, string if single (backward compat)
+
   return urls.length === 1 ? urls[0] : urls;
 });
 
-// Combined media picker — Video + Image + Audio in one dialog. Used by
-// the CapCut Media panel where the Import button accepts any media type
-// (matches the "Drag and drop videos, photos, and audio files" empty
-// state). Returns file:// URLs same as select-video-files for symmetry.
 ipcMain.handle('select-media-files', async () => {
   const result = await dialog.showOpenDialog(runtime.mainWindow, {
     title: 'Chọn file media để import',
     properties: ['openFile', 'multiSelections'],
     filters: [
       { name: 'All Media', extensions: [
-        // Video
+
         'mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv', 'flv', 'wmv', '3gp', 'mts', 'm2ts',
-        // Image
+
         'png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'heic', 'heif', 'tiff', 'tif',
-        // Audio
+
         'mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac', 'opus', 'wma',
       ] },
       { name: 'Video', extensions: ['mp4', 'mov', 'm4v', 'webm', 'avi', 'mkv', 'flv', 'wmv', '3gp', 'mts', 'm2ts'] },
@@ -154,8 +139,6 @@ ipcMain.handle('select-media-files', async () => {
   return urls.length === 1 ? urls[0] : urls;
 });
 
-// AI Agent Canvas picker — returns structured local paths so renderer trim
-// queues never need to infer file identity from file:// URL strings.
 ipcMain.handle('select-agent-canvas-media-files', async () => {
   const result = await dialog.showOpenDialog(runtime.mainWindow, {
     title: 'Chọn Media cho Canvas',
@@ -207,7 +190,6 @@ ipcMain.handle('select-agent-canvas-media-files', async () => {
   return selectedMedia;
 });
 
-// ── Delete file (Move to OS Recycle Bin with boundary and realpath checks) ──
 const { validateMediaDeleteTarget } = require('../../runtime/mediaSecurity');
 
 ipcMain.handle('delete-file', async (_, filePath) => {
@@ -237,5 +219,4 @@ ipcMain.handle('delete-file', async (_, filePath) => {
     throw err;
   }
 });
-
 };

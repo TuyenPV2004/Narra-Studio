@@ -110,11 +110,9 @@ export function SmartLinkChip({ url, label }: SmartLinkChipProps) {
   );
 }
 
-// Tokenize and render inline formatting safely (bold, italic, code, smart links, strikethrough)
 export function renderInlineMarkdown(text: string): React.ReactNode[] {
   if (!text) return [];
 
-  // Match inline tokens: `code`, ***bold-italic***, **bold**, *italic*, ~~strike~~, [text](url)
   const regex =
     /(`[^`]+`|\*\*\*[^*]+\*\*\*|\*\*[^*]+\*\*|\*[^*]+\*|~~[^~]+~~|\[[^\]]+\]\([^)]+\))/g;
   const parts = text.split(regex);
@@ -122,7 +120,6 @@ export function renderInlineMarkdown(text: string): React.ReactNode[] {
   return parts.map((part, index) => {
     if (!part) return null;
 
-    // Inline code `...`
     if (part.startsWith("`") && part.endsWith("`") && part.length >= 2) {
       return (
         <code key={index} className="source-agent-inline-code">
@@ -131,7 +128,6 @@ export function renderInlineMarkdown(text: string): React.ReactNode[] {
       );
     }
 
-    // Bold + Italic ***...***
     if (part.startsWith("***") && part.endsWith("***") && part.length >= 6) {
       return (
         <strong key={index}>
@@ -140,22 +136,18 @@ export function renderInlineMarkdown(text: string): React.ReactNode[] {
       );
     }
 
-    // Bold **...**
     if (part.startsWith("**") && part.endsWith("**") && part.length >= 4) {
       return <strong key={index}>{part.slice(2, -2)}</strong>;
     }
 
-    // Italic *...*
     if (part.startsWith("*") && part.endsWith("*") && part.length >= 2) {
       return <em key={index}>{part.slice(1, -1)}</em>;
     }
 
-    // Strikethrough ~~...~~
     if (part.startsWith("~~") && part.endsWith("~~") && part.length >= 4) {
       return <del key={index}>{part.slice(2, -2)}</del>;
     }
 
-    // Link [text](url) -> Smart Link Chip with Favicon
     const linkMatch = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (linkMatch && linkMatch[1] && linkMatch[2]) {
       const label = linkMatch[1];
@@ -211,7 +203,6 @@ function buildListTree(items: RawListItem[]): TreeNode[] {
   for (const item of items) {
     const node: TreeNode = { text: item.text, type: item.type, children: [] };
 
-    // Pop stack until top has strictly smaller indent
     while (stack.length > 0 && stack[stack.length - 1]!.indent >= item.indent) {
       stack.pop();
     }
@@ -258,7 +249,6 @@ export function AgentMarkdownRenderer({ content }: { content: string }) {
     while (i < lines.length) {
       const line = lines[i]!;
 
-      // 1. Fenced Code Block (```lang)
       if (line.trim().startsWith("```")) {
         const langMatch = line.trim().match(/^```([a-zA-Z0-9_-]+)?/);
         const language = langMatch?.[1] || "";
@@ -269,7 +259,7 @@ export function AgentMarkdownRenderer({ content }: { content: string }) {
           i++;
         }
         if (i < lines.length && lines[i]!.trim().startsWith("```")) {
-          i++; // skip closing ```
+          i++;
         }
         blocks.push(
           <CodeBlock
@@ -281,13 +271,11 @@ export function AgentMarkdownRenderer({ content }: { content: string }) {
         continue;
       }
 
-      // 2. Horizontal Rule (---, ***, ___) - Skip dividing lines for a cleaner chat UI
       if (/^(?:---|\\*\\*\\*|___)\s*$/.test(line.trim())) {
         i++;
         continue;
       }
 
-      // 3. Headings (# H1, ## H2, ### H3, #### H4)
       const headingMatch = line.match(/^(#{1,4})\s+(.+)$/);
       if (headingMatch) {
         const level = headingMatch[1]!.length;
@@ -322,7 +310,6 @@ export function AgentMarkdownRenderer({ content }: { content: string }) {
         continue;
       }
 
-      // 4. Blockquotes (> quote)
       if (line.trim().startsWith(">")) {
         const quoteLines: string[] = [];
         while (i < lines.length && lines[i]!.trim().startsWith(">")) {
@@ -342,7 +329,6 @@ export function AgentMarkdownRenderer({ content }: { content: string }) {
         continue;
       }
 
-      // 5. Tables (| col 1 | col 2 |)
       if (line.trim().startsWith("|") && line.trim().endsWith("|")) {
         const tableLines: string[] = [];
         while (
@@ -384,7 +370,6 @@ export function AgentMarkdownRenderer({ content }: { content: string }) {
         }
       }
 
-      // 6. Lists (Unordered & Ordered, with full nested hierarchy support)
       const listMatch = line.match(/^(\s*)(?:[-*+]|\d+\.)\s+(.+)$/);
       if (listMatch) {
         const listItems: RawListItem[] = [];
@@ -406,7 +391,6 @@ export function AgentMarkdownRenderer({ content }: { content: string }) {
         continue;
       }
 
-      // 8. Regular Paragraphs (collect consecutive non-empty lines)
       if (line.trim()) {
         const pLines: string[] = [];
         while (
@@ -438,7 +422,6 @@ export function AgentMarkdownRenderer({ content }: { content: string }) {
         continue;
       }
 
-      // Empty line / whitespace
       i++;
     }
 

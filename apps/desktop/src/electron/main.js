@@ -21,7 +21,6 @@ const captchaBridge = require('./captcha-bridge');
 const veo3ProviderModule = require('./providers/veo3/module');
 const createOpenAiCompatibleProvider = require('./providers/openai-compatible');
 
-// ── Runtime composition ─────────────────────────────────────────────────
 const createSupportRuntime = require('./runtime/support');
 const createAppCore = require('./runtime/app-core');
 const createCaptchaRuntime = require('./runtime/captcha');
@@ -88,7 +87,6 @@ registerProviderIpc({
 registerLocalWorkspaceIpc(sharedDependencies);
 registerSystemIpc({ ...sharedDependencies, ...crossDomainDependencies, openAiProvider });
 registerVoiceIpc(sharedDependencies);
-
 
 registerAppLifecycle({
   ...sharedDependencies,

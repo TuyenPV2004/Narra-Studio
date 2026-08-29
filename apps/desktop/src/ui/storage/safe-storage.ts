@@ -9,9 +9,7 @@ export function readStorageValue(key: string): string | null {
 export function writeStorageValue(key: string, value: string): void {
   try {
     window.localStorage.setItem(key, value);
-  } catch {
-    // Storage is optional in restricted or temporary renderer contexts.
-  }
+  } catch {}
 }
 
 export function readStorageJson<T>(key: string, fallback: T): T {

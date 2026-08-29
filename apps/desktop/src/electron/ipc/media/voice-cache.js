@@ -1,12 +1,5 @@
 'use strict';
 
-/**
- * Voice-changer impulse-response asset cache: mirror table, on-disk cache,
- * and mirrored download.
- *
- * Registered by `electron/ipc/media.js`.
- */
-
 module.exports = function registerMediaVoiceCacheIpc(dependencies) {
   const {
     app,
@@ -17,17 +10,6 @@ module.exports = function registerMediaVoiceCacheIpc(dependencies) {
     fs,
   } = dependencies;
 
-// ── Voice Changer Asset Cache ─────────────────────────────────────────
-// Downloads real IR (impulse response) WAV files used by the convolution
-// reverb path of the voice changer's space-based presets (Cathedral,
-// Auditorium, Small Room, Mermaid). The registry of assets + URLs lives in
-// src/components/capcut/voiceAssets.ts on the renderer side; main.js
-// receives just the assetId and looks up the URL/filename via a hardcoded
-// mirror table here so we don't have to ship the whole TS module to main.
-//
-// The mirror table MUST stay in sync with voiceAssets.ts. Treat the
-// renderer file as the source of truth — the duplication is a small price
-// for keeping main.js plain JS without a build step.
 const VOICE_ASSET_MIRRORS = {
   'ir-cathedral': {
     filename: 'cathedral-york-minster.wav',
@@ -68,11 +50,11 @@ ipcMain.handle('list-voice-assets-cached', async () => {
     const filePath = path.join(dir, meta.filename);
     if (fs.existsSync(filePath)) {
       const stat = fs.statSync(filePath);
-      // Sanity check: skip empty/corrupted (<2 KB) files so we re-download.
+
       if (stat.size > 2048) {
         result[assetId] = { path: filePath, size: stat.size };
       } else {
-        try { fs.unlinkSync(filePath); } catch (_) { /* ignore */ }
+        try { fs.unlinkSync(filePath); } catch (_) {  }
       }
     }
   }
@@ -86,7 +68,6 @@ ipcMain.handle('download-voice-asset', async (event, { assetId }) => {
   const dir = getVoiceAssetsDir();
   const outPath = path.join(dir, meta.filename);
 
-  // If already cached and non-empty, return immediately.
   if (fs.existsSync(outPath)) {
     const stat = fs.statSync(outPath);
     if (stat.size > 2048) {
@@ -106,8 +87,6 @@ ipcMain.handle('download-voice-asset', async (event, { assetId }) => {
     const chunks = [];
 
     req.on('response', (res) => {
-      // Follow redirects manually — Electron's net does most automatically
-      // but mirrors sometimes use 302 to canonicalize.
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers['location']) {
         const loc = Array.isArray(res.headers['location']) ? res.headers['location'][0] : res.headers['location'];
         return resolve(tryDownload(loc));
@@ -121,7 +100,7 @@ ipcMain.handle('download-voice-asset', async (event, { assetId }) => {
       res.on('data', (chunk) => {
         chunks.push(chunk);
         bytesDownloaded += chunk.length;
-        // Throttle progress events to ~10 Hz to avoid IPC spam.
+
         if (!sender.isDestroyed() && (bytesDownloaded === chunk.length || Date.now() - (req._lastEmit || 0) > 100)) {
           req._lastEmit = Date.now();
           sender.send('voice-asset-progress', { assetId, bytesDownloaded, totalBytes });
@@ -139,13 +118,11 @@ ipcMain.handle('download-voice-asset', async (event, { assetId }) => {
     req.end();
   });
 
-  // Try each mirror in order — primary CDN first, then public mirrors.
   let lastErr = null;
   for (const url of meta.urls) {
     try {
       const buffer = await tryDownload(url);
       if (buffer.length < 2048) {
-        // Probably an HTML error page mistakenly served as 200. Skip mirror.
         throw new Error(`Suspicious payload size (${buffer.length} bytes) — treating as failed`);
       }
       fs.writeFileSync(outPath, buffer);
@@ -158,5 +135,4 @@ ipcMain.handle('download-voice-asset', async (event, { assetId }) => {
   }
   throw new Error(`All mirrors failed for ${assetId}: ${lastErr?.message || 'unknown error'}`);
 });
-
 };

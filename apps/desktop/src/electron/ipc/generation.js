@@ -15,17 +15,14 @@ const {
   resolveVideoModelKey,
 } = require("./video-model-policy");
 
-// ── Validation Helpers ───────────────────────────────────────────────
 function isValidVideoBuffer(buffer) {
   if (!buffer || !Buffer.isBuffer(buffer) || buffer.length < 12) return false;
 
-  // MP4 / MOV / M4V (ISO Base Media File Format box types at offset 4..7)
   const boxType = buffer.toString("ascii", 4, 8);
   if (["ftyp", "moov", "mdat", "wide", "free", "skip"].includes(boxType)) {
     return true;
   }
 
-  // WebM / MKV (EBML header: 1A 45 DF A3)
   if (
     buffer[0] === 0x1a &&
     buffer[1] === 0x45 &&
@@ -35,7 +32,6 @@ function isValidVideoBuffer(buffer) {
     return true;
   }
 
-  // AVI (RIFF .... AVI )
   if (
     buffer.toString("ascii", 0, 4) === "RIFF" &&
     buffer.toString("ascii", 8, 12) === "AVI "
@@ -43,7 +39,6 @@ function isValidVideoBuffer(buffer) {
     return true;
   }
 
-  // FLV (FLV\x01)
   if (
     buffer[0] === 0x46 &&
     buffer[1] === 0x4c &&
@@ -63,8 +58,8 @@ const ALLOWED_IMAGE_MIME_TYPES = new Set([
   "image/gif",
 ]);
 const ALLOWED_IMAGE_EXTS = new Set([".jpg", ".jpeg", ".png", ".webp", ".gif"]);
-const MAX_IMAGE_FILE_SIZE_BYTES = 25 * 1024 * 1024; // 25MB
-const MAX_IMAGE_BASE64_LENGTH = 35 * 1024 * 1024; // ~35MB Base64 string (~25MB binary)
+const MAX_IMAGE_FILE_SIZE_BYTES = 25 * 1024 * 1024;
+const MAX_IMAGE_BASE64_LENGTH = 35 * 1024 * 1024;
 
 const ALLOWED_VIDEO_EXTS = new Set([
   ".mp4",
@@ -74,7 +69,7 @@ const ALLOWED_VIDEO_EXTS = new Set([
   ".avi",
   ".m4v",
 ]);
-const MAX_VIDEO_FILE_SIZE_BYTES = 200 * 1024 * 1024; // 200MB max limit for video upload
+const MAX_VIDEO_FILE_SIZE_BYTES = 200 * 1024 * 1024;
 
 module.exports = function registerGenerationIpc(dependencies) {
   const {
@@ -151,8 +146,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     try {
       event.returnValue = grantLocalFileCapability(filePath);
     } catch {
-      // Fail closed: a path that Electron/Main cannot canonicalize is not
-      // eligible for any later upload request from the renderer.
     }
   });
 
@@ -167,7 +160,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Get Credits Balance ───────────────────────────────────────────────
   ipcMain.handle("get-credits", async (_event, { slotId } = {}) => {
     const slot = getSlot(slotId ?? 0);
     if (!slot.bearerToken) return null;
@@ -189,9 +181,6 @@ module.exports = function registerGenerationIpc(dependencies) {
       const sku = data.sku || "";
       const isUltra = sku === "G1_TIER2" || sku === "WS_ULTRA";
 
-      // Keep the account-specific model policy on the same isolated slot that
-      // owns the authenticated Flow session. Video handlers use this value when
-      // resolving tier-dependent model keys.
       if (tier) slot.userPaygateTier = tier;
       if (sku) slot.sku = sku;
 
@@ -207,9 +196,6 @@ module.exports = function registerGenerationIpc(dependencies) {
       return null;
     }
   });
-
-  // ── License Management ────────────────────────────────────────────────
-  // ── Machine fingerprint ──────────────────────────────────────────────
 
   function normalizeImageAspect(aspect) {
     if (!aspect) return "IMAGE_ASPECT_RATIO_LANDSCAPE";
@@ -292,7 +278,6 @@ module.exports = function registerGenerationIpc(dependencies) {
         sessionId,
       };
 
-      // Build imageInputs — enforce max 5 reference images in Main process
       const MAX_REFERENCE_IMAGES = 5;
       let imageInputs = [];
       if (referenceImageNames !== undefined && referenceImageNames !== null) {
@@ -382,8 +367,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Edit Image (AI edit with base image) ─────────────────────────────
-
   ipcMain.handle(
     "edit-image",
     async (
@@ -455,7 +438,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Upscale Image (1K / 2K / 4K) ─────────────────────────────────────
   ipcMain.handle(
     "upscale-image",
     async (_, { mediaId, captchaToken, targetResolution, slotId = 0 }) => {
@@ -476,7 +458,7 @@ module.exports = function registerGenerationIpc(dependencies) {
 
       const body = {
         mediaId,
-        targetResolution, // 'UPSAMPLE_IMAGE_RESOLUTION_1K' | '2K' | '4K'
+        targetResolution,
         clientContext: {
           recaptchaContext: {
             token: captchaToken,
@@ -499,7 +481,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Generate Pinhole GIF (270p animated GIF from video) ───────────────
   ipcMain.handle("generate-pinhole-gif", async (_, { mediaId, slotId = 0 }) => {
     const slot = getSlot(slotId);
     if (!slot?.bearerToken) {
@@ -517,7 +498,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     return makeApiRequestWithCaptcha(url, body, slotId);
   });
 
-  // ── Upscale Video (1080p / 4K) ────────────────────────────────────────
   ipcMain.handle(
     "upscale-video",
     async (
@@ -577,7 +557,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Transform Image (Crop, etc) ───────────────────────────────────────
   ipcMain.handle(
     "transform-image",
     async (_, { mediaId, cropCoordinates, slotId = 0 }) => {
@@ -602,7 +581,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Upload Image ──────────────────────────────────────────────────────
   ipcMain.handle(
     "upload-image",
     async (_, { imageBytes, fileName, mimeType, slotId = 0 }) => {
@@ -668,7 +646,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Upload Image from file path (avoid renderer memory) ───────────────
   ipcMain.handle(
     "upload-image-from-path",
     async (_, { filePath, fileName, mimeType, slotId = 0 }) => {
@@ -686,7 +663,6 @@ module.exports = function registerGenerationIpc(dependencies) {
           `Slot ${slotId} chưa có Project ID. Vui lòng mở phiên Flow cho slot này trước.`,
         );
 
-      // Resolve file:// URL → absolute path (fix Windows C:\C:\ double drive + %20 encoding)
       const { fileURLToPath } = require("url");
       let resolvedPath = filePath;
       try {
@@ -759,7 +735,6 @@ module.exports = function registerGenerationIpc(dependencies) {
         throw new Error(`Định dạng MIME không được hỗ trợ: ${mimeType}`);
       }
 
-      // Read file in main process and verify magic bytes
       const buffer = fs.readFileSync(realPath);
       if (!isValidImageBuffer(buffer)) {
         throw new Error(
@@ -788,7 +763,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Generate Video (legacy — used by VideoPage) ──────────────────────
   ipcMain.handle(
     "generate-video",
     async (
@@ -866,7 +840,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Generate Video (Text to Video) ────────────────────────────────────
   ipcMain.handle(
     "generate-video-text",
     async (
@@ -936,7 +909,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Generate Video from Start Image (Image-to-Video) ──────────────────
   ipcMain.handle(
     "generate-video-start-image",
     async (
@@ -1011,7 +983,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Generate Video from Start + End Image ─────────────────────────────
   ipcMain.handle(
     "generate-video-start-end-image",
     async (
@@ -1091,7 +1062,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Generate Video with Reference Images (Character Sync) ─────────────
   ipcMain.handle(
     "generate-video-reference-images",
     async (
@@ -1168,9 +1138,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Edit Video / Remix ──────────────────────────────────────────────────────
-  // Text-only → batchAsyncGenerateVideoText + abra_t2v_8s + useV2ModelConfig
-  // With video input → batchAsyncGenerateVideoEditVideo + abra_edit
   ipcMain.handle(
     "generate-video-edit-video",
     async (
@@ -1254,7 +1221,6 @@ module.exports = function registerGenerationIpc(dependencies) {
         metadata: {},
       };
 
-      // Add video input if provided
       if (hasVideoInput) {
         request.videoInput = {
           mediaId: videoInputMediaId,
@@ -1263,7 +1229,6 @@ module.exports = function registerGenerationIpc(dependencies) {
         };
       }
 
-      // Add reference images if provided (up to 5)
       if (hasRefImages) {
         request.referenceImages = refIds.map((mediaId) => ({
           mediaId,
@@ -1301,12 +1266,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // Upload Omni Video (local file → mediaId). The direct request is preferred;
-  // a short-lived same-origin BrowserWindow is used only when Google rejects it.
-  // Upload video to Google via /fx/api/upload-video proxy (resumable chunked upload).
-  // All 3 steps run inside webview executeJavaScript (same-origin, cookies automatic).
-  // Chunk-by-chunk base64 transfer to avoid single massive string.
-  // Last chunk uses "upload, finalize" (confirmed correct protocol).
   ipcMain.handle("upload-omni-video", async (_, { filePath, slotId = 0 }) => {
     const slot = getSlot(slotId);
     if (!slot?.bearerToken)
@@ -1325,7 +1284,6 @@ module.exports = function registerGenerationIpc(dependencies) {
       throw new Error("Đường dẫn file video không hợp lệ.");
     }
 
-    // Windows-safe normalization: resolve file:// URL → absolute path and normalize
     let resolvedPath = filePath;
     try {
       if (
@@ -1381,7 +1339,6 @@ module.exports = function registerGenerationIpc(dependencies) {
       );
     }
 
-    // Verify container magic bytes (read first 64KB header)
     const headerSize = Math.min(stats.size, 65536);
     const headerBuffer = Buffer.alloc(headerSize);
     const headerHandle = await fs.promises.open(realPath, "r");
@@ -1405,12 +1362,9 @@ module.exports = function registerGenerationIpc(dependencies) {
       `[UPLOAD-VIDEO] Verified file: ${realPath}, size: ${(originalSize / 1024 / 1024).toFixed(2)}MB`,
     );
 
-    // ── Pre-upload compression (match browser's ffmpeg.wasm behavior) ──
-    // Browser re-encodes video to ~720p H.264 before upload.
-    // We use the bundled ffmpeg-static to do the same.
     let uploadFilePath = realPath;
     let tempCompressedPath = null;
-    const COMPRESS_THRESHOLD = 5 * 1024 * 1024; // Compress files > 5MB
+    const COMPRESS_THRESHOLD = 5 * 1024 * 1024;
 
     if (originalSize > COMPRESS_THRESHOLD) {
       try {
@@ -1428,26 +1382,26 @@ module.exports = function registerGenerationIpc(dependencies) {
             "-i",
             realPath,
             "-t",
-            "30", // Trim to 30s max (server rejects >30s)
+            "30",
             "-c:v",
             "libx264",
             "-preset",
             "fast",
             "-b:v",
-            "750k", // Target bitrate (matches browser ffmpeg.wasm output)
+            "750k",
             "-maxrate",
-            "1000k", // Peak bitrate cap
+            "1000k",
             "-bufsize",
-            "1500k", // Rate control buffer
+            "1500k",
             "-vf",
-            "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease", // Cap at 720p
+            "scale='min(1280,iw)':'min(720,ih)':force_original_aspect_ratio=decrease",
             "-c:a",
             "aac",
             "-b:a",
-            "96k", // Re-encode audio
+            "96k",
             "-movflags",
-            "+faststart", // Web-optimized MP4
-            "-y", // Overwrite
+            "+faststart",
+            "-y",
             tempCompressedPath,
           ];
           const proc = execFile(ffmpegBin, args, { timeout: 120000 }, (err) => {
@@ -1500,7 +1454,7 @@ module.exports = function registerGenerationIpc(dependencies) {
             await fs.promises.unlink(tempCompressedPath);
           } catch (_) {}
         }
-        // Fail closed: do NOT silently upload unvalidated/broken raw file
+
         throw new Error(
           `Xử lý và nén video đầu vào bằng FFmpeg thất bại: ${compressErr.message}`,
         );
@@ -1524,7 +1478,7 @@ module.exports = function registerGenerationIpc(dependencies) {
       .join("; ");
 
     const MB = 1048576;
-    const CHUNK_SIZE = 2 * MB; // 2MB per chunk (matches browser, 1MB-aligned)
+    const CHUNK_SIZE = 2 * MB;
 
     const fullChunks = Math.floor(fileSizeBytes / CHUNK_SIZE);
     const remainderSize = fileSizeBytes - fullChunks * CHUNK_SIZE;
@@ -1534,7 +1488,6 @@ module.exports = function registerGenerationIpc(dependencies) {
       `[UPLOAD-VIDEO] Plan: ${totalChunks} chunks (${fullChunks} × 2MB + remainder ${remainderSize})`,
     );
 
-    // Strategy 1: Direct net.request using slot session cookies (headless/background compatible)
     const doNetRequest = (options, bodyBuffer = null) => {
       return new Promise((resolve, reject) => {
         const req = net.request({
@@ -1699,9 +1652,6 @@ module.exports = function registerGenerationIpc(dependencies) {
       }
     }
 
-    // Strategy 2: create a short-lived browser bridge with the selected slot's
-    // isolated session. The upload endpoint requires a same-origin browser
-    // context, but it does not require an Electron <webview>.
     let uploadBridgeWindow = null;
     const closeUploadBridge = () => {
       if (uploadBridgeWindow && !uploadBridgeWindow.isDestroyed()) {
@@ -1740,7 +1690,6 @@ module.exports = function registerGenerationIpc(dependencies) {
       );
     }
 
-    // ── Step 1 (same-origin BrowserWindow): Start upload session ──
     let startResult;
     try {
       startResult = await wv.executeJavaScript(`
@@ -1792,7 +1741,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     }
     console.log(`[UPLOAD-VIDEO] Session started`);
 
-    // ── Step 2 + 3: Upload chunks with chunk-by-chunk file reading to avoid reading entire file into memory ──
     let uploadHandle = null;
     try {
       uploadHandle = await fs.promises.open(uploadFilePath, "r");
@@ -1850,7 +1798,6 @@ module.exports = function registerGenerationIpc(dependencies) {
           `[UPLOAD-VIDEO] Chunk ${i + 1}/${totalChunks} → ${chunkResult.status}`,
         );
 
-        // Last chunk (finalize) returns the mediaServerId
         if (isLast) {
           let finalData;
           try {
@@ -1878,7 +1825,7 @@ module.exports = function registerGenerationIpc(dependencies) {
           await uploadHandle.close();
         } catch (_) {}
       }
-      // Clean up temp compressed file
+
       if (tempCompressedPath) {
         try {
           await fs.promises.unlink(tempCompressedPath);
@@ -1889,7 +1836,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     }
   });
 
-  // ── Poll Video Status ─────────────────────────────────────────────────
   ipcMain.handle(
     "poll-video-status",
     async (_, { mediaName, projectId: pid, slotId }) => {
@@ -1912,24 +1858,15 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Download Media Image to Temp File ─────────────────────────────────────────
-  // Download ảnh từ Google CDN/media API về temp file — dùng session cookies của slot
-  // Trả về local temp path để re-upload với slot khác (per-slot ownership)
   ipcMain.handle(
     "download-media-to-temp",
     async (_, { mediaName, slotId = 0 }) => {
       const os = require("os");
 
-      // Mirror _doDownloadVideo: the labs.google redirect endpoint authenticates via
-      // the slot's SESSION COOKIE (not the Bearer token). Using ?input=JSON + Bearer
-      // returns a 16-byte "No session found" body. We must use ?name= + Cookie header.
-      // Dropping the Authorization header also avoids the double-Bearer poison entirely
-      // (the redirect lands on a signed storage.googleapis.com URL that needs no auth).
       const redirectUrl = `https://labs.google/fx/api/trpc/media.getMediaUrlRedirect?name=${mediaName}`;
       const partition = `persist:slot-${slotId}`;
       const slotSes = session.fromPartition(partition);
 
-      // Lấy cookies của labs.google từ slot session
       let cookieHeader = "";
       try {
         const cookies = await slotSes.cookies.get({ domain: "labs.google" });
@@ -2003,7 +1940,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     },
   );
 
-  // ── Resolve Video / Media URL (follow redirect using Electron session with SSRF protection) ────────
   ipcMain.handle("resolve-video-url", async (_, { url, slotId = 0 } = {}) => {
     const { net } = require("electron");
 
@@ -2092,7 +2028,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     });
   });
 
-  // Look up mediaName in download-map to find local file path (for thumbnail repair)
   ipcMain.handle("resolve-downloaded-video", async (_, mediaName) => {
     if (
       typeof mediaName !== "string" ||
@@ -2115,14 +2050,11 @@ module.exports = function registerGenerationIpc(dependencies) {
     return null;
   });
 
-  // ── Background Video Download Queue ─────────────────────────────────────────
-  // Hoàn toàn tách biệt khỏi session slot — không block polling, không conflict
-  const _videoDownloadQueue = []; // { mediaName, itemId }
+  const _videoDownloadQueue = [];
   const MAX_VIDEO_DOWNLOAD_QUEUE = 100;
   const _activeVideoDownloadKeys = new Set();
   let _videoDownloadRunning = false;
 
-  // Push job vào queue, trả về ngay — non-blocking
   ipcMain.handle("queue-video-download", async (_, payload = {}) => {
     const { mediaName, itemId } = payload;
     const slotId =
@@ -2157,11 +2089,10 @@ module.exports = function registerGenerationIpc(dependencies) {
     console.log(
       `[DL-QUEUE] Queued job ${itemId} slot=${slotId} (queue size: ${_videoDownloadQueue.length})`,
     );
-    _processNextDownload(); // kick worker nếu chưa chạy
+    _processNextDownload();
     return { queued: true };
   });
 
-  // Backward compat: download-video vẫn hoạt động synchronously nếu cần
   ipcMain.handle("download-video", async (_, { mediaName, slotId = 0 }) => {
     return _doDownloadVideo(mediaName, slotId);
   });
@@ -2175,7 +2106,6 @@ module.exports = function registerGenerationIpc(dependencies) {
       `[DL-QUEUE] Worker started, ${_videoDownloadQueue.length} jobs in queue`,
     );
 
-    // Chạy parallel 2 jobs cùng lúc để tránh job cuối phải chờ quá lâu
     const MAX_CONCURRENT = 2;
     const running = new Set();
 
@@ -2285,7 +2215,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     };
 
     while (_videoDownloadQueue.length > 0 || running.size > 0) {
-      // Kick off up to MAX_CONCURRENT jobs
       while (_videoDownloadQueue.length > 0 && running.size < MAX_CONCURRENT) {
         const job = _videoDownloadQueue.shift();
         running.add(job);
@@ -2293,7 +2222,7 @@ module.exports = function registerGenerationIpc(dependencies) {
           console.error(`[DL-QUEUE] Unexpected worker error:`, err),
         );
       }
-      // Wait a bit before checking again
+
       await new Promise((r) => setTimeout(r, 500));
     }
 
@@ -2305,7 +2234,6 @@ module.exports = function registerGenerationIpc(dependencies) {
     const saveDir = getVideoOutputDir();
     if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir, { recursive: true });
 
-    // Dedup cache
     const lookupFile = path.join(saveDir, ".download-map.json");
     let downloadMap = {};
     try {
@@ -2323,11 +2251,9 @@ module.exports = function registerGenerationIpc(dependencies) {
       `[VIDEO] Downloading: ${mediaName} → ${filename} (slot=${slotId})`,
     );
 
-    // Dùng đúng session của slot đã generate video
     const partition = `persist:slot-${slotId}`;
     const slotSes = session.fromPartition(partition);
 
-    // Lấy cookies của labs.google từ slot session
     let cookieHeader = "";
     try {
       const cookies = await slotSes.cookies.get({ domain: "labs.google" });
@@ -2358,10 +2284,9 @@ module.exports = function registerGenerationIpc(dependencies) {
 
       const request = net.request({
         url: redirectUrl,
-        session: slotSes, // session OBJECT thay vì partition string
+        session: slotSes,
       });
 
-      // Browser-like headers để tránh 401
       request.setHeader(
         "User-Agent",
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -2408,7 +2333,6 @@ module.exports = function registerGenerationIpc(dependencies) {
         finish(err);
       });
 
-      // Timeout 120s cho video lớn
       const timer = setTimeout(
         () => finish(new Error("Download timeout 120s")),
         120000,
@@ -2438,15 +2362,14 @@ module.exports = function registerGenerationIpc(dependencies) {
 
   async function _downloadViaBrowserWindow(mediaName, filepath) {
     const redirectUrl = `https://labs.google/fx/api/trpc/media.getMediaUrlRedirect?name=${mediaName}`;
-    // Dùng SESSION_PARTITION (slot-0, có cookie Google) thay vì partition rỗng
-    // Named listener để có thể removeListener sau khi xong → không tích lũy
+
     return new Promise((resolve, reject) => {
       let done = false;
       let willDownloadHandler = null;
       const finish = (err) => {
         if (done) return;
         done = true;
-        // Cleanup listener trước khi close để tránh accumulation
+
         if (willDownloadHandler) {
           try {
             win.webContents.session.removeListener(
@@ -2465,7 +2388,7 @@ module.exports = function registerGenerationIpc(dependencies) {
         show: false,
         width: 1,
         height: 1,
-        webPreferences: { partition: SESSION_PARTITION }, // ← có Google cookies
+        webPreferences: { partition: SESSION_PARTITION },
       });
       willDownloadHandler = (event, item) => {
         item.setSavePath(filepath);

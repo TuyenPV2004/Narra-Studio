@@ -13,7 +13,7 @@ export interface XttsReferenceReleaseResult {
 export interface XttsVoiceRequest {
   language: string;
   mode: XttsVoiceMode;
-  /** Compatibility with queue snapshots created before multi-reference cloning. */
+
   referencePath?: string;
   referencePaths?: string[];
   requestId: string;
@@ -66,8 +66,6 @@ export interface XttsPresetVoice {
   useCases: readonly XttsPresetVoiceUseCase[];
 }
 
-// Narra-authored UX metadata derived from the local speaker audit; these are
-// not metadata fields published by the XTTS-v2 checkpoint.
 export const XTTS_PRESET_VOICES = [
   {
     name: "Claribel Dervla",

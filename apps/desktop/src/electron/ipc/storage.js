@@ -85,12 +85,10 @@ module.exports = function registerStorageIpc(dependencies) {
     getChromeRuntime,
   } = dependencies;
 
-// ── Get video output path ─────────────────────────────────────────────
 ipcMain.handle('get-video-output-path', async () => {
   return getVideoOutputDir();
 });
 
-// ── Open output folder in system file manager ─────────────────────────
 ipcMain.handle('open-output-folder', async (_, folderPath) => {
   const dir = folderPath || getVideoOutputDir();
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -98,9 +96,6 @@ ipcMain.handle('open-output-folder', async (_, folderPath) => {
   return { ok: !openError, error: openError || null };
 });
 
-// ── Director's Desk persistence ──────────────────────────────────────
-// Keep all Director's Desk data inside userData. Renderer-provided names
-// are never used as paths without sanitizing them first.
 const DIRECTOR_MAX_SCENE_BYTES = 10 * 1024 * 1024;
 const DIRECTOR_MAX_CAPTURE_BYTES = 50 * 1024 * 1024;
 
@@ -267,7 +262,6 @@ ipcMain.handle('save-director-capture', async (_, params = {}) => {
   });
 });
 
-// ── Change output folder via dialog ───────────────────────────────────
 ipcMain.handle('change-output-folder', async () => {
   const result = await dialog.showOpenDialog(runtime.mainWindow, {
     title: 'Chọn thư mục lưu video',
@@ -281,7 +275,6 @@ ipcMain.handle('change-output-folder', async () => {
   return newPath;
 });
 
-// ── Image output path ─────────────────────────────────────────────────
 ipcMain.handle('get-image-output-path', async () => {
   return getImageOutputDir();
 });
@@ -299,7 +292,6 @@ ipcMain.handle('change-image-output-folder', async () => {
   return newPath;
 });
 
-// ── Voice output path ─────────────────────────────────────────────────
 ipcMain.handle('get-voice-output-path', async () => {
   return getVoiceOutputDir();
 });
@@ -319,7 +311,6 @@ ipcMain.handle('change-voice-output-folder', async () => {
   return newPath;
 });
 
-// ── List saved images from image output directory ─────────────────────
 ipcMain.handle('list-image-files', async () => {
   const dir = getImageOutputDir();
   if (!fs.existsSync(dir)) return [];
@@ -343,7 +334,6 @@ ipcMain.handle('list-image-files', async () => {
   } catch { return []; }
 });
 
-// ── List video files in output folder ─────────────────────────────────
 ipcMain.handle('list-video-files', async () => {
   const dir = getVideoOutputDir();
   if (!fs.existsSync(dir)) return [];
@@ -367,7 +357,6 @@ ipcMain.handle('list-video-files', async () => {
   } catch { return []; }
 });
 
-// ── List voice / audio files in output folder ─────────────────────────
 ipcMain.handle('list-voice-files', async () => {
   const roots = typeof getVoiceOutputRoots === 'function'
     ? getVoiceOutputRoots()
@@ -394,13 +383,12 @@ ipcMain.handle('list-voice-files', async () => {
           time: stat.mtimeMs,
         });
       }
-    } catch { /* ignore directory read error */ }
+    } catch {  }
   }
   allFiles.sort((a, b) => b.time - a.time);
   return allFiles;
 });
 
-// ── Dashboard stats ───────────────────────────────────────────────────
 ipcMain.handle('get-dashboard-stats', async () => {
   const imgDir = getImageOutputDir();
   const vidDir = getVideoOutputDir();
@@ -415,12 +403,12 @@ ipcMain.handle('get-dashboard-stats', async () => {
         .map(f => {
           const fp = path.join(dir, f);
           const stat = fs.statSync(fp);
-          // Extract date from p-DD-MM-NNN format
+
           const m = f.match(/^p-(\d{2})-(\d{2})-(\d+)/);
           let date = null;
           if (m) {
             const year = new Date().getFullYear();
-            date = `${year}-${m[2]}-${m[1]}`; // YYYY-MM-DD
+            date = `${year}-${m[2]}-${m[1]}`;
           }
           return { name: f, size: stat.size, time: stat.mtimeMs, date };
         });
@@ -433,7 +421,6 @@ ipcMain.handle('get-dashboard-stats', async () => {
   const now = new Date();
   const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
-  // Daily counts for last 14 days
   const dailyData = [];
   for (let i = 13; i >= 0; i--) {
     const d = new Date(now);
@@ -460,7 +447,6 @@ ipcMain.handle('get-dashboard-stats', async () => {
   };
 });
 
-// ── Save file ─────────────────────────────────────────────────────────
 ipcMain.handle('save-file', async (_, { data, filename, dir }) => {
   const saveDir = dir || path.join(app.getPath('pictures'), 'VEO3Flow');
   if (!fs.existsSync(saveDir)) fs.mkdirSync(saveDir, { recursive: true });
@@ -980,9 +966,6 @@ ipcMain.handle('create-ai-agent-story-project', async (_, params = {}) => {
   };
 });
 
-// ── Capture a region (CSS px) of the main window → base64 PNG ──────────
-// Dùng cho nút "Xuất PNG" của graph AI Agent. rect tính theo CSS px (toạ độ
-// trong cửa sổ); capturePage tự nhân theo devicePixelRatio nên ảnh sắc nét.
 ipcMain.handle('capture-region', async (_, rect) => {
   if (!runtime.mainWindow || runtime.mainWindow.isDestroyed()) throw new Error('Không có cửa sổ để chụp');
   const hasRect = rect && rect.width > 0 && rect.height > 0;
@@ -997,7 +980,6 @@ ipcMain.handle('capture-region', async (_, rect) => {
   return img.toPNG().toString('base64');
 });
 
-// ── Save image locally (download from URL or save base64) ─────────────
 ipcMain.handle('save-image-locally', async (_, { src, fileName, slotId = 0 } = {}) => {
   const imagesDir = getImageOutputDir();
   if (!fs.existsSync(imagesDir)) fs.mkdirSync(imagesDir, { recursive: true });
@@ -1026,7 +1008,7 @@ ipcMain.handle('save-image-locally', async (_, { src, fileName, slotId = 0 } = {
     fs.writeFileSync(filepath, buffer);
   } else if (src.startsWith('https:')) {
     validateGoogleMediaUrl(src);
-    // Download from URL using Electron session downloadURL with matching slot partition
+
     const targetPartition = `persist:slot-${slotId ?? 0}`;
     const ses = session.fromPartition(targetPartition);
     await new Promise((resolve, reject) => {
@@ -1040,7 +1022,6 @@ ipcMain.handle('save-image-locally', async (_, { src, fileName, slotId = 0 } = {
         if (err) reject(err); else resolve(null);
       };
 
-      // Use will-download to intercept and save
       const handler = (event, item) => {
         const initialChain = typeof item.getURLChain === 'function' ? item.getURLChain() : [];
         const initialUrl = typeof item.getURL === 'function' ? item.getURL() : '';
@@ -1085,7 +1066,6 @@ ipcMain.handle('save-image-locally', async (_, { src, fileName, slotId = 0 } = {
       console.log(`[IMAGE] Starting download for URL: ${src.substring(0, 100)}...`);
       ses.downloadURL(src);
 
-      // Safety timeout
       timeoutId = setTimeout(() => {
         ses.removeListener('will-download', handler);
         try { activeItem?.cancel(); } catch {}
@@ -1098,7 +1078,6 @@ ipcMain.handle('save-image-locally', async (_, { src, fileName, slotId = 0 } = {
   return pathToFileURL(filepath).toString();
 });
 
-// ── Media Library Persistence ─────────────────────────────────────────
 const MEDIA_LIB_FILE = path.join(app.getPath('userData'), 'media-library.json');
 
 ipcMain.handle('load-media-library', async () => {
@@ -1123,7 +1102,6 @@ ipcMain.handle('save-media-library', async (_, items) => {
   }
 });
 
-// ── Result History Persistence (generic, per-key) ─────────────────────
 function sanitizeHistoryKey(key) {
   if (typeof key !== 'string' || !/^[a-zA-Z0-9_-]{1,80}$/.test(key)) {
     throw new Error(`Invalid history key: ${String(key).slice(0, 50)}`);
@@ -1173,13 +1151,6 @@ ipcMain.handle('save-history', async (_, key, items) => {
   }
 });
 
-// ── User-defined Presets (CapCut transitions + effects) ───────────────
-// End users can author their own transitions / effects without rebuilding
-// the app. Storage layout under app.getPath('userData'):
-//   user-presets.json   { version, transitions: [...], effects: [...] }
-// All schema validation lives renderer-side in
-// src/components/capcut/presets/userPresets.ts — main process is a dumb
-// file I/O + dialog wrapper so the validation logic isn't duplicated.
 function getUserPresetsPath() {
   return path.join(app.getPath('userData'), 'user-presets.json');
 }
@@ -1211,8 +1182,7 @@ ipcMain.handle('save-user-presets', async (_, payload) => {
       transitions: Array.isArray(payload?.transitions) ? payload.transitions : [],
       effects:     Array.isArray(payload?.effects)     ? payload.effects     : [],
     };
-    // Atomic write: temp file then rename. Avoids a half-written file
-    // if the user kills the app mid-save.
+
     const tmp = `${filePath}.tmp`;
     fs.writeFileSync(tmp, JSON.stringify(data, null, 2));
     fs.renameSync(tmp, filePath);
@@ -1223,8 +1193,6 @@ ipcMain.handle('save-user-presets', async (_, payload) => {
   }
 });
 
-// Open file picker → return raw JSON content as string. Renderer parses
-// + validates. Returning `null` means user cancelled.
 ipcMain.handle('import-user-preset-file', async () => {
   try {
     const result = await dialog.showOpenDialog(runtime.mainWindow, {
@@ -1242,8 +1210,6 @@ ipcMain.handle('import-user-preset-file', async () => {
   }
 });
 
-// Open save-as dialog → write the provided template object as pretty JSON.
-// `kind` is just for the default filename. Returns the chosen path or null.
 ipcMain.handle('export-user-preset-template', async (_, { kind, template, suggestedName }) => {
   try {
     const defaultName = suggestedName
@@ -1264,16 +1230,9 @@ ipcMain.handle('export-user-preset-template', async (_, { kind, template, sugges
   }
 });
 
-// ── Project management (CapCut Pro) ────────────────────────────────
-// Storage layout under app.getPath('userData'):
-//   projects/
-//     index.json          — array of ProjectMeta for the picker
-//     {id}.json           — full Project (meta + state) per project
-// Atomic writes: write to temp file then rename. The picker reads the
-// index; opening a project reads its individual file.
 function getProjectsDir() {
   const dir = path.join(app.getPath('userData'), 'projects');
-  try { fs.mkdirSync(dir, { recursive: true }); } catch { /* exists */ }
+  try { fs.mkdirSync(dir, { recursive: true }); } catch {  }
   return dir;
 }
 
@@ -1298,7 +1257,6 @@ function writeProjectIndex(index) {
 }
 
 ipcMain.handle('projects:list', async () => {
-  // Returns ProjectMeta[] sorted by updatedAt desc.
   const index = readProjectIndex();
   return index.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 });
@@ -1320,17 +1278,15 @@ ipcMain.handle('projects:save', async (_, project) => {
     throw new Error('projects:save requires { id, name, ... }');
   }
   const now = Date.now();
-  // Update timestamps before writing.
+
   project.updatedAt = now;
   if (!project.createdAt) project.createdAt = now;
 
-  // Write the full project to its own file (atomic via tmp + rename).
   const file = path.join(getProjectsDir(), `${project.id}.json`);
   const tmp = file + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(project, null, 2));
   fs.renameSync(tmp, file);
 
-  // Update the index — keep only meta fields (drop state).
   const meta = {
     id: project.id,
     name: project.name,
@@ -1351,7 +1307,7 @@ ipcMain.handle('projects:save', async (_, project) => {
 ipcMain.handle('projects:delete', async (_, { id }) => {
   if (!id) return false;
   const file = path.join(getProjectsDir(), `${id}.json`);
-  try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch { /* already gone */ }
+  try { if (fs.existsSync(file)) fs.unlinkSync(file); } catch {  }
   const index = readProjectIndex().filter(p => p.id !== id);
   writeProjectIndex(index);
   console.log(`[PROJECTS] Deleted ${id}`);
@@ -1360,7 +1316,7 @@ ipcMain.handle('projects:delete', async (_, { id }) => {
 
 ipcMain.handle('projects:rename', async (_, { id, name }) => {
   if (!id || !name) return false;
-  // Rename in the per-project file.
+
   const file = path.join(getProjectsDir(), `${id}.json`);
   if (fs.existsSync(file)) {
     try {
@@ -1372,7 +1328,7 @@ ipcMain.handle('projects:rename', async (_, { id, name }) => {
       console.error('[PROJECTS] rename file write failed:', err);
     }
   }
-  // And in the index.
+
   const index = readProjectIndex().map(p => p.id === id ? { ...p, name, updatedAt: Date.now() } : p);
   writeProjectIndex(index);
   return true;
@@ -1403,7 +1359,6 @@ ipcMain.handle('projects:duplicate', async (_, { id, newName }) => {
   return newId;
 });
 
-// ── Select files dialog ───────────────────────────────────────────────
 ipcMain.handle('select-files', async () => {
   const { dialog } = require('electron');
   const result = await dialog.showOpenDialog({
@@ -1413,7 +1368,6 @@ ipcMain.handle('select-files', async () => {
 
   if (result.canceled || !result.filePaths.length) return [];
 
-  // Save copies to VEO3Flow/uploads for persistent access
   const uploadsDir = path.join(app.getPath('pictures'), 'VEO3Flow', 'uploads');
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
@@ -1422,7 +1376,6 @@ ipcMain.handle('select-files', async () => {
     const ext = path.extname(fp).toLowerCase();
     const mimeMap = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp', '.gif': 'image/gif', '.bmp': 'image/bmp' };
 
-    // Copy to uploads dir with unique name
     const uniqueName = `${Date.now()}_${path.basename(fp)}`;
     const localPath = path.join(uploadsDir, uniqueName);
     fs.writeFileSync(localPath, buffer);
@@ -1436,18 +1389,13 @@ ipcMain.handle('select-files', async () => {
   });
 });
 
-// ── Select image folder / files dialog ────────────────────────────────
-// Cho chọn NHIỀU file ảnh và/hoặc NHIỀU thư mục cùng lúc. Mỗi thư mục được
-// duyệt ĐỆ QUY qua mọi sub-folder. Kết quả trả về cùng shape với
-// 'select-files' để tái dùng luồng upload-lên-canvas.
 const IMPORT_IMAGE_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp', '.gif', '.bmp', '.avif', '.heic', '.heif']);
 const IMPORT_IMAGE_MIME = {
   '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.webp': 'image/webp',
   '.gif': 'image/gif', '.bmp': 'image/bmp', '.avif': 'image/avif', '.heic': 'image/heic', '.heif': 'image/heif',
 };
-const IMPORT_MAX_IMAGES = 2000; // chặn an toàn tránh nổ RAM khi folder quá lớn
+const IMPORT_MAX_IMAGES = 2000;
 
-// Duyệt đệ quy 1 thư mục, gom mọi đường dẫn ảnh (folder sort trước, file sort trong folder).
 function collectImagesRecursive(dir, out, limit) {
   if (out.length >= limit) return;
   let entries;
@@ -1478,7 +1426,6 @@ ipcMain.handle('select-image-folder', async () => {
 
   if (result.canceled || !result.filePaths.length) return [];
 
-  // Gom tất cả đường dẫn ảnh từ các lựa chọn (file trực tiếp + đệ quy trong folder).
   const imagePaths = [];
   const seen = new Set();
   for (const selected of result.filePaths) {
@@ -1507,10 +1454,6 @@ ipcMain.handle('select-image-folder', async () => {
   const uploadsDir = path.join(app.getPath('pictures'), 'VEO3Flow', 'uploads');
   if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-  // PERF: trước đây đọc/ghi/base64 từng ảnh bằng *Sync trong 1 vòng lặp → chặn main
-  // thread suốt cả tác vụ (tới 2000 ảnh), khiến UI đơ + CPU nhảy vọt. Chuyển sang fs
-  // bất đồng bộ (chạy trên libuv threadpool) và xử lý theo lô có giới hạn: mỗi lô
-  // nhường lại event-loop, không nổ RAM, vẫn giữ nguyên thứ tự ảnh.
   const stamp = Date.now();
   const IMPORT_CONCURRENCY = 6;
 
@@ -1549,21 +1492,14 @@ ipcMain.handle('select-image-folder', async () => {
   return out;
 });
 
-// ── Folder/File-based Skill (chuẩn chung .claude-plugin + flat + single file) ──
-// Cây skill chuẩn: <root>/.claude-plugin/plugin.json + <root>/skills/<group>/SKILL.md
-//                 + <root>/skills/<group>/references/*.md (mỗi file = 1 "skill con")
-// Cây skill flat:  <root>/SKILL.md + <root>/references/*.md
-// Skill 1 file:    <path>/SKILL-one.md
-// Chỉ trả METADATA (không kèm nội dung lớn). Nội dung đọc qua 'read-skill-files'
-// theo từng group; renderer quyết định đọc một phần hay full-layer.
 function readSkillPluginMeta(rootPath) {
   let meta = {};
   let rootStat = null;
-  try { rootStat = fs.statSync(rootPath); } catch { /* checked by caller later */ }
+  try { rootStat = fs.statSync(rootPath); } catch {  }
   try {
     const pj = path.join(rootPath, '.claude-plugin', 'plugin.json');
     if (rootStat?.isDirectory() && fs.existsSync(pj)) meta = JSON.parse(fs.readFileSync(pj, 'utf8')) || {};
-  } catch { /* plugin.json hỏng → vẫn đọc cây được */ }
+  } catch {  }
   if (meta && Object.keys(meta).length) return meta;
   try {
     const skillMdPath = rootStat?.isFile() ? rootPath : path.join(rootPath, 'SKILL.md');
@@ -1578,7 +1514,7 @@ function readSkillPluginMeta(rootPath) {
       }
       meta = parsed;
     }
-  } catch { /* không có root SKILL.md hoặc frontmatter */ }
+  } catch {  }
   return meta || {};
 }
 
@@ -1587,7 +1523,7 @@ function buildSkillReferenceChildren(refDir, titleCase) {
   if (fs.existsSync(refDir) && fs.statSync(refDir).isDirectory()) {
     for (const f of fs.readdirSync(refDir)) {
       if (!f.toLowerCase().endsWith('.md')) continue;
-      if (f.toLowerCase() === 'craft.md') continue; // craft = luật nghề chung, tự kèm — không phải skill con
+      if (f.toLowerCase() === 'craft.md') continue;
       const id = f.replace(/\.md$/i, '');
       children.push({ id, fileName: f, label: titleCase(id) });
     }
@@ -1713,7 +1649,6 @@ ipcMain.handle('import-skill-folder', async () => {
   catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 
-// Re-đọc cây từ path đã lưu (khi mở lại app) — không mở dialog.
 ipcMain.handle('read-skill-folder', async (_e, rootPath) => {
   try {
     if (!rootPath || !fs.existsSync(rootPath)) return { ok: false, error: 'Folder không còn tồn tại.' };
@@ -1721,13 +1656,12 @@ ipcMain.handle('read-skill-folder', async (_e, rootPath) => {
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
 
-// Đọc root SKILL.md + group SKILL.md + craft.md + danh sách child .md được yêu cầu.
 ipcMain.handle('read-skill-files', async (_e, params) => {
   try {
     const { rootPath, group, childIds } = params || {};
     if (!rootPath || !group) return { ok: false, error: 'Thiếu rootPath/group.' };
     let rootStat = null;
-    try { rootStat = fs.statSync(rootPath); } catch { /* handled by safeRead */ }
+    try { rootStat = fs.statSync(rootPath); } catch {  }
     const isFileSkill = rootStat?.isFile() && path.extname(rootPath).toLowerCase() === '.md';
     if (isFileSkill) {
       const safeReadFile = (p) => { try { return fs.existsSync(p) ? fs.readFileSync(p, 'utf8') : ''; } catch { return ''; } };
@@ -1754,11 +1688,10 @@ ipcMain.handle('read-skill-files', async (_e, params) => {
     const groupSkillMd = isFlatSkill ? '' : safeRead(path.join(groupPath, 'SKILL.md'));
     const craftMd = safeRead(path.join(refDir, 'craft.md'));
     const children = (Array.isArray(childIds) ? childIds : []).map(id => {
-      const safeId = path.basename(String(id)); // chống path traversal
+      const safeId = path.basename(String(id));
       return { id: safeId, text: safeRead(path.join(refDir, `${safeId}.md`)) };
     });
     return { ok: true, rootSkillMd, groupSkillMd, craftMd, children };
   } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
 });
-
 };

@@ -438,9 +438,7 @@ export const imageApi = {
         });
       }
       if (discovered.size > 0) return [...discovered.values()];
-    } catch {
-      // Project model metadata is optional; named defaults keep offline UI usable.
-    }
+    } catch {}
     return imageApi.getModels(providerId);
   },
   async resolveMediaUrl(mediaId: string, slotId = 0): Promise<string> {

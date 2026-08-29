@@ -130,7 +130,7 @@ Xóa child `div.sidebar-footer` chứa `sidebar-trust-label` và `sidebar-versio
 
 - [ ] **Step 3: Thêm lớp override light theme cuối CSS chính**
 
-Thêm block comment `/* Narra light theme */` ở cuối CSS. Block phải:
+Thêm section Narra light theme ở cuối CSS. Block phải:
 
 - khai báo lại các custom properties light;
 - đặt `color-scheme: light`;

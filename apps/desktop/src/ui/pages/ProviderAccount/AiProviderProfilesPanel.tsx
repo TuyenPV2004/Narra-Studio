@@ -182,7 +182,6 @@ export function AiProviderProfilesPanel({
 
   const checkAllProfiles = useCallback(
     async (profileList: AiProviderProfile[], currentActiveId?: string) => {
-      // Sắp xếp theo đúng thứ tự card hiển thị (active lên đầu)
       const ordered = [...profileList].sort((a, b) => {
         const aInUse = currentActiveId === a.id;
         const bInUse = currentActiveId === b.id;
@@ -222,7 +221,6 @@ export function AiProviderProfilesPanel({
       const nextErrors: Record<string, string | null> = {};
       let hasError = false;
 
-      // Hiển thị toast lỗi riêng lẻ theo đúng thứ tự card từ trên xuống dưới
       results.forEach((res, idx) => {
         const profile = checkable[idx]!;
         if (res.status === "fulfilled") {

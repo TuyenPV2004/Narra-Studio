@@ -32,7 +32,7 @@ function isAudioHeader(buffer) {
 
 function parseLastJson(output) {
   for (const line of String(output || '').trim().split(/\r?\n/).reverse()) {
-    try { return JSON.parse(line); } catch { /* ignore dependency/runtime noise */ }
+    try { return JSON.parse(line); } catch {  }
   }
   return {};
 }
@@ -41,10 +41,10 @@ function terminateProcessTree(proc, spawnProcess = spawn) {
   if (!proc || !Number.isInteger(proc.pid)) return;
   if (process.platform === 'win32') {
     const killer = spawnProcess('taskkill', ['/pid', String(proc.pid), '/t', '/f'], { shell: false, stdio: 'ignore', windowsHide: true });
-    killer.once('error', () => { try { proc.kill('SIGKILL'); } catch { /* already stopped */ } });
+    killer.once('error', () => { try { proc.kill('SIGKILL'); } catch {  } });
     return;
   }
-  try { proc.kill('SIGKILL'); } catch { /* already stopped */ }
+  try { proc.kill('SIGKILL'); } catch {  }
 }
 
 module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, shell, pathToFileURL, getVoiceOutputDir, getVoiceOutputRoots, runtime, spawnProcess = spawn }) {
@@ -225,7 +225,7 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
       }
       return imported;
     } catch (error) {
-      for (const item of imported) try { await fs.promises.rm(item.localPath, { force: true }); } catch { /* best-effort rollback */ }
+      for (const item of imported) try { await fs.promises.rm(item.localPath, { force: true }); } catch {  }
       throw error;
     }
   });
@@ -335,7 +335,7 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
     } catch (error) {
       activeJobs.delete(requestId);
       scheduleIdleStop();
-      if (outputPath) try { fs.rmSync(outputPath, { force: true }); } catch { /* partial output cleanup */ }
+      if (outputPath) try { fs.rmSync(outputPath, { force: true }); } catch {  }
       throw error;
     }
   });
@@ -345,7 +345,7 @@ module.exports = function registerVoiceIpc({ app, ipcMain, dialog, path, fs, she
     const active = activeJobs.has(id);
     if (active) stopWorker(new Error('Tác vụ XTTS-v2 đã bị hủy.'));
     if (/^[0-9a-f-]{36}$/i.test(id)) {
-      try { fs.rmSync(path.join(runtimeRoot(), 'jobs', id), { recursive: true, force: true }); } catch { /* best-effort checkpoint cleanup */ }
+      try { fs.rmSync(path.join(runtimeRoot(), 'jobs', id), { recursive: true, force: true }); } catch {  }
     }
     return { cancelled: active };
   });

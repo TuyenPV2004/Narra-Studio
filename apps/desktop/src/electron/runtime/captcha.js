@@ -62,14 +62,9 @@ module.exports = function createCaptchaRuntime(dependencies) {
     RECAPTCHA_SITE_KEY,
   } = dependencies;
 
-// ── Persistent Real Chrome for Captcha ───────────────────────────────
-// Mo Google Chrome THAT 1 lan khi app start, giu nguyen suot session.
-// Inject warning overlay de user khong dong.
-// Moi lan can captcha chi execute grecaptcha trong Chrome da chay san.
-
-let chromeProc = null;   // Chrome process handle
-let chromeCdp = null;    // Active CDP client
-let chromeReady = false; // True khi labs.google da load
+let chromeProc = null;
+let chromeCdp = null;
+let chromeReady = false;
 function getChromeRuntime() { return { chromeProc, chromeCdp, chromeReady }; }
 
 function findChromePath() {
@@ -78,13 +73,13 @@ function findChromePath() {
   const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
   const localAppData = process.env.LOCALAPPDATA || path.join(home, 'AppData', 'Local');
   const paths = [
-    // macOS
+
     '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     '/Applications/Google Chrome Canary.app/Contents/MacOS/Google Chrome Canary',
     '/Applications/Brave Browser.app/Contents/MacOS/Brave Browser',
     '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
     '/Applications/Chromium.app/Contents/MacOS/Chromium',
-    // Windows
+
     path.join(programFiles, 'Google\\Chrome\\Application\\chrome.exe'),
     path.join(programFilesX86, 'Google\\Chrome\\Application\\chrome.exe'),
     path.join(localAppData, 'Google\\Chrome\\Application\\chrome.exe'),
@@ -92,7 +87,7 @@ function findChromePath() {
     path.join(programFilesX86, 'BraveSoftware\\Brave-Browser\\Application\\brave.exe'),
     path.join(programFiles, 'Microsoft\\Edge\\Application\\msedge.exe'),
     path.join(programFilesX86, 'Microsoft\\Edge\\Application\\msedge.exe'),
-    // Linux
+
     '/usr/bin/google-chrome',
     '/usr/bin/google-chrome-stable',
     '/usr/bin/chromium',
@@ -152,14 +147,13 @@ async function createCdpClient(wsUrl) {
     sock.on('data', (data) => {
       if (!upgraded) {
         const str = data.toString();
-        // Chrome returns "101 WebSocket Protocol Handshake" (not "101 Switching Protocols")
+
         if (str.includes('101')) {
           upgraded = true;
-          // Find end of HTTP headers (\r\n\r\n or \r\r\n\r\r\n in Chrome)
+
           let hEnd = data.indexOf('\r\n\r\n');
           if (hEnd === -1) hEnd = data.indexOf('\r\r\n\r\r\n');
           if (hEnd !== -1) {
-            // Skip past the header terminator
             const skip = data.indexOf('\r\n\r\n') !== -1 ? 4 : 7;
             buf = data.slice(hEnd + skip);
             if (buf.length > 0) parseFrames();
@@ -255,14 +249,9 @@ async function startPersistentChrome() {
 
   const tab = tabs.find(t => t.type === 'page') || tabs[0];
   chromeCdp = await createCdpClient(tab.webSocketDebuggerUrl);
-  // Note: NOT calling Runtime.enable — it's the #1 reCAPTCHA detection signal.
-  // Runtime.evaluate works without it; we just lose console/context events.
+
   await getChromeRuntime().chromeCdp.send('Page.enable');
 
-  // Stealth: patch navigator + chrome runtime before any page script runs
-  // Matches puppeteer-extra-plugin-stealth evasions (chrome.app, chrome.csi,
-  // chrome.loadTimes, chrome.runtime with PlatformOs, navigator.permissions,
-  // navigator.webdriver, plugins, languages, WebGL, iframe.contentWindow).
   const stealthScript = `
     (function() {
       try {
@@ -306,7 +295,6 @@ async function startPersistentChrome() {
       try {
         Object.defineProperty(navigator, 'deviceMemory', { get: () => 8, configurable: true });
       } catch (e) {}
-      // window.chrome with all sub-objects
       window.chrome = window.chrome || {};
       window.chrome.app = window.chrome.app || {
         isInstalled: false,
@@ -337,7 +325,6 @@ async function startPersistentChrome() {
           connectionInfo: 'h2',
         };
       };
-      // chrome.runtime — the critical one for reCAPTCHA
       window.chrome.runtime = window.chrome.runtime || {
         OnInstalledReason: { CHROME_UPDATE: 'chrome_update', INSTALL: 'install', SHARED_MODULE_UPDATE: 'shared_module_update', UPDATE: 'update' },
         OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update', PERIODIC: 'periodic' },
@@ -350,7 +337,6 @@ async function startPersistentChrome() {
         getManifest: function() { return undefined; },
         id: undefined,
       };
-      // navigator.permissions consistency
       try {
         const origPerm = navigator.permissions && navigator.permissions.query;
         if (origPerm) {
@@ -359,7 +345,6 @@ async function startPersistentChrome() {
             : origPerm.call(navigator.permissions, p);
         }
       } catch (e) {}
-      // WebGL vendor/renderer spoof
       try {
         const getParameter = WebGLRenderingContext.prototype.getParameter;
         WebGLRenderingContext.prototype.getParameter = function(p) {
@@ -368,7 +353,6 @@ async function startPersistentChrome() {
           return getParameter.call(this, p);
         };
       } catch (e) {}
-      // iframe.contentWindow — patch HTMLIFrameElement.prototype.contentWindow
       try {
         const iframe = HTMLIFrameElement.prototype;
         const orig = Object.getOwnPropertyDescriptor(iframe, 'contentWindow');
@@ -387,7 +371,6 @@ async function startPersistentChrome() {
           });
         }
       } catch (e) {}
-      // Notification permission consistency
       try {
         if (window.Notification && Notification.permission === 'denied') {
           Object.defineProperty(Notification, 'permission', { get: () => 'default', configurable: true });
@@ -403,7 +386,6 @@ async function startPersistentChrome() {
     console.warn('[CHROME-CDP] Stealth patch failed:', e.message);
   }
 
-  // Wait for labs.google
   for (let i = 0; i < 30; i++) {
     await new Promise(r => setTimeout(r, 1000));
     try {
@@ -421,19 +403,16 @@ async function startPersistentChrome() {
     } catch (e) { }
   }
 
-
   await injectChromeWarningOverlay();
 }
 
 async function getCaptchaFromChrome(captchaAction = 'IMAGE_GENERATION') {
-  // Ensure Chrome is running
   if (!chromeCdp || !chromeReady) {
     console.log('[CHROME-CDP] Not ready, starting...');
     await startPersistentChrome();
     if (!chromeCdp) throw new Error('Cannot start Chrome');
   }
 
-  // Verify still on labs.google
   try {
     const r = await getChromeRuntime().chromeCdp.send('Runtime.evaluate', {
       expression: '({ onLabs: location.href.includes("labs.google"), state: document.readyState })',
@@ -454,7 +433,6 @@ async function getCaptchaFromChrome(captchaAction = 'IMAGE_GENERATION') {
     if (!chromeCdp) throw new Error('Cannot restart Chrome');
   }
 
-  // Execute captcha in persistent Chrome
   console.log('[CHROME-CDP] Generating captcha in persistent Chrome, action:', captchaAction);
   const rcKey = RECAPTCHA_SITE_KEY;
   const rcAction = captchaAction || 'IMAGE_GENERATION';
@@ -498,13 +476,6 @@ async function getCaptchaFromChrome(captchaAction = 'IMAGE_GENERATION') {
   throw new Error('No token from Chrome');
 }
 
-
-// ── Make API request via Chrome CDP ──────────────────────────────────
-// Thuc hien captcha + fetch() hoan toan trong Chrome that.
-// Tat ca di qua Chrome's network stack voi real browser cookies/TLS:
-//   - captcha generate trong Chrome (real user-initiated browser context)
-//   - fetch() chay trong Chrome → credentials: 'include' (tu dong gui cookies)
-//   - Khong co Node.js HTTPS — response tra ve tu Chrome
 async function makeApiRequestViaChrome(url, body) {
   if (!chromeCdp || !chromeReady) {
     console.log('[CHROME-API] Chrome not ready, starting...');
@@ -516,16 +487,14 @@ async function makeApiRequestViaChrome(url, body) {
   const rcKey = RECAPTCHA_SITE_KEY;
   const urlStr = JSON.stringify(url);
 
-  // Build headers (without cookie — Chrome handles cookies via credentials:include)
   const headers = buildHeaders();
-  delete headers['cookie']; // Chrome gi tu dong qua credentials
+  delete headers['cookie'];
   const headersJson = JSON.stringify(headers);
   const bodyJson = JSON.stringify(body);
 
   const result = await getChromeRuntime().chromeCdp.send('Runtime.evaluate', {
     expression: `(async function() {
       try {
-        // === Step 1: Get captcha token in Chrome (real browser context) ===
         if (!window.grecaptcha || !window.grecaptcha.enterprise) {
           await new Promise(function(res, rej) {
             var ex = document.querySelector('script[src*="recaptcha/enterprise"]');
@@ -555,7 +524,6 @@ async function makeApiRequestViaChrome(url, body) {
           setTimeout(function() { reject('captcha timeout 25s'); }, 25000);
         });
 
-        // === Step 2: Inject captcha token into body ===
         var body = ` + bodyJson + `;
         var rcCtx = { token: captchaToken, applicationType: 'RECAPTCHA_APPLICATION_TYPE_WEB' };
         if (body.clientContext) body.clientContext.recaptchaContext = rcCtx;
@@ -565,7 +533,6 @@ async function makeApiRequestViaChrome(url, body) {
           });
         }
 
-        // === Step 3: Fetch from Chrome (credentials:include auto-sends cookies) ===
         var resp = await fetch(` + urlStr + `, {
           method: 'POST',
           headers: ` + headersJson + `,
@@ -603,14 +570,12 @@ async function makeApiRequestViaChrome(url, body) {
   return { status: val.status, data: val.data };
 }
 
-
-// Reload the Chrome-CDP labs.google tab to reset its reCAPTCHA session state.
 async function reloadChromeCdpLabs() {
   if (!chromeCdp || !chromeReady) return false;
   try {
     await getChromeRuntime().chromeCdp.send('Page.reload', { ignoreCache: false });
     chromeReady = false;
-    // Wait for labs.google to load again (max 12s)
+
     for (let i = 0; i < 12; i++) {
       await new Promise(r => setTimeout(r, 1000));
       try {
@@ -635,8 +600,6 @@ async function reloadChromeCdpLabs() {
 }
 
 async function requestWithCaptchaOnce(url, body, slotId, captchaAction) {
-  // Extract existing frontend token (if any) for fallback. Discard placeholders
-  // sent by the renderer when it expects the extension to provide the real token.
   let frontendToken = null;
   if (body.clientContext?.recaptchaContext?.token) {
     frontendToken = body.clientContext.recaptchaContext.token;
@@ -649,13 +612,6 @@ async function requestWithCaptchaOnce(url, body, slotId, captchaAction) {
 
   let captchaToken = null;
 
-  // Strategy 0: User's real Chrome via extension (HIGHEST trust — same as
-  // manual browsing). When the extension is connected, treat it as the ONLY
-  // captcha source — retry on transient failure but DO NOT fall back to
-  // Chrome-CDP. Falling back would spawn a visible Chrome window which is
-  // confusing UX when the user has already set up the extension. If the
-  // extension is genuinely broken (closed tab, signed out), surface the
-  // error so the user can fix it.
   const extConnected = captchaBridge.isExtensionConnected();
   if (extConnected) {
     let extErr = null;
@@ -677,8 +633,6 @@ async function requestWithCaptchaOnce(url, body, slotId, captchaAction) {
     }
   }
 
-  // Strategy 1: Persistent real Chrome via CDP — only when extension is NOT
-  // connected at all (user hasn't installed the extension yet).
   if (!captchaToken && !extConnected) {
     try {
       captchaToken = await getCaptchaFromChrome(captchaAction);
@@ -688,7 +642,6 @@ async function requestWithCaptchaOnce(url, body, slotId, captchaAction) {
     }
   }
 
-  // Strategy 2: Use frontend token if Chrome CDP unavailable
   if (!captchaToken && frontendToken && frontendToken.length > 20) {
     captchaToken = frontendToken;
     console.log(`[CAPTCHA] Using frontend token (len: ${frontendToken.length})`);
@@ -711,9 +664,7 @@ async function requestWithCaptchaOnce(url, body, slotId, captchaAction) {
 
 async function makeApiRequestWithCaptcha(url, body, slotId = 0, captchaAction = 'IMAGE_GENERATION') {
   console.log('[API] Request:', url.substring(0, 80));
-  // DRY-RUN: skip real captcha acquisition (no extension/webview needed).
-  // Inject a dummy token exactly where the real one would go, then let
-  // makeApiRequest capture the (faithful) payload and short-circuit.
+
   if (isDryRunActive()) {
     const bodyWithToken = JSON.parse(JSON.stringify(body));
     const recaptchaCtx = { token: 'DRYRUN_DUMMY_TOKEN', applicationType: 'RECAPTCHA_APPLICATION_TYPE_WEB' };
@@ -729,9 +680,7 @@ async function makeApiRequestWithCaptcha(url, body, slotId = 0, captchaAction = 
     return await requestWithCaptchaOnce(url, body, slotId, captchaAction);
   } catch (e) {
     const msg = (e && e.message) || String(e);
-    // Reload the Chrome-CDP labs page, then retry once. Targeted at reCAPTCHA
-    // UNUSUAL_ACTIVITY which resets after
-    // page reload (reCAPTCHA session state is per page lifecycle).
+
     if (msg.includes('UNUSUAL_ACTIVITY') || msg.includes('reCAPTCHA evaluation failed')) {
       console.log('[API] UNUSUAL_ACTIVITY detected — reloading Chrome-CDP, then retrying once...');
       await reloadChromeCdpLabs();
@@ -740,8 +689,6 @@ async function makeApiRequestWithCaptcha(url, body, slotId = 0, captchaAction = 
     throw e;
   }
 }
-
-
 
   return {
     findChromePath,

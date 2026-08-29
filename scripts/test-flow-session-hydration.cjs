@@ -4,7 +4,6 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const path = require("node:path");
 
-// 1. Direct Import of Production Policy Module
 const {
   AUTH_COOKIE_NAMES,
   hasAuthenticationCookie,
@@ -12,7 +11,6 @@ const {
   evaluateSlotStatus,
 } = require("../apps/desktop/src/electron/runtime/flowSessionPolicy");
 
-// 2. Test Auth Cookie Identification
 assert.equal(AUTH_COOKIE_NAMES.has("__Secure-next-auth.session-token"), true);
 assert.equal(AUTH_COOKIE_NAMES.has("SID"), true);
 assert.equal(AUTH_COOKIE_NAMES.has("SSID"), true);
@@ -25,7 +23,6 @@ assert.equal(hasAuthenticationCookie([{ name: "SID", value: "123" }]), true);
 assert.equal(hasAuthenticationCookie([{ name: "_ga", value: "abc" }]), false);
 assert.equal(hasAuthenticationCookie([]), false);
 
-// 3. Test classifySessionFetchResult across all HTTP & Network cases
 const authResult = classifySessionFetchResult({
   status: 200,
   data: { user: { email: "alpha@gmail.com", name: "Alpha", image: "https://avatar.url" } },
@@ -74,11 +71,8 @@ assert.equal(client404.kind, "client-error");
 const netError = classifySessionFetchResult({ error: new Error("DNS resolution failed") });
 assert.equal(netError.kind, "network-error");
 
-// 4. Test evaluateSlotStatus (Decision Matrix)
-// Case A: No cookies -> empty
 assert.equal(evaluateSlotStatus({ cookiesCount: 0 }), "empty");
 
-// Case B: Valid session without bearer token -> authenticated
 assert.equal(
   evaluateSlotStatus({
     cookiesCount: 5,
@@ -89,7 +83,6 @@ assert.equal(
   "authenticated"
 );
 
-// Case C: Valid session with bearer token -> connected
 assert.equal(
   evaluateSlotStatus({
     cookiesCount: 5,
@@ -100,7 +93,6 @@ assert.equal(
   "connected"
 );
 
-// Case D: 401/403 unauthenticated with existing auth cookies -> expired
 assert.equal(
   evaluateSlotStatus({
     cookiesCount: 3,
@@ -111,7 +103,6 @@ assert.equal(
   "expired"
 );
 
-// Case E: 401 with no auth cookies -> empty
 assert.equal(
   evaluateSlotStatus({
     cookiesCount: 1,
@@ -122,7 +113,6 @@ assert.equal(
   "empty"
 );
 
-// Case F: 429 Too Many Requests MUST NOT mark slot as expired!
 assert.equal(
   evaluateSlotStatus({
     cookiesCount: 4,
@@ -135,7 +125,6 @@ assert.equal(
   "Rate limiting 429 must preserve authenticated state"
 );
 
-// Case G: 408 Timeout MUST NOT mark slot as expired!
 assert.equal(
   evaluateSlotStatus({
     cookiesCount: 4,
@@ -148,7 +137,6 @@ assert.equal(
   "Timeout 408 must preserve authenticated state"
 );
 
-// Case H: 5xx Server Error MUST NOT mark slot as expired!
 assert.equal(
   evaluateSlotStatus({
     cookiesCount: 4,
@@ -161,7 +149,6 @@ assert.equal(
   "500 Server error must preserve authenticated state"
 );
 
-// Case I: Network offline error MUST NOT mark slot as expired!
 assert.equal(
   evaluateSlotStatus({
     cookiesCount: 4,
@@ -174,7 +161,6 @@ assert.equal(
   "Network offline error must preserve authenticated state"
 );
 
-// Case J: Initial startup with server error -> error (not expired)
 assert.equal(
   evaluateSlotStatus({
     cookiesCount: 4,
@@ -187,15 +173,13 @@ assert.equal(
   "Initial startup with server error must transition to error"
 );
 
-// 5. Test Bearer 401 fallback simulation (Bearer stale, cookie session valid)
 function simulateHydrationWithBearerFallback(slot, mockBearerStatus, mockCookieSession) {
-  // Step 1: Bearer check
   if (slot.bearerToken) {
     if (mockBearerStatus === 401 || mockBearerStatus === 403) {
-      slot.bearerToken = null; // Cleared in RAM
+      slot.bearerToken = null;
     }
   }
-  // Step 2: Cookie session check
+
   const classification = classifySessionFetchResult(mockCookieSession);
   const status = evaluateSlotStatus({
     cookiesCount: 3,
@@ -220,25 +204,22 @@ const slotTest = {
 
 const resultStatus = simulateHydrationWithBearerFallback(
   slotTest,
-  401, // Bearer returns 401
-  { status: 200, data: { user: { email: "user@gmail.com", name: "User" } } } // Cookie returns 200
+  401,
+  { status: 200, data: { user: { email: "user@gmail.com", name: "User" } } }
 );
 
 assert.equal(resultStatus, "authenticated", "Bearer 401 with valid cookie session must resolve to authenticated, NOT expired");
 assert.equal(slotTest.bearerToken, null, "Expired bearer token must be cleared from memory");
 assert.equal(slotTest.email, "user@gmail.com", "Email must be populated from cookie session");
 
-// 6. Test Multi-slot Isolation
 const slot0 = { id: 0, partition: "persist:slot-0", cookies: "SID=abc", email: "user0@gmail.com", status: "authenticated", projectId: "p-0" };
 const slot1 = { id: 1, partition: "persist:slot-1", cookies: "SID=xyz", email: "user1@gmail.com", status: "authenticated", projectId: "p-1" };
 
-// Logout slot 0
 slot0.cookies = "";
 slot0.email = null;
 slot0.status = "empty";
 slot0.projectId = null;
 
-// Assert slot 1 is 100% unaffected
 assert.equal(slot0.status, "empty");
 assert.equal(slot0.email, null);
 assert.equal(slot1.status, "authenticated");
@@ -246,7 +227,6 @@ assert.equal(slot1.email, "user1@gmail.com");
 assert.equal(slot1.projectId, "p-1");
 assert.equal(slot1.cookies, "SID=xyz");
 
-// 7. Test IPC implementation contract & security
 const sessionIpcPath = path.join(__dirname, "..", "apps", "desktop", "src", "electron", "ipc", "flow", "session.js");
 const sessionIpcCode = fs.readFileSync(sessionIpcPath, "utf8");
 

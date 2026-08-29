@@ -19,10 +19,10 @@
   "rendererRoot": "apps/desktop/src/ui",
   "preloadFile": "apps/desktop/src/electron/preload.js",
   "summary": {
-    "usedMethods": 172,
-    "usedApiMethods": 172,
+    "usedMethods": 176,
+    "usedApiMethods": 176,
     "usedElectronApiMethods": 0,
-    "exposedPreloadMethods": 238,
+    "exposedPreloadMethods": 242,
     "missingFromPreload": 0,
     "missingFromPreloadDistinctMethodCount": 0,
     "missingFromPreloadCallSiteCount": 0,
@@ -124,7 +124,67 @@
     },
     {
       "global": "api",
+      "method": "aiAgentResearch",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiAgentResearchQuery",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
       "method": "aiAgentReviewOutput",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiAgentWebFetch",
+      "businessArea": "AI Agent",
+      "callCount": 1,
+      "files": [
+        "apps/desktop/src/ui/services/electron-api/agent.ts"
+      ],
+      "preload": {
+        "exposed": true,
+        "parameters": [
+          "p"
+        ]
+      }
+    },
+    {
+      "global": "api",
+      "method": "aiAgentWebSearch",
       "businessArea": "AI Agent",
       "callCount": 1,
       "files": [
@@ -1286,9 +1346,10 @@
       "global": "api",
       "method": "openExternalUrl",
       "businessArea": "Desktop / Local utility",
-      "callCount": 2,
+      "callCount": 3,
       "files": [
         "apps/desktop/src/ui/pages/AIAgent/components/AgentMarkdownRenderer.tsx",
+        "apps/desktop/src/ui/services/electron-api/agent.ts",
         "apps/desktop/src/ui/services/electron-api/captcha.ts"
       ],
       "preload": {

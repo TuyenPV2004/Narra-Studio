@@ -25,8 +25,6 @@ async function getDepthPipeline(modelName, cacheDir) {
   env.allowRemoteModels = true;
   env.cacheDir = cacheDir;
   if (env.backends?.onnx?.wasm) {
-    // This is a background Canvas tool: reserve the machine for renderer input,
-    // pan/zoom, and other app work even if inference takes longer.
     env.backends.onnx.wasm.numThreads = depthThreadCount;
   }
   const sessionOptions = {
@@ -76,17 +74,11 @@ receiveMessage(async message => {
         result = await pipe(message.inputFrames[index]);
         await result.depth.save(message.outputFrames[index]);
       } finally {
-        // Transformers.js returns both the rendered RawImage and the backing
-        // ONNX Tensor. The tensor owns native memory and is not reclaimed by
-        // ordinary JS GC between video frames, so long clips otherwise grow
-        // until macOS/Windows kills the worker with a null exit code.
         if (typeof result?.predicted_depth?.dispose === 'function') {
           await result.predicted_depth.dispose();
         }
         result = null;
-        // RawImage output buffers are ordinary JavaScript/native-backed memory.
-        // Give the isolated worker a bounded collection point on long videos so
-        // low-memory Macs do not accumulate several decoded/output frames.
+
         if (typeof global.gc === 'function' && (index + 1) % 8 === 0) {
           global.gc();
         }

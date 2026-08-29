@@ -194,7 +194,7 @@ export function GoogleFlowPage() {
               data-status={slot.status}
               data-connected={isConnected}
             >
-              {/* Top row: Slot Badge on Left, Project ID & Logout on Right */}
+              {}
               <div className="source-flow-slot-card__top">
                 <span className="source-flow-slot-tag">Slot {slot.id + 1}</span>
                 <div className="source-flow-slot-card__top-right">
@@ -256,7 +256,7 @@ export function GoogleFlowPage() {
                 </div>
               </div>
 
-              {/* Profile row: Round Avatar + Status Dot + Name/Email */}
+              {}
               <div className="source-flow-slot-user">
                 <div className="source-flow-avatar-wrap">
                   {slot.avatar ? (
@@ -291,7 +291,7 @@ export function GoogleFlowPage() {
                 </div>
               </div>
 
-              {/* Actions row */}
+              {}
               <div className="source-flow-slot-actions">
                 {isConnected && (
                   <>

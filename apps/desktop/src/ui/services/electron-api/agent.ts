@@ -1,6 +1,33 @@
 import { getElectronApi } from "@/services/electron-api/client";
 import { aiProviderApi } from "@/services/electron-api/ai-providers";
 
+export interface ResearchSource {
+  rank: number;
+  url: string;
+  domain: string;
+  title: string;
+  siteName: string;
+  success: boolean;
+  wordCount?: number | undefined;
+  fetchedAt?: string | undefined;
+  keyExcerpts: string[];
+}
+
+export interface ResearchResult {
+  query: string;
+  sources: ResearchSource[];
+  nonce: string;
+  synthesizedEvidenceText: string;
+  evidenceAvailable: boolean;
+  failureReason?: string | undefined;
+  fullTextSourceCount?: number | undefined;
+}
+
+export interface ChatEvidencePayload {
+  nonce: string;
+  text: string;
+}
+
 export interface AgentMessage extends Record<string, unknown> {
   id?: string | undefined;
   role: "assistant" | "user" | "system";
@@ -11,6 +38,9 @@ export interface AgentMessage extends Record<string, unknown> {
   provider?: string | undefined;
   planProposal?: unknown | undefined;
   createdAt?: number | undefined;
+
+  researchSources?: ResearchSource[] | undefined;
+  researchQuery?: string | undefined;
 }
 
 export interface WorkflowContextPayload {
@@ -50,6 +80,7 @@ const streamChat = async (
     model?: string | undefined;
     source?: string | undefined;
   }) => void,
+  evidence?: ChatEvidencePayload | undefined,
 ): Promise<{
   reply: string;
   model?: string | undefined;
@@ -65,6 +96,7 @@ const streamChat = async (
       ),
       hasPlan,
       workflowContext: workflowContext || null,
+      evidence: evidence ?? null,
     },
     (payload) => {
       const event = record(payload);
@@ -151,6 +183,7 @@ export const agentApi = {
       model?: string | undefined;
       source?: string | undefined;
     }) => void,
+    evidence?: ChatEvidencePayload | undefined,
   ): Promise<{
     reply: string;
     model?: string | undefined;
@@ -165,6 +198,7 @@ export const agentApi = {
       hasPlan,
       workflowContext,
       onMeta,
+      evidence,
     );
   },
 
@@ -179,9 +213,7 @@ export const agentApi = {
       for (const [id, cancel] of activeRequests.entries()) {
         try {
           cancel();
-        } catch {
-          // ignore
-        }
+        } catch {}
         activeRequests.delete(id);
         getElectronApi()
           .aiAgentChatCancel({ requestId: id })
@@ -295,5 +327,90 @@ export const agentApi = {
       typeof response.audio_url === "string" ? response.audio_url : "";
     if (!src) throw new Error("Local Piper không trả về file audio.");
     return { jobId, src };
+  },
+
+  async webSearch(
+    query: string,
+  ): Promise<Array<{ title: string; url: string; snippet: string }>> {
+    const res = await getElectronApi().aiAgentWebSearch({ query });
+    if (!res?.success) return [];
+    return res.results || [];
+  },
+
+  async webFetch(url: string) {
+    const res = await getElectronApi().aiAgentWebFetch({ url });
+    if (!res?.success || !res.data) return null;
+    return res.data;
+  },
+
+  async researchQuery(
+    message: string,
+    history: AgentMessage[],
+    title = "",
+  ): Promise<string> {
+    const res = record(
+      await getElectronApi().aiAgentResearchQuery({
+        message,
+        history: history.filter(
+          (m) => m.status !== "failed" && m.status !== "cancelled",
+        ),
+        title,
+      }),
+    );
+    return typeof res.query === "string" ? res.query.trim() : "";
+  },
+
+  async openSourceUrl(url: string): Promise<void> {
+    const value = String(url || "").trim();
+    if (!/^https?:\/\//i.test(value)) {
+      throw new Error("Liên kết nguồn không hợp lệ.");
+    }
+    await getElectronApi().openExternalUrl(value);
+  },
+
+  async research(query: string, maxSources = 3): Promise<ResearchResult> {
+    const res = record(
+      await getElectronApi().aiAgentResearch({ query, maxSources }),
+    );
+    const failure = (reason: string): ResearchResult => ({
+      query,
+      sources: [],
+      nonce: "",
+      synthesizedEvidenceText: "",
+      evidenceAvailable: false,
+      failureReason: reason,
+    });
+    if (res.success !== true) {
+      return failure(
+        typeof res.error === "string" && res.error
+          ? res.error
+          : "Không thể thực hiện nghiên cứu đa nguồn.",
+      );
+    }
+    const nonce = typeof res.nonce === "string" ? res.nonce : "";
+    const evidence =
+      typeof res.synthesizedEvidenceText === "string"
+        ? res.synthesizedEvidenceText
+        : "";
+
+    if (res.evidenceAvailable !== true || !nonce || !evidence) {
+      return failure(
+        typeof res.failureReason === "string" && res.failureReason
+          ? res.failureReason
+          : "Không tìm được nguồn nào để đối soát.",
+      );
+    }
+    return {
+      query: typeof res.query === "string" ? res.query : query,
+      sources: Array.isArray(res.sources)
+        ? (res.sources as ResearchSource[])
+        : [],
+      nonce,
+      synthesizedEvidenceText: evidence,
+      evidenceAvailable: true,
+      ...(typeof res.fullTextSourceCount === "number"
+        ? { fullTextSourceCount: res.fullTextSourceCount }
+        : {}),
+    };
   },
 };

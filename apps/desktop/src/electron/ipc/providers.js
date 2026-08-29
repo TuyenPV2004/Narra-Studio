@@ -18,7 +18,6 @@ module.exports = function registerProviderIpc(dependencies) {
   let veo3CookieRefreshTimer = null;
   let veo3InitialCookieRefreshTimer = null;
 
-  
   const stopVeo3Runtime = () => {
     if (veo3CookieRefreshTimer) clearInterval(veo3CookieRefreshTimer);
     if (veo3InitialCookieRefreshTimer) clearTimeout(veo3InitialCookieRefreshTimer);
@@ -77,8 +76,7 @@ module.exports = function registerProviderIpc(dependencies) {
   ipcMain.handle('provider-set-active', async (_event, { providerId, activate = true } = {}) => {
     const id = registry.normalizeProviderId(providerId);
     saveSettings({ activeProvider: id });
-    // Tear down the previous provider before validating/starting the next one.
-    // This also guarantees a failed license check cannot leave VEO3 running.
+
     stopVeo3Runtime();
     if (activate) {
       if (id === 'veo3') startVeo3Runtime();

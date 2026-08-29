@@ -124,7 +124,7 @@ export function VoiceAudioCard({
     >
       <audio ref={audioRef} src={src} preload="metadata" />
 
-      {/* Top Row: Rewind 10s -> Play/Pause -> Forward 10s */}
+      {}
       <div className="source-voice-music-card__top">
         <button
           type="button"
@@ -166,7 +166,7 @@ export function VoiceAudioCard({
         </button>
       </div>
 
-      {/* Bottom Timeline: Time Left -> Scrubber -> Time Right */}
+      {}
       <div className="source-voice-music-card__timeline">
         <span className="source-voice-music-card__time">
           {formatAudioTime(currentTime)}

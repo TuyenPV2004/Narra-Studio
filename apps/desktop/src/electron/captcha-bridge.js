@@ -1,7 +1,3 @@
-// captcha-bridge.js — minimal WebSocket server that the Chrome extension
-// connects to. Provides getTokenFromExtension(action) which sends a request
-// to the connected extension and awaits the reCAPTCHA token.
-
 const net = require('net');
 const crypto = require('crypto');
 
@@ -26,7 +22,7 @@ let extensionClientStatus = {
   lastTokenError: null,
 };
 let nextReqId = 1;
-const pending = new Map(); // id -> { resolve, reject, timer }
+const pending = new Map();
 
 function ack(sock, key) {
   const accept = crypto
@@ -92,7 +88,7 @@ function parseFrames(buf, onText) {
       payload = un;
     }
     if (opcode === 0x1) onText(payload.toString('utf8'));
-    if (opcode === 0x8) return -1; // close frame
+    if (opcode === 0x8) return -1;
     offset = pos + len;
   }
   return offset;
@@ -187,7 +183,6 @@ function handleClient(sock) {
           p.resolve(msg.token);
         }
       } else if (msg.type === 'pong') {
-        // heartbeat ack
       }
     });
     if (consumed === -1) { sock.destroy(); return; }
@@ -202,7 +197,7 @@ function start() {
   server.on('error', (e) => {
     console.warn('[CAPTCHA-BRIDGE] Server error:', e.message);
     server = null;
-    // Retry after delay
+
     if (enabled) retryTimer = setTimeout(start, 5000);
   });
   server.listen(PORT, HOST, () => {

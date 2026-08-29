@@ -12,7 +12,6 @@
         const siteKey = new URL(script.src).searchParams.get('render');
         if (siteKey && siteKey !== 'explicit') return siteKey;
       } catch {
-        // Ignore malformed script URLs and keep looking for the loaded runtime.
       }
     }
     throw new Error('reCAPTCHA site key unavailable');

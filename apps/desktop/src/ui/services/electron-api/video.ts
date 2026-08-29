@@ -200,7 +200,6 @@ async function uploadFlowImage(file: File, slotId: number): Promise<string> {
     }
   }
 
-  // Fallback: Read file bytes directly in renderer and upload via uploadImage
   const buffer = await file.arrayBuffer();
   const bytes = new Uint8Array(buffer);
   let binary = "";
@@ -378,9 +377,7 @@ export const videoApi = {
         ? { slotId: request.slotId }
         : record(await getElectronApi().pickRandomSlot());
     const slotId = typeof slot.slotId === "number" ? slot.slotId : 0;
-    // Refresh and cache the tier on the selected account slot before Main
-    // resolves tier-dependent model keys. Credit lookup is read-only and the
-    // Main handler degrades to null when the session cannot provide it.
+
     const credits = record(await getElectronApi().getCredits({ slotId }));
     if (isTierDependentRequest(request) && !isKnownPaygateTier(credits.tier)) {
       throw new Error(

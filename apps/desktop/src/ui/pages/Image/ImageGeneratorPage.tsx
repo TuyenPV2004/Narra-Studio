@@ -407,9 +407,7 @@ export function ImageGeneratorPage({ providerId }: { providerId: ProviderId }) {
       }
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 1500);
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   const run = useCallback(() => {

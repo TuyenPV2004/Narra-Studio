@@ -86,9 +86,7 @@ const restoredTasks = (): VideoQueueTask[] =>
         try {
           const mediaName = new URL(task.src).searchParams.get("name");
           if (mediaName) base.downloadMediaName = mediaName;
-        } catch {
-          // Legacy non-URL source cannot be used to repair a background download.
-        }
+        } catch {}
       }
       if (task.thumbnailDataUrl) {
         base.thumbnailDataUrl = task.thumbnailDataUrl;
@@ -330,8 +328,7 @@ function useVideoQueueState(
           })),
           ...currentTasks,
         ];
-        // Update the synchronous snapshot before React commits so rapid
-        // consecutive enqueue calls cannot both consume the same free slots.
+
         tasksRef.current = nextTasks;
         setTasks(nextTasks);
       }

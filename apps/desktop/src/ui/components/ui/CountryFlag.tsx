@@ -52,7 +52,6 @@ export function CountryFlag({
 
 function renderFlagPaths(code: string) {
   switch (code) {
-    // 1. Tiếng Anh (English - US Flag)
     case "en":
       return (
         <g>
@@ -76,7 +75,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 2. Tiếng Nhật (Japanese - JP)
     case "ja":
       return (
         <g>
@@ -85,12 +83,11 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 3. Tiếng Hàn (Korean - KR)
     case "ko":
       return (
         <g>
           <rect width="24" height="16" fill="#ffffff" />
-          {/* Taegeuk Yin-Yang */}
+          {}
           <path
             d="M 8.4 8 A 3.6 3.6 0 0 1 15.6 8 A 1.8 1.8 0 0 1 12 8 A 1.8 1.8 0 0 0 8.4 8 Z"
             fill="#cd2e3a"
@@ -99,8 +96,8 @@ function renderFlagPaths(code: string) {
             d="M 8.4 8 A 3.6 3.6 0 0 0 15.6 8 A 1.8 1.8 0 0 1 12 8 A 1.8 1.8 0 0 0 8.4 8 Z"
             fill="#0047a0"
           />
-          {/* 4 Trigrams */}
-          {/* Top-Left: Geon (3 solid bars) */}
+          {}
+          {}
           <g transform="translate(4.2, 3.2) rotate(34)">
             <line
               x1="-2"
@@ -127,7 +124,7 @@ function renderFlagPaths(code: string) {
               strokeWidth="0.6"
             />
           </g>
-          {/* Bottom-Right: Gon (3 broken bars) */}
+          {}
           <g transform="translate(19.8, 12.8) rotate(34)">
             <line
               x1="-2"
@@ -178,7 +175,7 @@ function renderFlagPaths(code: string) {
               strokeWidth="0.6"
             />
           </g>
-          {/* Top-Right: Gam (broken, solid, broken) */}
+          {}
           <g transform="translate(19.8, 3.2) rotate(-34)">
             <line
               x1="-2"
@@ -221,7 +218,7 @@ function renderFlagPaths(code: string) {
               strokeWidth="0.6"
             />
           </g>
-          {/* Bottom-Left: Ri (solid, broken, solid) */}
+          {}
           <g transform="translate(4.2, 12.8) rotate(-34)">
             <line
               x1="-2"
@@ -259,7 +256,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 4. Tiếng Tây Ban Nha (Spanish - ES)
     case "es":
       return (
         <g>
@@ -271,7 +267,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 5. Tiếng Pháp (French - FR)
     case "fr":
       return (
         <g>
@@ -281,7 +276,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 6. Tiếng Đức (German - DE)
     case "de":
       return (
         <g>
@@ -291,7 +285,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 7. Tiếng Ý (Italian - IT)
     case "it":
       return (
         <g>
@@ -301,7 +294,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 8. Tiếng Bồ Đào Nha (Portuguese - PT)
     case "pt":
       return (
         <g>
@@ -313,7 +305,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 9. Tiếng Ba Lan (Polish - PL)
     case "pl":
       return (
         <g>
@@ -322,7 +313,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 10. Tiếng Thổ Nhĩ Kỳ (Turkish - TR)
     case "tr":
       return (
         <g>
@@ -336,7 +326,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 11. Tiếng Nga (Russian - RU)
     case "ru":
       return (
         <g>
@@ -346,7 +335,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 12. Tiếng Hà Lan (Dutch - NL)
     case "nl":
       return (
         <g>
@@ -356,7 +344,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 13. Tiếng Séc (Czech - CS)
     case "cs":
       return (
         <g>
@@ -366,7 +353,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 14. Tiếng Ả Rập (Arabic - AR)
     case "ar":
       return (
         <g>
@@ -381,18 +367,17 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 15. Tiếng Trung giản thể (Chinese - ZH / ZH-CN)
     case "zh":
     case "zh-cn":
       return (
         <g>
           <rect width="24" height="16" fill="#de2910" />
-          {/* Main big star */}
+          {}
           <polygon
             points="5,2.5 5.8,5.1 8.5,5.1 6.3,6.7 7.1,9.3 5,7.7 2.9,9.3 3.7,6.7 1.5,5.1 4.2,5.1"
             fill="#ffde00"
           />
-          {/* 4 small stars */}
+          {}
           <circle cx="10" cy="2.5" r="0.75" fill="#ffde00" />
           <circle cx="11.5" cy="4.5" r="0.75" fill="#ffde00" />
           <circle cx="11.5" cy="7.2" r="0.75" fill="#ffde00" />
@@ -400,7 +385,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 16. Tiếng Hungary (Hungarian - HU)
     case "hu":
       return (
         <g>
@@ -410,7 +394,6 @@ function renderFlagPaths(code: string) {
         </g>
       );
 
-    // 17. Tiếng Hindi (Hindi - HI)
     case "hi":
       return (
         <g>

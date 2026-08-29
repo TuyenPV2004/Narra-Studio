@@ -1,5 +1,8 @@
 import { getElectronApi } from "@/services/electron-api/client";
-import type { AgentMessage } from "@/services/electron-api/agent";
+import type {
+  AgentMessage,
+  ResearchSource,
+} from "@/services/electron-api/agent";
 
 export interface AgentConversation extends Record<string, unknown> {
   id: string;
@@ -32,12 +35,22 @@ const kind = (value: unknown): AgentConversation["kind"] =>
 const aspect = (value: unknown): AgentConversation["aspect"] =>
   value === "portrait" ? "portrait" : "landscape";
 
+const sanitizeMessage = (msg: AgentMessage): AgentMessage => {
+  if (msg.status === "streaming") {
+    return {
+      ...msg,
+      status: msg.content && msg.content.trim() ? "cancelled" : "failed",
+    };
+  }
+  return msg;
+};
+
 export const normalizeConversation = (
   value: unknown,
 ): AgentConversation | undefined => {
   const item = object(value);
   const messages = Array.isArray(item.messages)
-    ? item.messages.filter(isMessage)
+    ? item.messages.filter(isMessage).map(sanitizeMessage)
     : [];
   if (typeof item.id !== "string" || !messages.length) return undefined;
   const now = Date.now();
@@ -61,9 +74,55 @@ export const normalizeConversation = (
   };
 };
 
-const MAX_IMPORT_BYTES = 5 * 1024 * 1024; // 5MB
+const MAX_IMPORT_BYTES = 5 * 1024 * 1024;
 const MAX_IMPORT_MESSAGES = 200;
 const MAX_MESSAGE_LENGTH = 50000;
+const MAX_IMPORT_SOURCES = 10;
+const MAX_IMPORT_EXCERPTS = 6;
+const MAX_EXCERPT_LENGTH = 1200;
+const MAX_SOURCE_FIELD_LENGTH = 300;
+
+const sanitizeResearchSources = (value: unknown): ResearchSource[] => {
+  if (!Array.isArray(value)) return [];
+  const sources: ResearchSource[] = [];
+  for (const entry of value) {
+    if (sources.length >= MAX_IMPORT_SOURCES) break;
+    const item = object(entry);
+    const url = typeof item.url === "string" ? item.url.trim() : "";
+    if (!/^https?:\/\//i.test(url)) continue;
+    let domain = typeof item.domain === "string" ? item.domain.trim() : "";
+    try {
+      domain = new URL(url).hostname;
+    } catch {
+      if (!domain) continue;
+    }
+    const excerpts = Array.isArray(item.keyExcerpts)
+      ? item.keyExcerpts
+          .filter((excerpt): excerpt is string => typeof excerpt === "string")
+          .slice(0, MAX_IMPORT_EXCERPTS)
+          .map((excerpt) => excerpt.slice(0, MAX_EXCERPT_LENGTH))
+      : [];
+    const title =
+      typeof item.title === "string" && item.title.trim()
+        ? item.title.trim().slice(0, MAX_SOURCE_FIELD_LENGTH)
+        : domain;
+    sources.push({
+      rank: Number.isFinite(Number(item.rank))
+        ? Math.max(1, Math.min(99, Math.round(Number(item.rank))))
+        : sources.length + 1,
+      url: url.slice(0, 2048),
+      domain: domain.slice(0, MAX_SOURCE_FIELD_LENGTH),
+      title,
+      siteName:
+        typeof item.siteName === "string" && item.siteName.trim()
+          ? item.siteName.trim().slice(0, MAX_SOURCE_FIELD_LENGTH)
+          : domain,
+      success: item.success === true,
+      keyExcerpts: excerpts,
+    });
+  }
+  return sources;
+};
 
 export const parseConversationPackage = (text: string): AgentConversation => {
   if (text.length > MAX_IMPORT_BYTES) {
@@ -76,7 +135,7 @@ export const parseConversationPackage = (text: string): AgentConversation => {
     throw new Error("Định dạng file JSON không hợp lệ.");
   }
   const root = object(parsed);
-  const conversation = object(root.conversation || root);
+  const conversation = object(root.conversation ?? root);
   const workflow = object(root.workflow);
   const rawMessages = Array.isArray(conversation.messages)
     ? conversation.messages
@@ -86,13 +145,29 @@ export const parseConversationPackage = (text: string): AgentConversation => {
     if (messages.length >= MAX_IMPORT_MESSAGES) break;
     if (isMessage(item)) {
       const msgObj = item as Record<string, unknown>;
-      messages.push({
+      const importedSources = sanitizeResearchSources(msgObj.researchSources);
+      const sanitized = sanitizeMessage({
         role: item.role,
         content: String(item.content).slice(0, MAX_MESSAGE_LENGTH),
+        status: (item as AgentMessage).status || "completed",
         ...(typeof msgObj.createdAt === "number"
           ? { createdAt: msgObj.createdAt }
           : {}),
+        ...(importedSources.length
+          ? {
+              researchSources: importedSources,
+              ...(typeof msgObj.researchQuery === "string"
+                ? {
+                    researchQuery: msgObj.researchQuery.slice(
+                      0,
+                      MAX_SOURCE_FIELD_LENGTH,
+                    ),
+                  }
+                : {}),
+            }
+          : {}),
       });
+      messages.push(sanitized);
     }
   }
   if (!messages.length) {

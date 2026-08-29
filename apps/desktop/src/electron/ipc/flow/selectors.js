@@ -2,14 +2,6 @@
 
 const { withPageGenLock } = require('./page-gen-lock');
 
-/**
- * Syncing app settings into the Flow page UI: model, quantity, aspect ratio.
- *
- * Shares the page-gen lock with `generate-via-page` — these clicks and a
- * running generation must never interleave in the same webview.
- * Registered by `electron/ipc/flow.js`.
- */
-
 module.exports = function registerFlowSelectorsIpc(dependencies) {
   const {
     app,
@@ -17,8 +9,6 @@ module.exports = function registerFlowSelectorsIpc(dependencies) {
     findFlowWebview,
   } = dependencies;
 
-// ── Select Model on WebView ──────────────────────────────────────────
-// Map app model values to WebView model display names
 const MODEL_MAP = {
   'NARWHAL': 'Nano Banana 2',
   'GEM_PIX_2': 'Nano Banana Pro',
@@ -42,8 +32,6 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
       var modelNames = ['Nano Banana 2', 'Nano Banana Pro', 'Nano Banana 2 Lite'];
 
       try {
-        // ═══ STEP 1: Click config trigger button ═══
-        // Button with radix id containing a model name + "crop_"
         var configBtn = null;
         var buttons = Array.from(document.querySelectorAll('button'));
         for (var i = 0; i < buttons.length; i++) {
@@ -59,7 +47,6 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
         }
         if (!configBtn) return { success: false, error: 'Config button not found', debug: debug };
 
-        // Click with native events for Radix
         var r = configBtn.getBoundingClientRect();
         var cx = r.x + r.width/2, cy = r.y + r.height/2;
         configBtn.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, clientX:cx, clientY:cy}));
@@ -71,13 +58,9 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
         await new Promise(r => setTimeout(r, 800));
         debug.push('Step1: Config clicked');
 
-        // ═══ STEP 2: Find model dropdown button INSIDE the popover ═══
-        // Radix renders popover in [data-radix-popper-content-wrapper]
-        // Inside it, the model dropdown is a button with aria-haspopup="menu"
         var popovers = Array.from(document.querySelectorAll('[data-radix-popper-content-wrapper]'));
         debug.push('Step2: Found ' + popovers.length + ' radix popovers');
 
-        // If no popover, config was already open and we toggled it closed — click again
         if (popovers.length === 0) {
           debug.push('Step2: No popover — re-clicking config to open');
           await new Promise(r => setTimeout(r, 300));
@@ -96,7 +79,6 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
 
         var modelBtn = null;
 
-        // Search inside popovers for button with aria-haspopup="menu"
         for (var p = 0; p < popovers.length; p++) {
           var btns = Array.from(popovers[p].querySelectorAll('button[aria-haspopup="menu"]'));
           for (var b = 0; b < btns.length; b++) {
@@ -114,7 +96,6 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
         }
 
         if (!modelBtn) {
-          // Fallback: search ALL buttons with aria-haspopup="menu" containing a model name
           var allBtns = Array.from(document.querySelectorAll('button[aria-haspopup="menu"]'));
           for (var i = 0; i < allBtns.length; i++) {
             var txt = (allBtns[i].textContent || '');
@@ -130,7 +111,6 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
         }
 
         if (!modelBtn) {
-          // Dump what we found for debug
           var allHaspopup = Array.from(document.querySelectorAll('[aria-haspopup]')).map(function(e) {
             return e.tagName + '|' + (e.textContent||'').trim().substring(0,40);
           });
@@ -139,7 +119,6 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
           return { success: false, error: 'Model dropdown btn not found', debug: debug };
         }
 
-        // Click model dropdown button
         var mr = modelBtn.getBoundingClientRect();
         var mx = mr.x + mr.width/2, my = mr.y + mr.height/2;
         modelBtn.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, clientX:mx, clientY:my}));
@@ -151,14 +130,11 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
         await new Promise(r => setTimeout(r, 600));
         debug.push('Step2: Model dropdown clicked');
 
-        // ═══ STEP 3: Click target model in the new dropdown ═══
-        // A second data-radix-popper-content-wrapper should appear with model items
         var popovers2 = Array.from(document.querySelectorAll('[data-radix-popper-content-wrapper]'));
         debug.push('Step3: Now ' + popovers2.length + ' radix popovers');
 
         var clicked = false;
 
-        // Try role-based selectors first
         var menuItems = Array.from(document.querySelectorAll('[role="menuitemradio"], [role="menuitem"]'));
         debug.push('Step3: menuitem elements: ' + menuItems.length);
         for (var i = 0; i < menuItems.length; i++) {
@@ -171,7 +147,6 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
           }
         }
 
-        // If not found via role, scan popovers for elements with target text
         if (!clicked) {
           for (var p = 0; p < popovers2.length; p++) {
             var allEls = Array.from(popovers2[p].querySelectorAll('*'));
@@ -190,7 +165,6 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
           }
         }
 
-        // Broadest fallback: any visible element with target text
         if (!clicked) {
           var allEls = Array.from(document.querySelectorAll('div, span, button, li, a'));
           for (var i = 0; i < allEls.length; i++) {
@@ -213,7 +187,6 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
           return { success: false, error: 'Target model not found', debug: debug };
         }
 
-        // Close all popovers after successful selection
         document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
         await new Promise(r => setTimeout(r, 100));
         document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
@@ -227,16 +200,15 @@ ipcMain.handle('select-model-on-webview', async (_, { model }) => {
 
     console.log('[MODEL-SYNC] Result:', JSON.stringify(result, null, 2));
     return result;
-  }); // end withPageGenLock
+  });
 });
 
-// ── Select Quantity on WebView ────────────────────────────────────────
 ipcMain.handle('select-quantity-on-webview', async (_, { quantity }) => {
   return withPageGenLock(async () => {
     const wv = findFlowWebview();
     if (!wv) return { success: false, error: 'WebView not found' };
 
-    const targetText = 'x' + quantity; // "x1", "x2", "x3", "x4"
+    const targetText = 'x' + quantity;
     console.log('[QTY-SYNC] Selecting quantity:', targetText);
 
     const result = await wv.executeJavaScript(`
@@ -246,7 +218,6 @@ ipcMain.handle('select-quantity-on-webview', async (_, { quantity }) => {
       var modelNames = ['Nano Banana 2', 'Nano Banana Pro', 'Imagen 4'];
 
       try {
-        // Step 1: Open config panel
         var configBtn = null;
         var buttons = Array.from(document.querySelectorAll('button'));
         for (var i = 0; i < buttons.length; i++) {
@@ -262,7 +233,6 @@ ipcMain.handle('select-quantity-on-webview', async (_, { quantity }) => {
         }
         if (!configBtn) return { success: false, error: 'Config button not found', debug: debug };
 
-        // Click to open config
         var r = configBtn.getBoundingClientRect();
         var cx = r.x + r.width/2, cy = r.y + r.height/2;
         configBtn.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, clientX:cx, clientY:cy}));
@@ -273,10 +243,8 @@ ipcMain.handle('select-quantity-on-webview', async (_, { quantity }) => {
         configBtn.dispatchEvent(new MouseEvent('click', {bubbles:true, clientX:cx, clientY:cy}));
         await new Promise(r => setTimeout(r, 800));
 
-        // Check popover
         var popovers = Array.from(document.querySelectorAll('[data-radix-popper-content-wrapper]'));
         if (popovers.length === 0) {
-          // Re-click
           await new Promise(r => setTimeout(r, 300));
           var r2 = configBtn.getBoundingClientRect();
           configBtn.dispatchEvent(new PointerEvent('pointerdown', {bubbles:true, clientX:r2.x+r2.width/2, clientY:r2.y+r2.height/2}));
@@ -290,7 +258,6 @@ ipcMain.handle('select-quantity-on-webview', async (_, { quantity }) => {
         }
         debug.push('Popovers: ' + popovers.length);
 
-        // Step 2: Find quantity tab buttons (role="tab" with text x1/x2/x3/x4)
         var searchRoot = popovers.length > 0 ? popovers[0] : document;
         var tabs = Array.from(searchRoot.querySelectorAll('button[role="tab"]'));
         debug.push('Tabs found: ' + tabs.length);
@@ -314,7 +281,6 @@ ipcMain.handle('select-quantity-on-webview', async (_, { quantity }) => {
         }
 
         if (!clicked) {
-          // Broader search: any button with exact quantity text
           var allBtns = Array.from(searchRoot.querySelectorAll('button'));
           for (var i = 0; i < allBtns.length; i++) {
             var bText = (allBtns[i].textContent || '').trim();
@@ -334,7 +300,6 @@ ipcMain.handle('select-quantity-on-webview', async (_, { quantity }) => {
           }
         }
 
-        // Close popover
         await new Promise(r => setTimeout(r, 200));
         document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
 
@@ -348,10 +313,9 @@ ipcMain.handle('select-quantity-on-webview', async (_, { quantity }) => {
 
     console.log('[QTY-SYNC] Result:', JSON.stringify(result, null, 2));
     return result;
-  }); // end withPageGenLock
+  });
 });
 
-// ── Select Aspect Ratio on WebView ───────────────────────────────────
 const ASPECT_MAP = {
   'IMAGE_ASPECT_RATIO_LANDSCAPE': '16:9',
   'IMAGE_ASPECT_RATIO_PORTRAIT': '9:16',
@@ -386,7 +350,6 @@ ipcMain.handle('select-aspect-on-webview', async (_, { aspect }) => {
       var modelNames = ['Nano Banana 2', 'Nano Banana Pro', 'Nano Banana 2 Lite', 'Nano Banana'];
 
       try {
-        // Step 1: Open config panel
         var configBtn = null;
         var buttons = Array.from(document.querySelectorAll('button'));
         for (var i = 0; i < buttons.length; i++) {
@@ -431,7 +394,6 @@ ipcMain.handle('select-aspect-on-webview', async (_, { aspect }) => {
         }
         debug.push('Popovers: ' + popovers.length);
 
-        // Step 2: Find aspect tab (role="tab" with text Landscape/Portrait)
         var searchRoot = popovers.length > 0 ? popovers[0] : document;
         var tabs = Array.from(searchRoot.querySelectorAll('button[role="tab"]'));
         debug.push('Tabs found: ' + tabs.length);
@@ -439,7 +401,6 @@ ipcMain.handle('select-aspect-on-webview', async (_, { aspect }) => {
         var clicked = false;
         for (var i = 0; i < tabs.length; i++) {
           var tabText = (tabs[i].textContent || '').trim();
-          // Tab text includes icon text like "crop_16_9Landscape" — check with indexOf
           if (tabText.indexOf(targetText) !== -1) {
             debug.push('Clicking tab: "' + tabText + '"');
             var tr = tabs[i].getBoundingClientRect();
@@ -455,7 +416,6 @@ ipcMain.handle('select-aspect-on-webview', async (_, { aspect }) => {
           }
         }
 
-        // Close popover
         await new Promise(r => setTimeout(r, 200));
         document.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
 
@@ -469,7 +429,6 @@ ipcMain.handle('select-aspect-on-webview', async (_, { aspect }) => {
 
     console.log('[ASPECT-SYNC] Result:', JSON.stringify(result, null, 2));
     return result;
-  }); // end withPageGenLock
+  });
 });
-
 };

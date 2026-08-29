@@ -72,7 +72,6 @@ module.exports = function registerSystemIpc(dependencies) {
     localPiperTextToSpeech,
   } = dependencies;
 
-// ── IPC: Lấy version hiện tại ──
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });
@@ -81,9 +80,6 @@ ipcMain.handle('get-app-arch', () => {
   return process.arch;
 });
 
-// Keep renderer diagnostics reachable even when React fails before mounting.
-// The matching control lives outside #root in index.html, so customers can
-// still open Console from a blank/black application window.
 ipcMain.handle('open-dev-tools', (event) => {
   const webContents = event.sender;
   if (webContents.isDestroyed()) return false;
@@ -91,9 +87,6 @@ ipcMain.handle('open-dev-tools', (event) => {
   return true;
 });
 
-// ── IPC: Ngôn ngữ giao diện (i18n) ──
-// A saved user choice always wins. Otherwise every install starts in English;
-// users can switch to Vietnamese from Settings.
 const UI_LANGUAGES = ['vi', 'en'];
 
 function resolveUiLanguage() {
@@ -116,8 +109,6 @@ ipcMain.handle('set-ui-language', (_event, language) => {
   saveSettings({ uiLanguage: language });
   return { success: true, language };
 });
-
-// ── IPC: Mac Auto-Install Update (download ZIP → extract → reveal) ──
 
 const loadTtsRuntime = () => {
   const profile = openAiProvider?.getActiveRuntime?.('text-to-speech');
@@ -178,7 +169,6 @@ ipcMain.handle('text-to-speech', async (event, { text, voiceId, stability, langu
   activeTtsRequests.set(requestKey, controller);
 
   try {
-    // Step 1: Submit TTS job
     console.log(`[TTS] Submitting job: ${text.length} chars, voice=${vid}, provider=${useProvider}, model=${useModel}`);
     const submitRes = await net.fetch(`${baseUrl}/v1/text-to-speech/${encodeURIComponent(vid)}`, {
       method: 'POST',
@@ -209,7 +199,6 @@ ipcMain.handle('text-to-speech', async (event, { text, voiceId, stability, langu
     if (!jobId) throw new Error('No job ID returned');
     console.log(`[TTS] Job submitted: ${jobId}, status=${submitData.status}`);
 
-    // Step 2: Poll for completion (max 120s, poll every 3s)
     const maxPollTime = 120000;
     const pollInterval = 3000;
     const startTime = Date.now();
@@ -252,7 +241,6 @@ ipcMain.handle('text-to-speech', async (event, { text, voiceId, stability, langu
   }
 });
 
-// ── Fetch TTS Models by provider ──────────────────────────────────────
 ipcMain.handle('tts-models', async (_, { provider }) => {
   try {
     const { baseUrl } = loadTtsRuntime();
@@ -270,7 +258,6 @@ ipcMain.handle('tts-models', async (_, { provider }) => {
   }
 });
 
-// ── Fetch TTS Languages by provider ──────────────────────────────────
 ipcMain.handle('tts-languages', async (_, { provider }) => {
   try {
     const { baseUrl } = loadTtsRuntime();
@@ -287,7 +274,7 @@ ipcMain.handle('tts-languages', async (_, { provider }) => {
     return [];
   }
 });
-// ── Fetch shared voices (Voice Library) ───────────────────────────────
+
 ipcMain.handle('tts-minimax-voices', async (_, params = {}) => {
   try {
     const { baseUrl } = loadTtsRuntime();
@@ -335,7 +322,6 @@ ipcMain.handle('tts-shared-voices', async (_, params = {}) => {
   }
 });
 
-// ── Fetch default voices ──────────────────────────────────────────────
 ipcMain.handle('tts-default-voices', async (_, params = {}) => {
   try {
     const { baseUrl } = loadTtsRuntime();
@@ -352,7 +338,7 @@ ipcMain.handle('tts-default-voices', async (_, params = {}) => {
     return { voices: [] };
   }
 });
-// ── Fetch TTS generation history ──────────────────────────────────────
+
 ipcMain.handle('tts-history', async (_, params = {}) => {
   try {
     const { baseUrl } = loadTtsRuntime();
@@ -370,7 +356,6 @@ ipcMain.handle('tts-history', async (_, params = {}) => {
   }
 });
 
-// ── Delete history item ───────────────────────────────────────────────
 ipcMain.handle('tts-history-delete', async (_, { id }) => {
   try {
     const { baseUrl } = loadTtsRuntime();
@@ -385,7 +370,6 @@ ipcMain.handle('tts-history-delete', async (_, { id }) => {
   }
 });
 
-// ── Retry history item ────────────────────────────────────────────────
 ipcMain.handle('tts-history-retry', async (_, { id }) => {
   try {
     const { baseUrl } = loadTtsRuntime();
@@ -400,7 +384,7 @@ ipcMain.handle('tts-history-retry', async (_, { id }) => {
     return { ok: false };
   }
 });
-// ── Dialogue TTS ──────────────────────────────────────────────────────
+
 ipcMain.handle('tts-dialogue', async (_, params = {}) => {
   try {
     const { baseUrl } = loadTtsRuntime();
@@ -423,7 +407,6 @@ ipcMain.handle('tts-dialogue', async (_, params = {}) => {
     const jobId = data.id || data.task_id;
     if (!jobId) return data;
 
-    // Poll for completion
     const maxPoll = 120000;
     const start = Date.now();
     while (Date.now() - start < maxPoll) {
@@ -445,7 +428,7 @@ ipcMain.handle('tts-dialogue', async (_, params = {}) => {
     throw err;
   }
 });
-// ── File dialog ───────────────────────────────────────────────────────
+
 ipcMain.handle('dialog:openFile', async (_, opts = {}) => {
   const { dialog } = require('electron');
   const result = await dialog.showOpenDialog({
@@ -456,7 +439,6 @@ ipcMain.handle('dialog:openFile', async (_, opts = {}) => {
   return result.filePaths[0];
 });
 
-// ── Voice Changer ─────────────────────────────────────────────────────
 ipcMain.handle('tts-voice-changer', async (_, params = {}) => {
   try {
     const { baseUrl } = loadTtsRuntime();
@@ -471,17 +453,16 @@ ipcMain.handle('tts-voice-changer', async (_, params = {}) => {
     const mimeMap = { '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.m4a': 'audio/m4a', '.ogg': 'audio/ogg', '.webm': 'audio/webm', '.aac': 'audio/aac', '.flac': 'audio/flac' };
     const mime = mimeMap[ext] || 'audio/mpeg';
 
-    // Build multipart boundary
     const boundary = '----FormBoundary' + Date.now().toString(36);
     const parts = [];
     const addField = (name, value) => {
       parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`));
     };
-    // File part
+
     parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="audio"; filename="${fileName}"\r\nContent-Type: ${mime}\r\n\r\n`));
     parts.push(fileBuffer);
     parts.push(Buffer.from('\r\n'));
-    // Fields
+
     addField('voice_id', params.voice_id || '');
     addField('model_id', params.model_id || 'eleven_multilingual_sts_v2');
     if (params.remove_background_noise) addField('remove_background_noise', 'true');
@@ -506,7 +487,6 @@ ipcMain.handle('tts-voice-changer', async (_, params = {}) => {
     const jobId = data.id || data.task_id;
     if (!jobId) return data;
 
-    // Poll
     const start = Date.now();
     while (Date.now() - start < 120000) {
       await new Promise(r => setTimeout(r, 3000));
@@ -527,5 +507,4 @@ ipcMain.handle('tts-voice-changer', async (_, params = {}) => {
     throw err;
   }
 });
-
 };

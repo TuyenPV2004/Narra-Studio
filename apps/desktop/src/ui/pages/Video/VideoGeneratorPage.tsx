@@ -194,7 +194,6 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
     };
   }, [characterPreviews]);
 
-  // Extract real video thumbnail when editVideo changes
   useEffect(() => {
     if (!editVideo) {
       setEditVideoThumb(null);
@@ -229,7 +228,6 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
           }
         }
       } catch {
-        // Fallback handled by video tag
       } finally {
         if (isBlob && url.startsWith("blob:")) {
           URL.revokeObjectURL(url);
@@ -291,9 +289,7 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
       }
       setCopiedId(id);
       setTimeout(() => setCopiedId(null), 1500);
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   const successfulTasks = useMemo(
@@ -516,7 +512,6 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
         return;
       }
 
-      // For file-dependent modes restored from storage history:
       setMode(taskMode);
       if (task.model) setModelId(task.model);
       if (task.duration) setDuration(task.duration);
@@ -1676,7 +1671,7 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
                     </p>
                   )}
                   <footer className="source-image-task-actions">
-                    {/* 1. Xem */}
+                    {}
                     {task.src && (
                       <button
                         type="button"
@@ -1693,7 +1688,7 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
                       </button>
                     )}
 
-                    {/* 2. Mở thư mục / Đang tải... */}
+                    {}
                     {task.src &&
                       (task.localPath ? (
                         <button
@@ -1730,7 +1725,7 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
                         </span>
                       ) : null)}
 
-                    {/* 3. Copy prompt */}
+                    {}
                     <button
                       type="button"
                       className="source-task-action-btn"
@@ -1753,7 +1748,7 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
                       Copy
                     </button>
 
-                    {/* 4. 3 button nâng cấp & hậu kỳ: Tạo GIF, Nâng cấp 1080p, Nâng cấp 4K */}
+                    {}
                     {task.status === "success" && task.mediaId && (
                       <div className="source-video-post-actions">
                         <button
@@ -1879,7 +1874,7 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
                       </div>
                     )}
 
-                    {/* 5. Nút Xóa / Ẩn / Bỏ hàng đợi đặt trực tiếp liền kề bên phải Nâng cấp 4K */}
+                    {}
                     {task.status === "processing" ? (
                       <button
                         type="button"
@@ -1932,7 +1927,7 @@ export function VideoGeneratorPage({ providerId }: { providerId: ProviderId }) {
                       </button>
                     )}
 
-                    {/* 6. Thử lại (khi lỗi) */}
+                    {}
                     {task.status === "error" && (
                       <button
                         type="button"

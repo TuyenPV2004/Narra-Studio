@@ -1,14 +1,5 @@
 'use strict';
 
-/**
- * Local Video-node audio demux.
- *
- * Accepts a local path/file URL or a public HTTPS URL, verifies that the
- * source contains both video and audio, then emits two durable local files:
- * extracted audio and a silent video. Remote inputs are downloaded into an
- * isolated temporary directory and removed after the FFmpeg job settles.
- */
-
 const { spawn } = require('node:child_process');
 const {
   createPinnedLookup,
@@ -82,7 +73,6 @@ function emitProgress(event, payload) {
       ...(percent == null ? {} : { percent }),
     });
   } catch {
-    // Renderer may have closed while local cleanup is still running.
   }
   if (terminal) progressState.delete(jobId);
 }
@@ -95,8 +85,6 @@ async function downloadHttpsSource({ https, fs, url, targetPath, job, event, job
 
   return new Promise((resolve, reject) => {
     const request = https.get(parsed, {
-      // Pin this request to the already-vetted DNS result. This closes the
-      // validation/request gap that would otherwise permit DNS rebinding.
       lookup: createPinnedLookup(addresses),
     }, response => {
       const status = Number(response.statusCode || 0);

@@ -1,25 +1,9 @@
-/**
- * anti-detect.js — Injected as Electron session preload into every slot partition.
- * Runs BEFORE page scripts → reCAPTCHA scores a normal Chrome browser.
- *
- * Signals patched:
- *  1. navigator.webdriver    → false  (main bot detector)
- *  2. window.chrome.runtime  → mock   (real Chrome has this)
- *  3. navigator.plugins      → non-empty realistic list
- *  4. navigator.languages    → realistic browser locale
- *  5. Permissions API        → behaves like real browser
- */
-
-// 0a. Inject patches into the PAGE'S main world (not preload's isolated world)
-// via a <script> tag. Required for navigator.userAgent + window.chrome.runtime
-// overrides to be visible to labs.google's JS / reCAPTCHA Enterprise.
 (function injectMainWorld() {
   function _inject() {
     try {
       const code = `
         (function() {
           try {
-            // Detect platform from existing UA in main world
             const ua = navigator.userAgent || '';
             let plat = 'win32';
             if (/Windows/i.test(ua)) plat = 'win32';
@@ -61,7 +45,6 @@
             try { Object.defineProperty(navigator, 'webdriver', { get: () => false, configurable: true }); } catch (e) {}
             try { Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'], configurable: true }); } catch (e) {}
             try { Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 8, configurable: true }); } catch (e) {}
-            // chrome.runtime in MAIN world
             try {
               window.chrome = window.chrome || {};
               window.chrome.app = window.chrome.app || { isInstalled: false, getDetails: () => null, runningState: () => 'cannot_run' };
@@ -75,7 +58,6 @@
               window.chrome.loadTimes = window.chrome.loadTimes || (() => ({ requestTime: Date.now()/1000, startLoadTime: Date.now()/1000, commitLoadTime: Date.now()/1000, finishDocumentLoadTime: Date.now()/1000, finishLoadTime: Date.now()/1000, firstPaintTime: Date.now()/1000, firstPaintAfterLoadTime: 0, navigationType: 'Other', wasFetchedViaSpdy: true, wasNpnNegotiated: true, npnNegotiatedProtocol: 'h2', wasAlternateProtocolAvailable: false, connectionInfo: 'h2' }));
               window.chrome.csi = window.chrome.csi || (() => ({ onloadT: Date.now(), startE: Date.now(), pageT: 0, tran: 15 }));
             } catch (e) {}
-            // Remove Electron leaks
             try { delete window.module; delete window.exports; delete window.require; } catch (e) {}
           } catch (e) { console.warn('[anti-detect mainworld] err:', e); }
         })();
@@ -90,12 +72,11 @@
   else document.addEventListener('readystatechange', _inject, { once: true });
 })();
 
-// 0b. Also apply patches in isolated/preload world (some checks may run here)
 (function patchUA() {
   let plat = 'win32';
   let chromeMajor = '130';
   try { if (typeof process !== 'undefined') { plat = process.platform || plat; chromeMajor = ((process.versions && process.versions.chrome) || '130.0.0.0').split('.')[0]; } } catch (e) {}
-  // Derive from existing UA if process not available (we're in main world)
+
   if (typeof process === 'undefined') {
     const ua = navigator.userAgent || '';
     const cm = ua.match(/Chrome\/(\d+)/); if (cm) chromeMajor = cm[1];
@@ -109,13 +90,13 @@
   else if (plat === 'linux') osPart = 'X11; Linux x86_64';
   const cleanUA = 'Mozilla/5.0 (' + osPart + ') AppleWebKit/537.36 (KHTML, like Gecko) Chrome/' + ver + ' Safari/537.36';
   const platName = plat === 'darwin' ? 'macOS' : (plat === 'linux' ? 'Linux' : 'Windows');
-  // Patch BOTH the prototype getter (where real one lives) and the instance.
+
   const proto = Object.getPrototypeOf(navigator);
   try { Object.defineProperty(proto, 'userAgent', { get: () => cleanUA, configurable: true }); } catch (e) {}
   try { Object.defineProperty(navigator, 'userAgent', { get: () => cleanUA, configurable: true }); } catch (e) {}
   try { Object.defineProperty(proto, 'appVersion', { get: () => cleanUA.replace('Mozilla/', ''), configurable: true }); } catch (e) {}
   try { Object.defineProperty(navigator, 'appVersion', { get: () => cleanUA.replace('Mozilla/', ''), configurable: true }); } catch (e) {}
-  // userAgentData is the modern UA-CH API
+
   try {
     const fakeUAD = {
       brands: [
@@ -143,13 +124,11 @@
   } catch (e) {}
 })();
 
-// 1. navigator.webdriver = false
 Object.defineProperty(navigator, 'webdriver', {
   get: () => false,
   configurable: true,
 });
 
-// 2. Mock window.chrome (real Chrome has chrome.runtime, chrome.app, etc.)
 if (!window.chrome) {
   window.chrome = {
     runtime: {
@@ -189,8 +168,6 @@ if (!window.chrome) {
   };
 }
 
-// 3. navigator.plugins — empty list is a strong bot signal
-//    Inject a few common plugin entries that real Chrome has
 const pluginData = [
   { name: 'Chrome PDF Plugin', filename: 'internal-pdf-viewer', description: 'Portable Document Format' },
   { name: 'Chrome PDF Viewer', filename: 'mhjfbmdgcfjbbpaeojofohoefgiehjai', description: '' },
@@ -213,21 +190,18 @@ try {
     get: () => fakePlugins,
     configurable: true,
   });
-} catch (e) { /* ignore */ }
+} catch (e) {  }
 
-// 4. navigator.languages — match common Chrome locale
 try {
   Object.defineProperty(navigator, 'languages', {
     get: () => ['en-US', 'en'],
     configurable: true,
   });
-} catch (e) { /* ignore */ }
+} catch (e) {  }
 
-// 5. Permissions API — real Chrome doesn't throw on query
 if (navigator.permissions && navigator.permissions.query) {
   const originalQuery = navigator.permissions.query.bind(navigator.permissions);
   navigator.permissions.query = (params) => {
-    // Some automation tools trip on 'notifications' check
     if (params && params.name === 'notifications') {
       return Promise.resolve({ state: 'prompt', onchange: null });
     }
@@ -235,12 +209,10 @@ if (navigator.permissions && navigator.permissions.query) {
   };
 }
 
-// 6. Remove Electron-specific global leaks
 try {
-  // Electron exposes these — real Chrome doesn't
   delete window.module;
   delete window.exports;
   delete window.require;
-} catch (e) { /* ignore */ }
+} catch (e) {  }
 
 console.debug('[anti-detect] Fingerprint overrides applied ✅');

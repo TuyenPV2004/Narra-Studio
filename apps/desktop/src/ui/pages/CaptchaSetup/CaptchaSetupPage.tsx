@@ -114,7 +114,7 @@ export function CaptchaSetupPage() {
           <>
             <Button onClick={() => void copyAddress()}>
               <Clipboard size={16} />
-              chrome://extensions
+              chrome:
             </Button>
             <Button
               variant="secondary"

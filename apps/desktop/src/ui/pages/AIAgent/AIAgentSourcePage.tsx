@@ -3,11 +3,18 @@ import {
   Copy,
   Download,
   Eraser,
+  Layers,
   ListTodo,
+  Mic,
+  PackageCheck,
+  PenTool,
   Plus,
   RotateCcw,
+  Search,
+  ShieldAlert,
   Sparkles,
   Square,
+  Target,
   Trash2,
   Upload,
   UserRound,
@@ -39,7 +46,12 @@ import {
   SelectValue,
 } from "@/components/ui/Select";
 import { Tabs } from "@/components/ui/Tabs";
-import { agentApi, type AgentMessage } from "@/services/electron-api/agent";
+import {
+  agentApi,
+  type AgentMessage,
+  type ChatEvidencePayload,
+  type ResearchSource,
+} from "@/services/electron-api/agent";
 import { conversationPackageApi } from "@/services/electron-api/agent-conversations";
 import { aiProviderApi } from "@/services/electron-api/ai-providers";
 import { WorkspacePanel } from "@/pages/AIAgent/components/WorkspacePanel";
@@ -68,6 +80,76 @@ const formatMessageTime = (timestamp?: number): string => {
   return `${hours}:${minutes}`;
 };
 
+interface StageActionChip {
+  id: string;
+  label: string;
+  icon: typeof Target;
+  iconColor: string;
+  prompt: string;
+
+  needsResearch?: boolean;
+}
+
+const STAGE_ACTION_CHIPS: StageActionChip[] = [
+  {
+    id: "brief",
+    label: "Phân tích Brief",
+    icon: Target,
+    iconColor: "#f97316",
+    prompt:
+      "Hãy giúp anh phân tích Brief cho chủ đề này: Đối tượng khán giả mục tiêu, Góc tiếp cận độc đáo, Thời lượng lý tưởng và Giá trị cốt lõi đọng lại.",
+  },
+  {
+    id: "research",
+    label: "Nghiên cứu Đa Nguồn",
+    icon: Search,
+    iconColor: "#06b6d4",
+    needsResearch: true,
+    prompt:
+      "Hãy nghiên cứu đa nguồn (Multi-source Research) trên web về các số liệu, dẫn chứng thực tế, báo cáo chính thống và góc nhìn đa chiều cho chủ đề này.",
+  },
+  {
+    id: "outline",
+    label: "Lập Outline 12 Beats",
+    icon: Layers,
+    iconColor: "#3b82f6",
+    prompt:
+      "Hãy xây dựng một dàn ý chi tiết theo cấu trúc 12 Story Beats (từ Quan sát quen thuộc -> Nghịch lý -> Phá hiểu lầm -> Cơ chế cốt lõi -> Phản biện ngầm -> Ngoại lệ -> Callback/Payoff).",
+  },
+  {
+    id: "script",
+    label: "Viết Script Văn Nói",
+    icon: PenTool,
+    iconColor: "#10b981",
+    prompt:
+      "Dựa trên dàn ý đã thống nhất, hãy viết kịch bản chi tiết bằng VĂN NÓI tự nhiên (Anti-AI, câu ngắn ngắt nhịp thở, có chỉ dẫn Visual/B-roll cho từng đoạn).",
+  },
+  {
+    id: "tts",
+    label: "Xuất Bản Voice TTS",
+    icon: Mic,
+    iconColor: "#a855f7",
+    prompt:
+      "Hãy xuất riêng bản văn bản chỉ dành cho giọng đọc (TTS-ready): Phiên âm đầy đủ tên riêng tiếng Anh, từ viết tắt, số tiền và chèn các nhịp ngắt nghỉ [pause 0.5s].",
+  },
+  {
+    id: "critique",
+    label: "Bắt lỗi & Phản biện",
+    icon: ShieldAlert,
+    iconColor: "#f59e0b",
+    prompt:
+      "Hãy đóng vai Tổng biên tập khó tính: Rà soát lại kịch bản trên xem có chỗ nào bị lặp ý, câu từ mang mùi AI, hoặc có factual claim nào chưa đủ cơ sở không?",
+  },
+  {
+    id: "packaging",
+    label: "Packaging YouTube",
+    icon: PackageCheck,
+    iconColor: "#ec4899",
+    prompt:
+      "Hãy giúp anh đóng gói toàn diện cho video này: 3 Tiêu đề tìm kiếm (Searchable), 3 Tiêu đề tò mò (Curiosity), 2 Ý tưởng Thumbnail, Mô tả video và Danh sách Chapters/Timestamp.",
+  },
+];
+
 export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
   const [view, setView] = useState<
     "chat" | "director" | "media" | "skills" | "workflow" | "workspace"
@@ -79,6 +161,13 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
   const [activeProviderName, setActiveProviderName] = useState<string>("");
   const [activeModel, setActiveModel] = useState<string>("");
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [researchStatus, setResearchStatus] = useState<string | null>(null);
+  const [pendingResearch, setPendingResearch] = useState(false);
+  const [researchFailure, setResearchFailure] = useState<{
+    reason: string;
+    pendingText: string;
+    history: AgentMessage[];
+  } | null>(null);
 
   useEffect(() => {
     let unmounted = false;
@@ -94,9 +183,7 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
           if (found.name) setActiveProviderName(found.name);
           if (found.model) setActiveModel(found.model);
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
     };
     void loadActiveProvider();
     return () => {
@@ -114,7 +201,6 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isNearBottomRef = useRef(true);
 
-  // Auto-scroll to bottom only when user is already near the bottom
   useEffect(() => {
     if (view === "chat" && isNearBottomRef.current) {
       messagesEndRef.current?.scrollIntoView({
@@ -123,7 +209,6 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
     }
   }, [conversation.messages, sending, view]);
 
-  // Tự động co giãn chiều cao khung nhập theo nội dung text
   useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
@@ -144,7 +229,6 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
     isNearBottomRef.current = distance < 120;
   };
 
-  // Clean up streaming request on unmount
   useEffect(() => {
     return () => {
       if (streamCancelRef.current) {
@@ -159,19 +243,15 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
     if (streamCancelRef.current) {
       try {
         streamCancelRef.current();
-      } catch {
-        // ignore
-      }
+      } catch {}
       streamCancelRef.current = null;
     }
     agentApi.cancelChat();
 
-    // Khôi phục lại text đã gõ vào ô nhập để người dùng không mất ý tưởng
     if (lastSubmittedInputRef.current) {
       setInput(lastSubmittedInputRef.current);
     }
 
-    // Giữ lại tin nhắn user, đánh dấu phản hồi assistant dở dang là cancelled
     conversation.setMessages((current) => {
       return current.map((message, index) => {
         if (
@@ -195,6 +275,7 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
   const handleSendMessage = async (
     textToSend: string,
     historyOverride?: AgentMessage[],
+    options?: { needsResearch?: boolean; skipResearch?: boolean },
   ) => {
     const content = textToSend.trim();
     if (!content || sending || !conversation.hydrated) return;
@@ -232,6 +313,59 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
     try {
       const activePlan = conversation.activeConversation.plan;
       const runItems = conversation.activeConversation.runItems;
+
+      let evidence: ChatEvidencePayload | undefined;
+      let researchSources: ResearchSource[] | undefined;
+      let researchQuery = "";
+      if (options?.needsResearch && !options?.skipResearch) {
+        setResearchStatus("Đang xác định chủ đề cần tra cứu...");
+        researchQuery = await agentApi.researchQuery(
+          content,
+          baseHistory,
+          conversation.activeConversation.title,
+        );
+        if (!researchQuery) {
+          setResearchStatus(null);
+          setSending(false);
+          conversation.setMessages(
+            (current) => current.filter((m) => m.id !== assistantId),
+            true,
+          );
+          setResearchFailure({
+            reason: "Không xác định được chủ đề tra cứu từ hội thoại.",
+            pendingText: content,
+            history: baseHistory,
+          });
+          return;
+        }
+
+        setResearchStatus(`Đang tra cứu web: "${researchQuery}"...`);
+        const research = await agentApi.research(researchQuery, 3);
+        setResearchStatus(null);
+
+        if (!research.evidenceAvailable) {
+          setSending(false);
+          conversation.setMessages(
+            (current) => current.filter((m) => m.id !== assistantId),
+            true,
+          );
+          setResearchFailure({
+            reason:
+              research.failureReason || "Không tìm được nguồn nào để đối soát.",
+            pendingText: content,
+            history: baseHistory,
+          });
+          return;
+        }
+
+        evidence = {
+          nonce: research.nonce,
+          text: research.synthesizedEvidenceText,
+        };
+        researchSources = research.sources;
+        researchQuery = research.query;
+      }
+
       const res = await agentApi.chatStream(
         content,
         baseHistory,
@@ -259,6 +393,7 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
             setActiveProviderName(source);
           }
         },
+        evidence,
       );
 
       lastSubmittedInputRef.current = "";
@@ -272,10 +407,13 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
                   status: "completed",
                   model: res.model,
                   provider: res.source,
+                  ...(researchSources && researchSources.length
+                    ? { researchSources, researchQuery }
+                    : {}),
                 }
               : message,
           ),
-        true, // persist ngay lập tức khi stream hoàn tất
+        true,
       );
     } catch (value) {
       const errMsg = value instanceof Error ? value.message : String(value);
@@ -307,13 +445,31 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
       }
     } finally {
       streamCancelRef.current = null;
+      setResearchStatus(null);
       setSending(false);
     }
   };
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();
-    await handleSendMessage(input);
+    const needsResearch = pendingResearch;
+    setPendingResearch(false);
+    await handleSendMessage(input, undefined, { needsResearch });
+  };
+
+  const continueWithoutResearch = async () => {
+    const pending = researchFailure;
+    setResearchFailure(null);
+    if (!pending) return;
+    await handleSendMessage(pending.pendingText, pending.history, {
+      skipResearch: true,
+    });
+  };
+
+  const dismissResearchFailure = () => {
+    const pending = researchFailure;
+    setResearchFailure(null);
+    if (pending?.pendingText) setInput(pending.pendingText);
   };
 
   const retryLastMessage = async () => {
@@ -327,7 +483,6 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
     const userMsg = history[targetUserIndex];
     if (!userMsg?.content) return;
 
-    // Prune subsequent messages and retry with clean historySnapshot
     const historySnapshot = history.slice(0, targetUserIndex);
     await handleSendMessage(userMsg.content, historySnapshot);
   };
@@ -337,9 +492,32 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
       await navigator.clipboard.writeText(text);
       setCopiedIndex(index);
       setTimeout(() => setCopiedIndex(null), 1800);
-    } catch {
-      // ignore
+    } catch {}
+  };
+
+  const openResearchSource = async (source: ResearchSource) => {
+    try {
+      await agentApi.openSourceUrl(source.url);
+    } catch (value) {
+      setError(
+        value instanceof Error
+          ? value.message
+          : "Không thể mở liên kết nguồn trích dẫn.",
+      );
     }
+  };
+
+  const handleChipClick = (chip: StageActionChip) => {
+    if (sending || !conversation.hydrated) return;
+    if (chip.needsResearch) setPendingResearch(true);
+    if (!input.trim()) {
+      setInput(chip.prompt);
+    } else {
+      setInput((prev) => `${prev.trim()}\n\n${chip.prompt}`);
+    }
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
   };
 
   const applyIdeaToWorkflow = (content: string) => {
@@ -658,13 +836,62 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
                   ) : sending && index === conversation.messages.length - 1 ? (
                     <div
                       className="source-agent-typing"
-                      aria-label="AI đang suy nghĩ"
+                      aria-label={researchStatus || "AI đang suy nghĩ"}
                     >
-                      <span className="source-agent-typing__dot" />
-                      <span className="source-agent-typing__dot" />
-                      <span className="source-agent-typing__dot" />
+                      {researchStatus ? (
+                        <span
+                          className="source-agent-research-status"
+                          role="status"
+                        >
+                          <Search size={12} aria-hidden="true" />
+                          {researchStatus}
+                        </span>
+                      ) : (
+                        <>
+                          <span className="source-agent-typing__dot" />
+                          <span className="source-agent-typing__dot" />
+                          <span className="source-agent-typing__dot" />
+                        </>
+                      )}
                     </div>
                   ) : null}
+
+                  {Array.isArray(message.researchSources) &&
+                    message.researchSources.length > 0 && (
+                      <div className="source-agent-citations">
+                        <span className="source-agent-citations__label">
+                          <Search size={11} aria-hidden="true" />
+                          Nguồn đối soát
+                          {message.researchQuery
+                            ? `: "${message.researchQuery}"`
+                            : ""}
+                        </span>
+                        <ul className="source-agent-citations__list">
+                          {message.researchSources.map((source) => (
+                            <li key={`${source.rank}-${source.url}`}>
+                              <button
+                                type="button"
+                                className="source-agent-citation-chip"
+                                title={`${source.title} — ${source.url}`}
+                                onClick={() => void openResearchSource(source)}
+                              >
+                                <span className="source-agent-citation-chip__rank">
+                                  #{source.rank}
+                                </span>
+                                <span className="source-agent-citation-chip__domain">
+                                  {source.domain}
+                                </span>
+                                {!source.success && (
+                                  <span className="source-agent-citation-chip__partial">
+                                    trích đoạn
+                                  </span>
+                                )}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
 
                   {message.status === "cancelled" && (
                     <div className="source-agent-msg-tag source-agent-msg-tag--cancelled">
@@ -744,6 +971,61 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
                               <ListTodo size={12} /> Mở trong Workflow
                             </button>
                           )}
+
+                          {message.content.length > 80 && !sending && (
+                            <>
+                              <button
+                                type="button"
+                                className="source-agent-msg-btn"
+                                title="Nghiên cứu đa nguồn trên Web để kiểm chứng dữ liệu"
+                                onClick={() =>
+                                  void handleSendMessage(
+                                    "Hãy thực hiện Nghiên cứu Đa Nguồn (Multi-source Research) trên web: Tra cứu 2–3 bài viết/báo cáo uy tín về các số liệu, dẫn chứng thực tế cho chủ đề này để làm nguồn đối soát cho kịch bản.",
+                                    undefined,
+                                    { needsResearch: true },
+                                  )
+                                }
+                              >
+                                <Search size={12} /> Nghiên cứu Đa Nguồn
+                              </button>
+                              <button
+                                type="button"
+                                className="source-agent-msg-btn"
+                                title="Tạo bản đọc Voice TTS từ kịch bản này"
+                                onClick={() =>
+                                  void handleSendMessage(
+                                    "Hãy xuất riêng bản văn bản chỉ dành cho giọng đọc (TTS-ready) từ kịch bản ở trên: Phiên âm đầy đủ tên riêng tiếng Anh, từ viết tắt, số tiền và chèn các nhịp ngắt nghỉ [pause 0.5s].",
+                                  )
+                                }
+                              >
+                                <Mic size={12} /> Tạo Voice TTS
+                              </button>
+                              <button
+                                type="button"
+                                className="source-agent-msg-btn"
+                                title="Tạo Tiêu đề, Thumbnail và Description YouTube"
+                                onClick={() =>
+                                  void handleSendMessage(
+                                    "Hãy giúp anh đóng gói toàn diện cho video này: 3 Tiêu đề tìm kiếm (Searchable), 3 Tiêu đề tò mò (Curiosity), 2 Ý tưởng Thumbnail, Mô tả video và Danh sách Chapters/Timestamp.",
+                                  )
+                                }
+                              >
+                                <PackageCheck size={12} /> Packaging YouTube
+                              </button>
+                              <button
+                                type="button"
+                                className="source-agent-msg-btn"
+                                title="Phản biện và tìm điểm cần cải thiện"
+                                onClick={() =>
+                                  void handleSendMessage(
+                                    "Hãy đóng vai Tổng biên tập khó tính: Rà soát lại kịch bản ở trên xem có chỗ nào bị lặp ý, câu từ mang mùi AI, hoặc có factual claim nào chưa đủ cơ sở không?",
+                                  )
+                                }
+                              >
+                                <ShieldAlert size={12} /> Phản biện
+                              </button>
+                            </>
+                          )}
                         </div>
                       )}
                     </div>
@@ -758,6 +1040,35 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
             className="source-agent-chat-form"
             onSubmit={(event) => void submit(event)}
           >
+            <div
+              className="source-agent-stage-chips"
+              role="toolbar"
+              aria-label="Phím tắt chặng sáng tạo"
+            >
+              {STAGE_ACTION_CHIPS.map((chip) => {
+                const Icon = chip.icon;
+                const armed = Boolean(chip.needsResearch && pendingResearch);
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    className="source-agent-stage-chip"
+                    disabled={!conversation.hydrated || sending}
+                    aria-pressed={chip.needsResearch ? armed : undefined}
+                    data-armed={armed ? "true" : undefined}
+                    onClick={() => handleChipClick(chip)}
+                    title={
+                      chip.needsResearch
+                        ? `${chip.prompt}\n\n(Sẽ tra cứu web thật trước khi trả lời)`
+                        : chip.prompt
+                    }
+                  >
+                    <Icon size={13} color={chip.iconColor} aria-hidden="true" />
+                    <span>{chip.label}</span>
+                  </button>
+                );
+              })}
+            </div>
             <div className="source-agent-chat-form__input-wrap">
               <textarea
                 ref={textareaRef}
@@ -834,6 +1145,38 @@ export function AIAgentSourcePage({ providerId }: { providerId: ProviderId }) {
                   onClick={() => void handleConfirmAction()}
                 >
                   Xác nhận xóa
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          <Dialog
+            open={researchFailure !== null}
+            onOpenChange={(open) => !open && dismissResearchFailure()}
+          >
+            <DialogContent showClose={false}>
+              <DialogHeader>
+                <DialogTitle>Không tra cứu được nguồn nào</DialogTitle>
+                <DialogDescription>
+                  {researchFailure?.reason} Nếu tiếp tục, em sẽ viết dựa trên
+                  hiểu biết chung và{" "}
+                  <strong>không có dẫn chứng nào được kiểm chứng</strong>. Mọi
+                  số liệu trong câu trả lời sẽ không có nguồn đối soát.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={dismissResearchFailure}
+                >
+                  Để em sửa lại yêu cầu
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => void continueWithoutResearch()}
+                >
+                  Tiếp tục, không cần dẫn chứng
                 </Button>
               </DialogFooter>
             </DialogContent>

@@ -1,8 +1,5 @@
 'use strict'
 
-// Main-process startup must never depend on a generated cosmetic manifest.
-// Updaters and older package layouts can omit root-level config files; keep the
-// small runtime contract self-contained so branding can never crash the app.
 const brand = Object.freeze({
   id: 'narra',
   displayName: 'Narra Studio',
